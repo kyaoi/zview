@@ -55,6 +55,12 @@ Example:
 * `feat: add fit-to-width (=) zoom mode`
 * `perf: virtualize offscreen pages and cancel render tasks`
 
+### Pull requests & review (Codex)
+
+* If you are instructed to **create a PR** (or PR creation is part of the task), you must request an automated review by adding a PR comment containing **`@codex`**.
+* The `@codex` comment triggers the automatic review workflow.
+* Do this **on the PR** (not only in local notes), as soon as the PR is opened.
+
 ---
 
 ## Quality gates (before committing)
