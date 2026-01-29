@@ -21,6 +21,10 @@ zview is a **fast, lightweight, read-only PDF viewer** that runs in the browser.
 
 ## Development workflow
 
+### PLAN
+
+- When a task is completed, mark the corresponding task in `PLAN.md` as complete.　
+
 ### Branch/worktree
 
 * Work is organized by task branches/worktrees (recommended: `task/<slug>`).

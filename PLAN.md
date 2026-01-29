@@ -45,7 +45,7 @@ A task is “done” when:
 
 #### `task/bootstrap-repo`
 
-* [ ] Done
+* [x] Done
 
 **Goal:** Establish a stable foundation.
 
