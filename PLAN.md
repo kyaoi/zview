@@ -10,7 +10,7 @@ This plan breaks development of **zview** into small, reviewable tasks.
 
 ## Progress tracking
 
-* [ ] **Milestone 0:** Repo + tooling bootstrapped
+* [x] **Milestone 0:** Repo + tooling bootstrapped
 * [ ] **Milestone 1:** Single-PDF viewer works end-to-end
 * [ ] **Milestone 2:** Keybindings + zoom/fit-width
 * [ ] **Milestone 3:** Two-pane MAIN/SUB + focus + swap
@@ -67,11 +67,11 @@ A task is “done” when:
 
 ---
 
-### 1) Frontend tooling (pnpm + corepack) and skeleton UI
+### 1) Frontend tooling (pnpm) and skeleton UI
 
 #### `task/frontend-tooling-pnpm`
 
-* [ ] Done
+* [x] Done
 
 **Goal:** Lock frontend tooling and confirm reproducible installs.
 
@@ -79,7 +79,6 @@ A task is “done” when:
 
 * Add `frontend/package.json` with:
 
-  * `packageManager: "pnpm@<pinned>"`
   * scripts: `dev`, `build`, `lint`, `fmt`
 * Add minimal ESLint + Prettier (keep rules light)
 * Document Node version requirement (Node LTS) in `frontend/README.md` or root notes
@@ -495,4 +494,3 @@ A task is “done” when:
 
 * Keep PDF.js pinned to a known-good version to avoid worker mismatch surprises.
 * Performance tasks are first-class: avoid implementing features that require a TextLayer.
-

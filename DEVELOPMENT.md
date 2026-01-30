@@ -12,7 +12,7 @@ zview is a **web-based, read-only PDF viewer**. The Go CLI starts a local server
 
 * **Go** (recent stable version)
 * **Node.js (LTS)**
-* **pnpm** (via Corepack)
+* **pnpm** (installed via mise or equivalent; Corepack not used; version not pinned, tested with 10.19.0)
 
 Recommended:
 
@@ -34,7 +34,6 @@ Recommended:
 From `frontend/`:
 
 ```bash
-corepack enable
 pnpm install
 ```
 
@@ -144,8 +143,8 @@ Result:
 From `frontend/`:
 
 ```bash
-pnpm lint
-pnpm fmt
+pnpm lint     # Biome lint
+pnpm fmt      # Biome format --check
 pnpm build
 ```
 
