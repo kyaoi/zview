@@ -247,7 +247,7 @@ A task is “done” when:
 
 #### `task/font-i18n-japanese`
 
-* [ ] Done
+* [x] Done
 
 **Goal:** Ensure Japanese text renders correctly in both MAIN and SUB panes.
 

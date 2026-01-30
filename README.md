@@ -31,6 +31,7 @@ A **fast, lightweight, read-only PDF viewer** that runs in your browser, inspire
 * **Continuous scroll** with **16px** spacing between pages
 * **Zoom:** `+` / `-`
 * **Fit to width:** `=`
+* Bundled **Noto Sans JP** + PDF.js CMaps/standard fonts for offline-safe Japanese text rendering
 
 ### Two panes (max 2)
 

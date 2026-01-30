@@ -27,6 +27,11 @@ pnpm test      # Placeholder
 - Tailwind CSS with a small theme extension (brand/accent colors, Space Grotesk font).
 - Global styles live in `src/index.css` with Tailwind layers; avoid custom CSS files unless necessary.
 
+## Fonts & i18n
+
+- Bundles **Noto Sans JP Variable** for UI and PDF fallback to avoid tofu when offline.
+- PDF.js CMaps and standard fonts are served from `public/pdfjs/` so builds work without network access.
+
 ## Current UI
 
 - Top toolbar with required buttons: `Open(Main)`, `Open(Sub)`, `Swap`, `Reload(Main)`, `Help`.
