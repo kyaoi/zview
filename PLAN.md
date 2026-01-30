@@ -225,7 +225,7 @@ A task is “done” when:
 
 #### `task/zoom-and-fit-width`
 
-* [ ] Done
+* [x] Done
 
 **Goal:** Implement zoom and fit-to-width.
 
@@ -242,6 +242,25 @@ A task is “done” when:
 
 * Zoom feels responsive
 * Fit-to-width behaves predictably
+
+### 7.1) Font internationalization (Japanese)
+
+#### `task/font-i18n-japanese`
+
+* [ ] Done
+
+**Goal:** Ensure Japanese text renders correctly in both MAIN and SUB panes.
+
+**Work:**
+
+* Bundle or load a CJK-capable web font (e.g., Noto Sans JP) for UI and canvas fallback.
+* Apply any required PDF.js font settings so embedded fonts render correctly.
+* Verify UI text and PDF content do not show tofu when offline builds are used.
+
+**Acceptance:**
+
+* Japanese PDFs render legible text (no tofu/glyph missing).
+* Built artifacts still display Japanese correctly without network access.
 
 ---
 

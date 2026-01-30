@@ -12,6 +12,9 @@ GlobalWorkerOptions.workerSrc = workerSrc;
 const DPR_CAP = 2;
 const PAGE_GAP_PX = 16;
 const RENDER_BUFFER = 1;
+const ZOOM_STEP = 1.1;
+const ZOOM_MIN = 0.25;
+const ZOOM_MAX = 4;
 
 const toolbarActions = [
 	{ key: "openMain", label: "Open (Main)", hint: "Pick a PDF for MAIN" },
@@ -92,6 +95,8 @@ type PageSlotRef = {
 	renderedScale: number | null;
 };
 
+type ZoomMode = "fit-width" | "manual";
+
 function friendlyError(detail: string) {
 	if (detail.includes("Missing PDF")) return "MAIN PDF が指定されていません";
 	if (detail.includes("Unexpected server response")) return "MAIN PDF の取得に失敗しました";
@@ -101,9 +106,11 @@ function friendlyError(detail: string) {
 function MainViewer({
 	onStatus,
 	reloadKey,
+	isActive,
 }: {
 	onStatus: (message: string) => void;
 	reloadKey: number;
+	isActive: boolean;
 }) {
 	const hostRef = useRef<HTMLDivElement>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
@@ -111,11 +118,14 @@ function MainViewer({
 	const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
 	const [pageCount, setPageCount] = useState(0);
 	const [pageSize, setPageSize] = useState<{ width: number; height: number } | null>(null);
-	const [layoutScale, setLayoutScale] = useState(1);
+	const [zoomMode, setZoomMode] = useState<ZoomMode>("fit-width");
+	const [fitScale, setFitScale] = useState(1);
+	const [manualScale, setManualScale] = useState(1);
 	const [visibleRange, setVisibleRange] = useState<[number, number]>([0, 0]);
 	const [currentPage, setCurrentPage] = useState(1);
 	const rafId = useRef<number | null>(null);
 	const pageSlotsRef = useRef<PageSlotRef[]>([]);
+	const manualScaleInitializedRef = useRef(false);
 
 	const resetPageSlots = useCallback(() => {
 		pageSlotsRef.current.forEach((slot) => {
@@ -131,8 +141,12 @@ function MainViewer({
 		setPdf(null);
 		setPageCount(0);
 		setPageSize(null);
+		setFitScale(1);
+		setManualScale(1);
 		setVisibleRange([0, 0]);
 		setCurrentPage(1);
+		setZoomMode("fit-width");
+		manualScaleInitializedRef.current = false;
 
 		async function loadAndRender() {
 			setState({ phase: "loading" });
@@ -174,8 +188,8 @@ function MainViewer({
 		const node = hostRef.current;
 		const updateScale = () => {
 			const width = node.clientWidth || pageSize.width;
-			const fitScale = width / pageSize.width;
-			setLayoutScale(fitScale);
+			const nextFit = width / pageSize.width;
+			setFitScale(nextFit);
 		};
 
 		updateScale();
@@ -184,7 +198,15 @@ function MainViewer({
 		return () => observer.disconnect();
 	}, [pageSize]);
 
+	useEffect(() => {
+		if (!manualScaleInitializedRef.current && fitScale > 0) {
+			setManualScale(fitScale);
+			manualScaleInitializedRef.current = true;
+		}
+	}, [fitScale]);
+
 	const measureVisibility = useCallback(() => {
+		const layoutScale = zoomMode === "fit-width" ? fitScale : manualScale;
 		if (!pageSize || !hostRef.current || pageCount === 0) return;
 		const hostTop = hostRef.current.getBoundingClientRect().top + window.scrollY;
 		const viewTop = window.scrollY - hostTop;
@@ -199,7 +221,7 @@ function MainViewer({
 			return [start, end];
 		});
 		setCurrentPage(current + 1);
-	}, [layoutScale, pageCount, pageSize]);
+	}, [fitScale, manualScale, pageCount, pageSize, zoomMode]);
 
 	useEffect(() => {
 		const handleScroll = () => {
@@ -257,6 +279,7 @@ function MainViewer({
 	);
 
 	useEffect(() => {
+		const layoutScale = zoomMode === "fit-width" ? fitScale : manualScale;
 		if (!pdf || !pageSize || pageCount === 0) return;
 
 		for (let i = visibleRange[0]; i <= visibleRange[1]; i += 1) {
@@ -282,12 +305,95 @@ function MainViewer({
 				slot.renderedScale = null;
 			}
 		});
-	}, [layoutScale, pageCount, pageSize, pdf, renderPage, visibleRange]);
+	}, [fitScale, manualScale, pageCount, pageSize, pdf, renderPage, visibleRange, zoomMode]);
 
 	useEffect(() => {
 		if (state.phase !== "ready" || pageCount === 0) return;
 		onStatus(`MAIN: ページ ${currentPage} / ${pageCount}`);
 	}, [currentPage, onStatus, pageCount, state.phase]);
+
+	const clampScale = useCallback(
+		(value: number) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value)),
+		[],
+	);
+
+	const layoutScale = useMemo(
+		() => (zoomMode === "fit-width" ? fitScale : manualScale),
+		[fitScale, manualScale, zoomMode],
+	);
+
+	const announceZoom = useCallback(
+		(nextScale: number, mode: ZoomMode) => {
+			const percent = Math.round(nextScale * 100);
+			if (mode === "fit-width") {
+				onStatus(`MAIN: 幅に合わせる (${percent}%)`);
+				return;
+			}
+			onStatus(`MAIN: ズーム ${percent}%`);
+		},
+		[onStatus],
+	);
+
+	const zoomIn = useCallback(() => {
+		if (!pageSize) return;
+		let nextScale = manualScale;
+		setManualScale((prev) => {
+			const base = zoomMode === "fit-width" ? fitScale : prev;
+			const next = clampScale(base * ZOOM_STEP);
+			nextScale = next;
+			return next;
+		});
+		setZoomMode("manual");
+		announceZoom(nextScale, "manual");
+	}, [announceZoom, clampScale, fitScale, manualScale, pageSize, zoomMode]);
+
+	const zoomOut = useCallback(() => {
+		if (!pageSize) return;
+		let nextScale = manualScale;
+		setManualScale((prev) => {
+			const base = zoomMode === "fit-width" ? fitScale : prev;
+			const next = clampScale(base / ZOOM_STEP);
+			nextScale = next;
+			return next;
+		});
+		setZoomMode("manual");
+		announceZoom(nextScale, "manual");
+	}, [announceZoom, clampScale, fitScale, manualScale, pageSize, zoomMode]);
+
+	const fitToWidth = useCallback(() => {
+		if (!pageSize) return;
+		setZoomMode("fit-width");
+		announceZoom(fitScale, "fit-width");
+	}, [announceZoom, fitScale, pageSize]);
+
+	useEffect(() => {
+		if (!isActive) return;
+		const handleKey = (event: KeyboardEvent) => {
+			const target = event.target as HTMLElement | null;
+			const tag = target?.tagName?.toLowerCase();
+			if (event.metaKey || event.ctrlKey || event.altKey) return;
+			if (tag === "input" || tag === "textarea" || tag === "select" || target?.isContentEditable)
+				return;
+
+			if (event.key === "+") {
+				event.preventDefault();
+				zoomIn();
+				return;
+			}
+			if (event.key === "-") {
+				event.preventDefault();
+				zoomOut();
+				return;
+			}
+			if (event.key === "=") {
+				event.preventDefault();
+				fitToWidth();
+			}
+		};
+
+		window.addEventListener("keydown", handleKey);
+		return () => window.removeEventListener("keydown", handleKey);
+	}, [fitToWidth, isActive, zoomIn, zoomOut]);
 
 	const displayWidth = pageSize ? Math.round(pageSize.width * layoutScale) : null;
 	const displayHeight = pageSize ? Math.round(pageSize.height * layoutScale) : null;
@@ -295,7 +401,7 @@ function MainViewer({
 
 	return (
 		<div className="flex flex-col gap-3" ref={containerRef}>
-			<div className="flex items-center justify-between gap-2 text-sm text-slate-300">
+			<div className="flex flex-col gap-1 text-sm text-slate-300 sm:flex-row sm:items-center sm:justify-between">
 				<span>
 					{state.phase === "ready"
 						? pageCount > 0 && displayWidth && displayHeight
@@ -305,9 +411,15 @@ function MainViewer({
 							? friendlyError(state.detail)
 							: "MAINを読み込み中"}
 				</span>
-				<span className="rounded-full border border-slate-700/70 bg-slate-800/80 px-2 py-1 text-xs">
-					PDF.js worker bundled
-				</span>
+				<div className="flex items-center gap-2 text-xs text-slate-200">
+					<span className="rounded-full border border-slate-700/70 bg-slate-800/80 px-2 py-1">
+						PDF.js worker bundled
+					</span>
+					<span className="rounded-full border border-brand/40 bg-brand/10 px-2 py-1 font-semibold text-brand">
+						{zoomMode === "fit-width" ? "Fit to width" : "Manual"} · {Math.round(layoutScale * 100)}
+						%
+					</span>
+				</div>
 			</div>
 			<div className="flex flex-col" ref={hostRef} style={listStyle}>
 				{state.phase === "ready" && pageCount > 0 && pageSize ? (
@@ -363,24 +475,24 @@ function MainViewer({
 											minHeight: `${Math.round(pageSize.height * layoutScale)}px`,
 										}}
 									>
-									<canvas
-										ref={(node) => {
-											const existing = pageSlotsRef.current[index];
-											if (existing) {
-												existing.canvas = node;
-											} else {
-												pageSlotsRef.current[index] = {
-													container: null,
-													canvas: node,
-													renderTask: null,
-													renderedScale: null,
-												};
-											}
-										}}
-										className="block h-full w-full bg-slate-900"
-										aria-label={`MAIN PDF page ${index + 1}`}
-										style={{
-											opacity: isVisible ? 1 : 0.4,
+										<canvas
+											ref={(node) => {
+												const existing = pageSlotsRef.current[index];
+												if (existing) {
+													existing.canvas = node;
+												} else {
+													pageSlotsRef.current[index] = {
+														container: null,
+														canvas: node,
+														renderTask: null,
+														renderedScale: null,
+													};
+												}
+											}}
+											className="block h-full w-full bg-slate-900"
+											aria-label={`MAIN PDF page ${index + 1}`}
+											style={{
+												opacity: isVisible ? 1 : 0.4,
 											}}
 										/>
 										{!isVisible ? (
@@ -473,7 +585,7 @@ export default function App() {
 				focused={focusedPane === "main"}
 				onFocus={() => setFocusedPane("main")}
 			>
-				<MainViewer onStatus={announce} reloadKey={reloadKey} />
+				<MainViewer onStatus={announce} reloadKey={reloadKey} isActive={focusedPane === "main"} />
 			</Pane>
 		);
 
