@@ -26,6 +26,7 @@ const ZOOM_MIN = 0.25;
 const ZOOM_MAX = 4;
 const PDFJS_ASSET_BASE = "/pdfjs/";
 const LINE_SCROLL_PX = 64;
+const clampScaleValue = (value: number) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value));
 
 function withCacheBust(url: string, token: number) {
 	if (token <= 0) return url;
@@ -133,6 +134,14 @@ type PageSlotRef = {
 };
 
 type ZoomMode = "fit-width" | "manual";
+type ScrollSnapshot = {
+	topPageIndex: number;
+	offsetPx: number;
+	zoomMode: ZoomMode;
+	manualScale: number;
+	scrollRatio: number;
+	pageCount: number;
+};
 
 type ViewerHandle = {
 	scrollLine: (deltaPx: number) => void;
@@ -174,6 +183,9 @@ const PdfViewer = forwardRef<
 	const manualScaleInitializedRef = useRef(false);
 	const currentPageRef = useRef(1);
 	const pdfRef = useRef<PDFDocumentProxy | null>(null);
+	const pendingRestoreRef = useRef<{ reloadKey: number; snapshot: ScrollSnapshot | null } | null>(
+		null,
+	);
 
 	const getHostTop = useCallback(
 		() => (hostRef.current ? hostRef.current.getBoundingClientRect().top + window.scrollY : 0),
@@ -188,9 +200,34 @@ const PdfViewer = forwardRef<
 		pageSlotsRef.current = [];
 	}, []);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: Reload処理はキー変化時のみ走らせ、現在の表示状態をスナップショットするため依存を限定
 	useEffect(() => {
 		let cancelled = false;
 		const requestUrl = role === "MAIN" ? withCacheBust(url, reloadKey) : url;
+
+		if (pdfRef.current) {
+			const snapshot = (() => {
+				if (!pageSize || pageCount === 0) return null;
+				const layoutScale = zoomMode === "fit-width" ? fitScale : manualScale;
+				if (!hostRef.current || layoutScale <= 0) return null;
+				const hostTop = getHostTop();
+				const viewTop = window.scrollY - hostTop;
+				const pageBlock = Math.round(pageSize.height * layoutScale) + PAGE_GAP_PX;
+				const topPageIndex = Math.min(pageCount - 1, Math.max(0, Math.floor(viewTop / pageBlock)));
+				const offsetPx = viewTop - topPageIndex * pageBlock;
+				const totalHeight = Math.max(1, pageCount * pageBlock - PAGE_GAP_PX);
+				const scrollRatio = Math.min(1, Math.max(0, viewTop / totalHeight));
+				return {
+					topPageIndex,
+					offsetPx,
+					zoomMode,
+					manualScale,
+					scrollRatio,
+					pageCount,
+				} satisfies ScrollSnapshot;
+			})();
+			pendingRestoreRef.current = { reloadKey, snapshot };
+		}
 
 		setState((prev) => (prev.phase === "ready" ? prev : { phase: "loading" }));
 		onStatus(reloadKey > 0 ? `${role}: Reloading…` : `${role}: Loading…`);
@@ -216,6 +253,18 @@ const PdfViewer = forwardRef<
 				}
 
 				const baseViewport = firstPage.getViewport({ scale: 1 });
+				const hostWidth = hostRef.current?.clientWidth || baseViewport.width;
+				const nextFitScale = hostWidth / baseViewport.width;
+				const restoreSnapshot =
+					pendingRestoreRef.current?.reloadKey === reloadKey
+						? pendingRestoreRef.current.snapshot
+						: null;
+				const restoredZoomMode = restoreSnapshot?.zoomMode ?? "fit-width";
+				const restoredManualScale = clampScaleValue(
+					restoreSnapshot && Number.isFinite(restoreSnapshot.manualScale)
+						? restoreSnapshot.manualScale
+						: nextFitScale,
+				);
 
 				resetPageSlots();
 				pdfRef.current?.destroy();
@@ -225,14 +274,20 @@ const PdfViewer = forwardRef<
 				setPageCount(loaded.numPages);
 				setPageSize({ width: baseViewport.width, height: baseViewport.height });
 				setState({ phase: "ready", summary: `Page 1 / ${loaded.numPages}` });
-				setFitScale(1);
-				setManualScale(1);
+				setFitScale(nextFitScale);
+				setManualScale(restoredManualScale);
 				setVisibleRange([0, 0]);
-				setCurrentPage(1);
-				setZoomMode("fit-width");
+				setCurrentPage(
+					restoreSnapshot
+						? Math.min(loaded.numPages, Math.max(1, restoreSnapshot.topPageIndex + 1))
+						: 1,
+				);
+				setZoomMode(restoredZoomMode);
 				setRenderNonce((v) => v + 1);
-				manualScaleInitializedRef.current = false;
-				onStatus(`${role}: showing page 1`);
+				manualScaleInitializedRef.current = Boolean(restoreSnapshot);
+				onStatus(
+					restoreSnapshot ? `${role}: restoring scroll position` : `${role}: showing page 1`,
+				);
 			} catch (err) {
 				if (cancelled) return;
 				const detail = err instanceof Error ? err.message : String(err);
@@ -322,6 +377,54 @@ const PdfViewer = forwardRef<
 		};
 	}, [measureVisibility]);
 
+	useEffect(() => {
+		const pending = pendingRestoreRef.current;
+		if (
+			!pending ||
+			pending.reloadKey !== reloadKey ||
+			state.phase !== "ready" ||
+			!pageSize ||
+			pageCount === 0
+		) {
+			return;
+		}
+
+		const snapshot = pending.snapshot;
+		const layoutScale = zoomMode === "fit-width" ? fitScale : manualScale;
+		if (!hostRef.current || layoutScale <= 0) return;
+
+		const pageBlock = Math.round(pageSize.height * layoutScale) + PAGE_GAP_PX;
+		const hostTop = getHostTop();
+		const totalHeight = Math.max(0, pageCount * pageBlock - PAGE_GAP_PX);
+		const ratio = snapshot ? Math.min(1, Math.max(0, snapshot.scrollRatio)) : 0;
+		const pageCountDropped = snapshot ? snapshot.pageCount > pageCount : false;
+
+		let targetTop: number;
+		if (snapshot && !pageCountDropped && snapshot.topPageIndex < pageCount) {
+			const clampedOffset = Math.min(Math.max(snapshot.offsetPx, 0), pageBlock);
+			targetTop = hostTop + snapshot.topPageIndex * pageBlock + clampedOffset;
+		} else {
+			targetTop = hostTop + Math.min(totalHeight, Math.max(0, Math.round(totalHeight * ratio)));
+		}
+
+		window.scrollTo({ top: targetTop, behavior: "auto" });
+		pendingRestoreRef.current = null;
+
+		requestAnimationFrame(() => {
+			measureVisibility();
+		});
+	}, [
+		fitScale,
+		getHostTop,
+		manualScale,
+		measureVisibility,
+		pageCount,
+		pageSize,
+		reloadKey,
+		state.phase,
+		zoomMode,
+	]);
+
 	const renderPage = useCallback(
 		async (pageIndex: number, slot: PageSlotRef, displayScale: number) => {
 			if (!pdf || !pageSize) return;
@@ -403,11 +506,6 @@ const PdfViewer = forwardRef<
 		onStatus(`${role}: page ${currentPage} / ${pageCount}`);
 	}, [currentPage, onStatus, pageCount, role, state.phase]);
 
-	const clampScale = useCallback(
-		(value: number) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value)),
-		[],
-	);
-
 	const layoutScale = useMemo(
 		() => (zoomMode === "fit-width" ? fitScale : manualScale),
 		[fitScale, manualScale, zoomMode],
@@ -430,26 +528,26 @@ const PdfViewer = forwardRef<
 		let nextScale = manualScale;
 		setManualScale((prev) => {
 			const base = zoomMode === "fit-width" ? fitScale : prev;
-			const next = clampScale(base * ZOOM_STEP);
+			const next = clampScaleValue(base * ZOOM_STEP);
 			nextScale = next;
 			return next;
 		});
 		setZoomMode("manual");
 		announceZoom(nextScale, "manual");
-	}, [announceZoom, clampScale, fitScale, manualScale, pageSize, zoomMode]);
+	}, [announceZoom, fitScale, manualScale, pageSize, zoomMode]);
 
 	const zoomOut = useCallback(() => {
 		if (!pageSize) return;
 		let nextScale = manualScale;
 		setManualScale((prev) => {
 			const base = zoomMode === "fit-width" ? fitScale : prev;
-			const next = clampScale(base / ZOOM_STEP);
+			const next = clampScaleValue(base / ZOOM_STEP);
 			nextScale = next;
 			return next;
 		});
 		setZoomMode("manual");
 		announceZoom(nextScale, "manual");
-	}, [announceZoom, clampScale, fitScale, manualScale, pageSize, zoomMode]);
+	}, [announceZoom, fitScale, manualScale, pageSize, zoomMode]);
 
 	const fitToWidth = useCallback(() => {
 		if (!pageSize) return;
