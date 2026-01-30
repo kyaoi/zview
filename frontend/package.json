@@ -2,21 +2,34 @@
 	"name": "zview-frontend",
 	"version": "0.1.0",
 	"private": true,
-	"description": "Frontend tooling scaffold for zview (pnpm + lint/format stubs)",
+	"description": "Web UI for zview (Vite + TypeScript)",
 	"type": "module",
 	"engines": {
 		"node": ">=22.0.0"
 	},
+	"packageManager": "pnpm@10.19.0",
 	"scripts": {
-		"dev": "node ./scripts/dev-placeholder.mjs",
-		"build": "node ./scripts/build-placeholder.mjs",
+		"dev": "vite",
+		"build": "vite build",
+		"preview": "vite preview",
 		"lint": "biome lint .",
-		"fmt": "biome check .",
+		"fmt": "biome format .",
 		"fmt:write": "biome format --write .",
-		"test": "node ./scripts/test-placeholder.mjs"
+		"check": "tsc --noEmit",
+		"test": "node -e \"console.log('tests pending')\""
+	},
+	"dependencies": {
+		"react": "18.3.1",
+		"react-dom": "18.3.1"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.3.13",
-		"typescript": "5.9.3"
+		"@types/react": "18.3.11",
+		"@types/react-dom": "18.3.1",
+		"@tailwindcss/vite": "4.1.8",
+		"@vitejs/plugin-react": "4.3.3",
+		"tailwindcss": "4.1.8",
+		"typescript": "5.9.3",
+		"vite": "5.4.10"
 	}
 }

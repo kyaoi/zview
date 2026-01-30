@@ -171,9 +171,12 @@ This project prioritizes speed:
 * The server should bind to **127.0.0.1** only.
 * Prefer a per-launch random token in the URL to avoid accidental cross-tab access.
 
+## Language
+
+Project documentation and UI text are written in English by default unless a task specifies otherwise. Use pnpm for Node installs. Styling should use Tailwind CSS v4.x.
+
 ---
 
 ## License
 
 TBD
-

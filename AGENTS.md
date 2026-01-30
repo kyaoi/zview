@@ -64,6 +64,7 @@ Example:
 * If you are instructed to **create a PR** (or PR creation is part of the task), you must request an automated review by adding a PR comment containing **`@codex`**.
 * The `@codex` comment triggers the automatic review workflow.
 * Do this **on the PR** (not only in local notes), as soon as the PR is opened.
+* When opening a PR, use the repository pull request template `.github/pull_request_template.md` to populate the description.
 
 ---
 
@@ -185,6 +186,18 @@ Keep docs short and practical.
 * Server must bind to localhost only.
 * Prefer a per-launch random token in the UI URL or headers to reduce accidental access.
 * No remote URL fetching.
+
+---
+
+## Language
+
+* Default to English for code, documentation, and UI text unless a task explicitly requests another language.
+* Keep wording concise and clear when adding copy or comments.
+
+## Tooling expectations
+
+* Use **pnpm** for all Node package installs/updates; run installs from the frontend directory unless specified.
+* Tailwind CSS should be version **4.x** for styling work (prefer the latest stable in the 4.x line).
 
 ---
 
