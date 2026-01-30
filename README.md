@@ -124,6 +124,19 @@ Then use the **Open** button in the Web UI.
 * `--port <N>` — bind to a specific port
 * `--no-open` — don’t auto-open a browser tab
 
+## Build (single binary)
+
+```bash
+cd frontend
+pnpm install        # first time only
+pnpm build          # emits assets to ../backend/dist for embedding
+
+cd ../backend
+go build -o ../zview
+```
+
+Result: `./zview` contains the embedded frontend; end users do **not** need Node/pnpm.
+
 ---
 
 ## Web UI

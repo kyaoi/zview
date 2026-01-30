@@ -139,7 +139,7 @@ A task is “done” when:
 
 #### `task/embed-frontend-dist`
 
-* [ ] Done
+* [x] Done
 
 **Goal:** Single-binary runtime (no Node/pnpm on user machines).
 

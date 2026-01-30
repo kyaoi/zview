@@ -23,7 +23,25 @@ dev:
 	@echo "Dev: frontend/backend dev servers will be wired here in later tasks"
 
 build:
-	@echo "Build: frontend build → backend build will be added in later tasks"
+	@echo "Build: frontend (pnpm build) → backend (go build)"
+	@if [ -f $(FRONTEND_DIR)/package.json ]; then \
+	  if command -v pnpm >/dev/null 2>&1; then \
+	    cd $(FRONTEND_DIR) && pnpm build; \
+	  else \
+	    echo 'pnpm not found: build aborted' >&2; exit 1; \
+	  fi; \
+	else \
+	  echo 'frontend/package.json not found: skip frontend build'; \
+	fi
+	@if [ -f $(BACKEND_DIR)/go.mod ]; then \
+	  if command -v go >/dev/null 2>&1; then \
+	    cd $(BACKEND_DIR) && go build -o ../zview; \
+	  else \
+	    echo 'go command not found: build aborted' >&2; exit 1; \
+	  fi; \
+	else \
+	  echo 'backend/go.mod not found: skip backend build'; \
+	fi
 
 fmt:
 	@echo "fmt: formatting backend (Go)…"
