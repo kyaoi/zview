@@ -19,14 +19,15 @@
 		"test": "node -e \"console.log('tests pending')\""
 	},
 	"dependencies": {
+		"pdfjs-dist": "^5.4.530",
 		"react": "18.3.1",
 		"react-dom": "18.3.1"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.3.13",
+		"@tailwindcss/vite": "4.1.8",
 		"@types/react": "18.3.11",
 		"@types/react-dom": "18.3.1",
-		"@tailwindcss/vite": "4.1.8",
 		"@vitejs/plugin-react": "4.3.3",
 		"tailwindcss": "4.1.8",
 		"typescript": "5.9.3",

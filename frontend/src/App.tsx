@@ -1,4 +1,10 @@
-import { useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { GlobalWorkerOptions, getDocument, type RenderTask } from "pdfjs-dist";
+import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+
+GlobalWorkerOptions.workerSrc = workerSrc;
+
+const DPR_CAP = 2;
 
 const toolbarActions = [
 	{ key: "openMain", label: "Open (Main)", hint: "Pick a PDF for MAIN" },
@@ -15,13 +21,14 @@ type PaneProps = {
 	status: string;
 	focused: boolean;
 	onFocus: () => void;
+	children?: ReactNode;
 };
 
 function classNames(...tokens: Array<string | false | null | undefined>) {
 	return tokens.filter(Boolean).join(" ");
 }
 
-function Pane({ paneRole, status, focused, onFocus }: PaneProps) {
+function Pane({ paneRole, status, focused, onFocus, children }: PaneProps) {
 	return (
 		<section
 			className={classNames(
@@ -60,37 +67,120 @@ function Pane({ paneRole, status, focused, onFocus }: PaneProps) {
 			</header>
 
 			<div className="rounded-xl border border-slate-700/50 bg-slate-900/60 px-4 py-4">
-				<div className="flex max-w-xl flex-col gap-2">
-					<p className="text-xs uppercase tracking-[0.2em] text-slate-400">
-						{paneRole === "MAIN" ? "Primary" : "Secondary"} pane
-					</p>
-					<h2 className="text-xl font-semibold text-slate-50">
-						{paneRole === "MAIN" ? "MAIN viewer placeholder" : "SUB viewer placeholder"}
-					</h2>
-					<p className="text-sm leading-6 text-slate-300">
-						PDF rendering arrives in the next task. This shell keeps the layout lean: role badge,
-						status, and a focus ring placeholder.
-					</p>
-					{paneRole === "SUB" ? (
-						<p className="text-sm leading-6 text-slate-300">
-							SUB stays static until you replace it.
-						</p>
-					) : (
-						<p className="text-sm leading-6 text-slate-300">
-							Reload and watch states will live here.
-						</p>
-					)}
-					<div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
-						{[1, 2, 3, 4].map((cell) => (
-							<div
-								key={cell}
-								className="h-16 rounded-xl border border-slate-700/60 bg-gradient-to-br from-brand/20 to-accent/20"
-							/>
-						))}
-					</div>
-				</div>
+				{children}
 			</div>
 		</section>
+	);
+}
+
+type MainViewerState =
+	| { phase: "idle" | "loading" }
+	| { phase: "ready"; summary: string }
+	| { phase: "error"; detail: string };
+
+function friendlyError(detail: string) {
+	if (detail.includes("Missing PDF")) return "MAIN PDF が指定されていません";
+	if (detail.includes("Unexpected server response")) return "MAIN PDF の取得に失敗しました";
+	return "MAIN を読み込めませんでした";
+}
+
+function MainViewer({
+	onStatus,
+	reloadKey,
+}: {
+	onStatus: (message: string) => void;
+	reloadKey: number;
+}) {
+	const containerRef = useRef<HTMLDivElement>(null);
+	const canvasRef = useRef<HTMLCanvasElement>(null);
+	const [state, setState] = useState<MainViewerState>({ phase: "idle" });
+
+	useEffect(() => {
+		let cancelled = false;
+		let renderTask: RenderTask | null = null;
+
+		async function loadAndRender() {
+			setState({ phase: "loading" });
+			onStatus(reloadKey > 0 ? "MAIN: 再読み込み中…" : "MAIN: 読み込み中…");
+
+			try {
+				const pdf = await getDocument({ url: "/api/main.pdf" }).promise;
+				if (cancelled) return;
+
+				const page = await pdf.getPage(1);
+				if (cancelled) return;
+
+				const container = containerRef.current;
+				const canvas = canvasRef.current;
+				if (!container || !canvas) return;
+
+				const baseViewport = page.getViewport({ scale: 1 });
+				const fitScale = (container.clientWidth || baseViewport.width) / baseViewport.width;
+				const outputScale = Math.min(window.devicePixelRatio || 1, DPR_CAP);
+				const viewport = page.getViewport({ scale: fitScale * outputScale });
+
+				const context = canvas.getContext("2d");
+				if (!context) throw new Error("Canvas 2D context is not available");
+
+				canvas.width = Math.floor(viewport.width);
+				canvas.height = Math.floor(viewport.height);
+				canvas.style.width = `${Math.floor(viewport.width / outputScale)}px`;
+				canvas.style.height = `${Math.floor(viewport.height / outputScale)}px`;
+
+					renderTask = page.render({
+						canvas,
+						canvasContext: context,
+						viewport,
+						transform: outputScale !== 1 ? [1 / outputScale, 0, 0, 1 / outputScale, 0, 0] : undefined,
+					});
+
+				await renderTask.promise;
+				if (cancelled) return;
+
+				const summary = `Page 1 / ${pdf.numPages} • ${Math.round(viewport.width / outputScale)}×${Math.round(viewport.height / outputScale)} px`;
+				setState({ phase: "ready", summary });
+				onStatus("MAIN: 1ページ目を表示中");
+			} catch (err) {
+				if (cancelled) return;
+				if (renderTask) {
+					renderTask.cancel();
+				}
+				const detail = err instanceof Error ? err.message : String(err);
+				setState({ phase: "error", detail });
+				onStatus("MAIN: 読み込みに失敗しました");
+			}
+		}
+
+		loadAndRender();
+
+		return () => {
+			cancelled = true;
+			renderTask?.cancel();
+		};
+	}, [onStatus, reloadKey]);
+
+	return (
+		<div className="flex flex-col gap-3" ref={containerRef}>
+			<div className="flex items-center justify-between gap-2 text-sm text-slate-300">
+				<span>
+					{state.phase === "ready"
+						? state.summary
+						: state.phase === "error"
+							? friendlyError(state.detail)
+							: "MAINを読み込み中"}
+				</span>
+				<span className="rounded-full border border-slate-700/70 bg-slate-800/80 px-2 py-1 text-xs">
+					PDF.js worker bundled
+				</span>
+			</div>
+			<div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-950/60 shadow-inner">
+				<canvas
+					ref={canvasRef}
+					className="block w-full bg-slate-900"
+					aria-label="MAIN PDF page 1"
+				/>
+			</div>
+		</div>
 	);
 }
 
@@ -124,9 +214,10 @@ export default function App() {
 	const [focusedPane, setFocusedPane] = useState<"main" | "sub">("main");
 	const [paneOrder, setPaneOrder] = useState<"main-first" | "sub-first">("main-first");
 	const [status, setStatus] = useState("Ready to open MAIN");
+	const [reloadKey, setReloadKey] = useState(0);
 	const [showHelp, setShowHelp] = useState(false);
 
-	const announce = (message: string) => setStatus(message);
+	const announce = useCallback((message: string) => setStatus(message), []);
 
 	const handleAction = (key: ActionKey) => {
 		switch (key) {
@@ -148,7 +239,8 @@ export default function App() {
 				announce("Swapped pane order");
 				break;
 			case "reloadMain":
-				announce("MAIN reload requested (placeholder)");
+				announce("MAIN: 再読み込み中…");
+				setReloadKey((v) => v + 1);
 				setFocusedPane("main");
 				break;
 			case "help":
@@ -167,7 +259,9 @@ export default function App() {
 				status="manual"
 				focused={focusedPane === "main"}
 				onFocus={() => setFocusedPane("main")}
-			/>
+			>
+				<MainViewer onStatus={announce} reloadKey={reloadKey} />
+			</Pane>
 		);
 
 		const subPane = hasSub ? (
@@ -182,7 +276,7 @@ export default function App() {
 
 		if (!subPane) return [mainPane];
 		return paneOrder === "main-first" ? [mainPane, subPane] : [subPane, mainPane];
-	}, [focusedPane, hasSub, paneOrder]);
+	}, [announce, focusedPane, hasSub, paneOrder, reloadKey]);
 
 	return (
 		<div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 pb-6 pt-4">

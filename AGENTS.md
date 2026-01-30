@@ -43,6 +43,7 @@ Rules:
 * Prefer **small, atomic commits** that build and run.
 * Avoid long-running “WIP” commits on shared branches.
 * Each commit message should describe *what changed and why*.
+* **After completing a task, open a PR for that task branch** (use the template). Do not leave completed task branches without a PR.
 
 Recommended commit prefixes:
 
