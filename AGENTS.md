@@ -188,6 +188,18 @@ Keep docs short and practical.
 
 ---
 
+## Language
+
+* Default to English for code, documentation, and UI text unless a task explicitly requests another language.
+* Keep wording concise and clear when adding copy or comments.
+
+## Tooling expectations
+
+* Use **pnpm** for all Node package installs/updates; run installs from the frontend directory unless specified.
+* Tailwind CSS should be version **4.x** for styling work (prefer the latest stable in the 4.x line).
+
+---
+
 ## When in doubt
 
 * Favor the simplest implementation that preserves performance constraints.

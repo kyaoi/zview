@@ -1,7 +1,2 @@
-.DS_Store
 dist
 node_modules
-.vite
-coverage
-tmp
-.tmp

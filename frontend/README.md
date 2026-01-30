@@ -1,18 +1,35 @@
-# Frontend Tooling
+# Frontend (Vite + React + Tailwind CSS)
 
-This package uses pnpm and Node.js LTS.
+Web UI shell built with Vite + TypeScript. PDF rendering will arrive in the next task.
 
 ## Requirements
 
-- Node.js **22.x or 24.x LTS** (developed with Node 25 is fine, but LTS is recommended)
-- pnpm (install via mise; any recent 10.x works — tested with 10.19.0; Corepack not required)
+- Node.js **22.x or 24.x LTS** (developed on Node 22)
+- pnpm **10.x** (matches the `packageManager` field)
 
-## Quick start
+## Scripts
 
 ```bash
 cd frontend
 pnpm install
-pnpm build  # currently a stub; replaced in the Vite skeleton task
+pnpm dev       # Vite dev server
+pnpm build     # Production build
+pnpm preview   # Preview built assets
+pnpm lint      # Biome lint
+pnpm fmt       # Format check (no write)
+pnpm fmt:write # Format with writes
+pnpm check     # TypeScript noEmit check
+pnpm test      # Placeholder
 ```
 
-`pnpm lint` and `pnpm fmt` run Biome (lint + format). Scripts are placeholders until the Vite skeleton is added in the next task.
+## Styling
+
+- Tailwind CSS with a small theme extension (brand/accent colors, Space Grotesk font).
+- Global styles live in `src/index.css` with Tailwind layers; avoid custom CSS files unless necessary.
+
+## Current UI
+
+- Top toolbar with required buttons: `Open(Main)`, `Open(Sub)`, `Swap`, `Reload(Main)`, `Help`.
+- Starts with MAIN only; clicking **Open(Sub)** reveals the SUB pane.
+- Persistent badges in pane headers (`MAIN` / `SUB`) and a focus indicator placeholder.
+- Lightweight help overlay (copy will expand when features are wired).

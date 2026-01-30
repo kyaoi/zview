@@ -89,7 +89,7 @@ A task is “done” when:
 
 #### `task/frontend-vite-skeleton`
 
-* [ ] Done
+* [x] Done
 
 **Goal:** Web app shell (no PDF yet).
 
