@@ -13,6 +13,8 @@ frontend/.vite/
 # Backend build artifacts
 backend/bin/
 backend/tmp/
+backend/backend
+backend/zview
 *.exe
 *.out
 *.test
