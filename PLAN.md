@@ -296,7 +296,7 @@ A task is “done” when:
 
 #### `task/two-pane-main-sub`
 
-* [ ] Done
+* [x] Done
 
 **Goal:** Optional second pane and consistent role labeling.
 
