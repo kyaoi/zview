@@ -64,6 +64,7 @@ Example:
 * If you are instructed to **create a PR** (or PR creation is part of the task), you must request an automated review by adding a PR comment containing **`@codex`**.
 * The `@codex` comment triggers the automatic review workflow.
 * Do this **on the PR** (not only in local notes), as soon as the PR is opened.
+* When opening a PR, use the repository pull request template `.github/pull_request_template.md` to populate the description.
 
 ---
 
