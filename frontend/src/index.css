@@ -28,3 +28,9 @@ body {
 .glass {
 	@apply bg-slate-900/80 backdrop-blur border border-slate-700/60 shadow-[0_10px_30px_rgba(5,12,26,0.35)];
 }
+
+[data-focused="true"] {
+	box-shadow:
+		0 0 0 1px rgba(28, 202, 216, 0.45),
+		0 16px 42px rgba(28, 202, 216, 0.18);
+}

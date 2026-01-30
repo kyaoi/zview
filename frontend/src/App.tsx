@@ -56,11 +56,19 @@ function Pane({ paneRole, status, focused, onFocus, children }: PaneProps) {
 			className={classNames(
 				"group relative flex flex-col gap-3 rounded-2xl border border-slate-700/70 bg-slate-900/70 px-4 py-4 shadow-glow transition",
 				focused
-					? "ring-2 ring-accent/70 border-accent/70 -translate-y-0.5"
+					? "ring-2 ring-accent/70 border-accent/70 -translate-y-0.5 shadow-[0_15px_45px_rgba(28,202,216,0.18)]"
 					: "hover:border-slate-500/70 hover:-translate-y-0.5",
 			)}
+			data-focused={focused ? "true" : "false"}
 		>
-			<header className="flex items-center justify-between gap-2">
+			<header
+				className={classNames(
+					"flex items-center justify-between gap-2 rounded-xl border px-3 py-2 transition",
+					focused
+						? "border-accent/70 bg-accent/10 shadow-[0_6px_28px_rgba(28,202,216,0.18)]"
+						: "border-slate-700/70 bg-slate-900/50",
+				)}
+			>
 				<div className="flex items-center gap-2">
 					<span
 						className={classNames(
@@ -72,10 +80,21 @@ function Pane({ paneRole, status, focused, onFocus, children }: PaneProps) {
 					>
 						{paneRole}
 					</span>
-					<span className="text-sm font-semibold text-slate-300">{status}</span>
+					<span className="text-xs font-semibold uppercase tracking-wide text-slate-200">
+						{status}
+					</span>
 				</div>
 				<div className="flex items-center gap-2 text-xs text-slate-400">
-					<span>{focused ? "focused" : "ready"}</span>
+					<span
+						className={classNames(
+							"rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide transition",
+							focused
+								? "bg-accent/90 text-slate-950 shadow-[0_10px_30px_rgba(28,202,216,0.3)]"
+								: "border border-slate-600 bg-slate-800/60 text-slate-100",
+						)}
+					>
+						{focused ? "FOCUS" : "Press Tab"}
+					</span>
 					{!focused ? (
 						<button
 							type="button"
@@ -634,6 +653,7 @@ export default function App() {
 	const [subRenderKey, setSubRenderKey] = useState(0);
 	const [showHelp, setShowHelp] = useState(false);
 	const mainViewerRef = useRef<ViewerHandle | null>(null);
+	const subViewerRef = useRef<ViewerHandle | null>(null);
 	const keySeqTimeoutRef = useRef<number | null>(null);
 	const lastKeyRef = useRef<string | null>(null);
 
@@ -730,15 +750,17 @@ export default function App() {
 			if (tag === "input" || tag === "textarea" || tag === "select" || target?.isContentEditable)
 				return;
 
-			const mainActive = focusedPane === "main";
+			const targetRole: ViewerRole = focusedPane === "sub" && hasSub ? "SUB" : "MAIN";
+			const targetViewer =
+				focusedPane === "sub" && hasSub ? subViewerRef.current : mainViewerRef.current;
 
 			// multi-key: gg
 			if (event.key === "g") {
 				if (lastKeyRef.current === "g") {
 					event.preventDefault();
 					clearSequence();
-					mainViewerRef.current?.jumpToTop();
-					announce("MAIN: jump to top");
+					targetViewer?.jumpToTop();
+					announce(`${targetRole}: jump to top`);
 					return;
 				}
 				lastKeyRef.current = "g";
@@ -749,67 +771,57 @@ export default function App() {
 
 			switch (event.key) {
 				case "j":
-					if (!mainActive) return;
 					event.preventDefault();
-					mainViewerRef.current?.scrollLine(LINE_SCROLL_PX);
-					announce("MAIN: scroll down");
+					targetViewer?.scrollLine(LINE_SCROLL_PX);
+					announce(`${targetRole}: scroll down`);
 					return;
 				case "k":
-					if (!mainActive) return;
 					event.preventDefault();
-					mainViewerRef.current?.scrollLine(-LINE_SCROLL_PX);
-					announce("MAIN: scroll up");
+					targetViewer?.scrollLine(-LINE_SCROLL_PX);
+					announce(`${targetRole}: scroll up`);
 					return;
 				case "d":
-					if (!mainActive) return;
 					event.preventDefault();
-					mainViewerRef.current?.scrollHalfPage(1);
-					announce("MAIN: half-page down");
+					targetViewer?.scrollHalfPage(1);
+					announce(`${targetRole}: half-page down`);
 					return;
 				case "u":
-					if (!mainActive) return;
 					event.preventDefault();
-					mainViewerRef.current?.scrollHalfPage(-1);
-					announce("MAIN: half-page up");
+					targetViewer?.scrollHalfPage(-1);
+					announce(`${targetRole}: half-page up`);
 					return;
 				case "G":
-					if (!mainActive) return;
 					event.preventDefault();
-					mainViewerRef.current?.jumpToBottom();
-					announce("MAIN: jump to bottom");
+					targetViewer?.jumpToBottom();
+					announce(`${targetRole}: jump to bottom`);
 					return;
 				case "n":
-					if (!mainActive) return;
 					event.preventDefault();
-					mainViewerRef.current?.jumpByPages(1);
-					announce("MAIN: next page");
+					targetViewer?.jumpByPages(1);
+					announce(`${targetRole}: next page`);
 					return;
 				case "p":
-					if (!mainActive) return;
 					event.preventDefault();
-					mainViewerRef.current?.jumpByPages(-1);
-					announce("MAIN: previous page");
+					targetViewer?.jumpByPages(-1);
+					announce(`${targetRole}: previous page`);
 					return;
 				case "+":
-					if (!mainActive) return;
 					event.preventDefault();
-					mainViewerRef.current?.zoomIn();
+					targetViewer?.zoomIn();
 					return;
 				case "-":
-					if (!mainActive) return;
 					event.preventDefault();
-					mainViewerRef.current?.zoomOut();
+					targetViewer?.zoomOut();
 					return;
 				case "=":
-					if (!mainActive) return;
 					event.preventDefault();
-					mainViewerRef.current?.fitToWidth();
+					targetViewer?.fitToWidth();
 					return;
 				case "Tab":
 					event.preventDefault();
 					if (hasSub) {
 						setFocusedPane((prev) => (prev === "main" ? "sub" : "main"));
-						announce("Toggled focus");
+						announce(`Focus: ${targetRole === "MAIN" ? "SUB" : "MAIN"}`);
 					} else {
 						setFocusedPane("main");
 					}
@@ -884,7 +896,13 @@ export default function App() {
 				focused={focusedPane === "sub"}
 				onFocus={() => setFocusedPane("sub")}
 			>
-				<PdfViewer paneRole="SUB" url="/api/sub.pdf" onStatus={announce} reloadKey={subRenderKey} />
+				<PdfViewer
+					paneRole="SUB"
+					url="/api/sub.pdf"
+					onStatus={announce}
+					reloadKey={subRenderKey}
+					ref={subViewerRef}
+				/>
 			</Pane>
 		) : null;
 
@@ -922,8 +940,22 @@ export default function App() {
 					))}
 				</nav>
 
-				<div className="flex items-center justify-end">
-					<div className="glass max-w-full truncate rounded-xl px-3 py-2 text-sm text-slate-200">
+				<div className="flex items-center justify-end gap-2">
+					<span
+						className={classNames(
+							"rounded-xl border px-3 py-1 text-[13px] font-semibold tracking-wide",
+							focusedPane === "sub" && hasSub
+								? "border-accent/60 bg-accent/20 text-accent"
+								: "border-brand/60 bg-brand/20 text-brand",
+						)}
+						aria-live="polite"
+					>
+						FOCUS: {focusedPane === "sub" && hasSub ? "SUB" : "MAIN"}
+					</span>
+					<div
+						className="glass max-w-full truncate rounded-xl px-3 py-2 text-sm text-slate-200"
+						aria-live="polite"
+					>
 						{status}
 					</div>
 				</div>
@@ -945,7 +977,9 @@ export default function App() {
 								<span className="inline-flex items-center gap-2 rounded-full border border-accent/60 bg-accent/10 px-3 py-1 text-xs font-semibold tracking-wide text-accent">
 									SUB
 								</span>
-								<span className="text-sm font-semibold text-slate-300">static</span>
+								<span className="text-xs font-semibold uppercase tracking-wide text-slate-300">
+									static
+								</span>
 							</div>
 							<span className="text-xs text-slate-400">hidden until opened</span>
 						</div>

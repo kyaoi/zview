@@ -323,7 +323,7 @@ A task is “done” when:
 
 #### `task/focus-and-swap-polish`
 
-* [ ] Done
+* [x] Done
 
 **Goal:** Remove ambiguity when switching focus.
 
