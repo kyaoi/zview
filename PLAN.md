@@ -394,7 +394,7 @@ A task is “done” when:
 
 #### `task/restore-scroll-position`
 
-* [ ] Done
+* [x] Done
 
 **Goal:** After MAIN reload, return to the same reading location.
 
