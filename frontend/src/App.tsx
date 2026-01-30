@@ -29,13 +29,14 @@ const LINE_SCROLL_PX = 64;
 
 const toolbarActions = [
 	{ key: "openMain", label: "Open (Main)", hint: "Pick a PDF for MAIN" },
-	{ key: "openSub", label: "Open (Sub)", hint: "Add an optional SUB" },
+	{ key: "openSub", label: "Open (Sub)", hint: "Use CLI --sub" },
 	{ key: "swap", label: "Swap", hint: "Switch left/right" },
 	{ key: "reloadMain", label: "Reload (Main)", hint: "Refresh MAIN" },
 	{ key: "help", label: "Help", hint: "Overlay" },
 ] as const;
 
 type ActionKey = (typeof toolbarActions)[number]["key"];
+type ViewerRole = "MAIN" | "SUB";
 
 type PaneProps = {
 	paneRole: "MAIN" | "SUB";
@@ -94,7 +95,7 @@ function Pane({ paneRole, status, focused, onFocus, children }: PaneProps) {
 	);
 }
 
-type MainViewerState =
+type PdfViewerState =
 	| { phase: "idle" | "loading" }
 	| { phase: "ready"; summary: string }
 	| { phase: "error"; detail: string };
@@ -108,7 +109,7 @@ type PageSlotRef = {
 
 type ZoomMode = "fit-width" | "manual";
 
-export type MainViewerHandle = {
+type ViewerHandle = {
 	scrollLine: (deltaPx: number) => void;
 	scrollHalfPage: (direction: 1 | -1) => void;
 	jumpToTop: () => void;
@@ -119,19 +120,20 @@ export type MainViewerHandle = {
 	fitToWidth: () => void;
 };
 
-function friendlyError(detail: string) {
-	if (detail.includes("Missing PDF")) return "MAIN PDF が指定されていません";
-	if (detail.includes("Unexpected server response")) return "MAIN PDF の取得に失敗しました";
-	return "MAIN を読み込めませんでした";
+function friendlyError(role: ViewerRole, detail: string) {
+	if (detail.includes("Missing PDF")) return `${role} PDF not provided`;
+	if (detail.includes("Unexpected server response")) return `${role} PDF request failed`;
+	return `${role} failed to load`;
 }
 
-const MainViewer = forwardRef<
-	MainViewerHandle,
-	{ onStatus: (message: string) => void; reloadKey: number }
->(function MainViewer({ onStatus, reloadKey }, ref) {
+const PdfViewer = forwardRef<
+	ViewerHandle,
+	{ paneRole: ViewerRole; url: string; onStatus: (message: string) => void; reloadKey?: number }
+>(function PdfViewer({ paneRole, url, onStatus, reloadKey = 0 }, ref) {
+	const role = paneRole;
 	const hostRef = useRef<HTMLDivElement>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
-	const [state, setState] = useState<MainViewerState>({ phase: "idle" });
+	const [state, setState] = useState<PdfViewerState>({ phase: "idle" });
 	const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
 	const [pageCount, setPageCount] = useState(0);
 	const [pageSize, setPageSize] = useState<{ width: number; height: number } | null>(null);
@@ -173,11 +175,11 @@ const MainViewer = forwardRef<
 
 		async function loadAndRender() {
 			setState({ phase: "loading" });
-			onStatus(reloadKey > 0 ? "MAIN: 再読み込み中…" : "MAIN: 読み込み中…");
+			onStatus(reloadKey > 0 ? `${role}: Reloading…` : `${role}: Loading…`);
 
 			try {
 				const loaded = await getDocument({
-					url: "/api/main.pdf",
+					url,
 					cMapUrl: `${PDFJS_ASSET_BASE}cmaps/`,
 					cMapPacked: true,
 					standardFontDataUrl: `${PDFJS_ASSET_BASE}standard_fonts/`,
@@ -193,13 +195,13 @@ const MainViewer = forwardRef<
 				setPageCount(loaded.numPages);
 				setPageSize({ width: baseViewport.width, height: baseViewport.height });
 				setState({ phase: "ready", summary: `Page 1 / ${loaded.numPages}` });
-				onStatus("MAIN: 1ページ目を表示中");
+				onStatus(`${role}: showing page 1`);
 			} catch (err) {
 				if (cancelled) return;
 				resetPageSlots();
 				const detail = err instanceof Error ? err.message : String(err);
 				setState({ phase: "error", detail });
-				onStatus("MAIN: 読み込みに失敗しました");
+				onStatus(`${role}: failed to load`);
 			}
 		}
 
@@ -209,7 +211,7 @@ const MainViewer = forwardRef<
 			cancelled = true;
 			resetPageSlots();
 		};
-	}, [onStatus, reloadKey, resetPageSlots]);
+	}, [onStatus, reloadKey, resetPageSlots, role, url]);
 
 	useEffect(() => {
 		if (!pageSize || !hostRef.current) return;
@@ -339,8 +341,8 @@ const MainViewer = forwardRef<
 
 	useEffect(() => {
 		if (state.phase !== "ready" || pageCount === 0) return;
-		onStatus(`MAIN: ページ ${currentPage} / ${pageCount}`);
-	}, [currentPage, onStatus, pageCount, state.phase]);
+		onStatus(`${role}: page ${currentPage} / ${pageCount}`);
+	}, [currentPage, onStatus, pageCount, role, state.phase]);
 
 	const clampScale = useCallback(
 		(value: number) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value)),
@@ -356,12 +358,12 @@ const MainViewer = forwardRef<
 		(nextScale: number, mode: ZoomMode) => {
 			const percent = Math.round(nextScale * 100);
 			if (mode === "fit-width") {
-				onStatus(`MAIN: 幅に合わせる (${percent}%)`);
+				onStatus(`${role}: fit to width (${percent}%)`);
 				return;
 			}
-			onStatus(`MAIN: ズーム ${percent}%`);
+			onStatus(`${role}: zoom ${percent}%`);
 		},
-		[onStatus],
+		[onStatus, role],
 	);
 
 	const zoomIn = useCallback(() => {
@@ -459,8 +461,8 @@ const MainViewer = forwardRef<
 							? `Page ${currentPage} / ${pageCount} • ${displayWidth}×${displayHeight} px`
 							: state.summary
 						: state.phase === "error"
-							? friendlyError(state.detail)
-							: "MAINを読み込み中"}
+							? friendlyError(role, state.detail)
+							: `${role} loading…`}
 				</span>
 				<div className="flex items-center gap-2 text-xs text-slate-200">
 					<span className="rounded-full border border-slate-700/70 bg-slate-800/80 px-2 py-1">
@@ -484,7 +486,7 @@ const MainViewer = forwardRef<
 				<div className="flex flex-col" style={listStyle}>
 					{pageCount === 0 || !pageSize ? (
 						<div className="rounded-xl border border-slate-800/70 bg-slate-900/70 px-4 py-10 text-center text-sm text-slate-300">
-							MAIN PDF を読み込んでいます…
+							Loading {role} PDF…
 						</div>
 					) : (
 						Array.from({ length: pageCount }).map((_, index) => {
@@ -541,7 +543,7 @@ const MainViewer = forwardRef<
 												}
 											}}
 											className="block h-full w-full bg-slate-900"
-											aria-label={`MAIN PDF page ${index + 1}`}
+											aria-label={`${role} PDF page ${index + 1}`}
 											style={{
 												opacity: isVisible ? 1 : 0.4,
 											}}
@@ -624,16 +626,50 @@ function HelpOverlay({ onClose }: { onClose: () => void }) {
 
 export default function App() {
 	const [hasSub, setHasSub] = useState(false);
+	const [watchEnabled, setWatchEnabled] = useState(true);
 	const [focusedPane, setFocusedPane] = useState<"main" | "sub">("main");
 	const [paneOrder, setPaneOrder] = useState<"main-first" | "sub-first">("main-first");
-	const [status, setStatus] = useState("Ready to open MAIN");
-	const [reloadKey, setReloadKey] = useState(0);
+	const [status, setStatus] = useState("Fetching bootstrap info…");
+	const [mainReloadKey, setMainReloadKey] = useState(0);
+	const [subRenderKey, setSubRenderKey] = useState(0);
 	const [showHelp, setShowHelp] = useState(false);
-	const mainViewerRef = useRef<MainViewerHandle | null>(null);
+	const mainViewerRef = useRef<ViewerHandle | null>(null);
 	const keySeqTimeoutRef = useRef<number | null>(null);
 	const lastKeyRef = useRef<string | null>(null);
 
 	const announce = useCallback((message: string) => setStatus(message), []);
+
+	useEffect(() => {
+		let aborted = false;
+		async function loadBootstrap() {
+			try {
+				const res = await fetch("/api/bootstrap", { cache: "no-store" });
+				if (!res.ok) throw new Error(`status ${res.status}`);
+				const data: {
+					focus: "main" | "sub";
+					hasMain: boolean;
+					hasSub: boolean;
+					watch: boolean;
+				} = await res.json();
+				if (aborted) return;
+				setHasSub(data.hasSub);
+				setWatchEnabled(data.watch);
+				setFocusedPane(data.focus === "sub" && data.hasSub ? "sub" : "main");
+				setStatus(data.hasMain ? "Loading MAIN" : "Please provide MAIN PDF");
+			} catch (_err) {
+				if (aborted) return;
+				setHasSub(false);
+				setWatchEnabled(true);
+				setFocusedPane("main");
+				setStatus("Failed to fetch bootstrap info");
+			}
+		}
+
+		loadBootstrap();
+		return () => {
+			aborted = true;
+		};
+	}, []);
 
 	const handleAction = (key: ActionKey) => {
 		switch (key) {
@@ -642,9 +678,12 @@ export default function App() {
 				setFocusedPane("main");
 				break;
 			case "openSub":
-				setHasSub(true);
+				if (!hasSub) {
+					announce("Specify SUB via CLI --sub");
+					return;
+				}
 				setFocusedPane("sub");
-				announce("SUB slot is ready (static)");
+				announce("SUB: active (static)");
 				break;
 			case "swap":
 				if (!hasSub) {
@@ -655,8 +694,8 @@ export default function App() {
 				announce("Swapped pane order");
 				break;
 			case "reloadMain":
-				announce("MAIN: 再読み込み中…");
-				setReloadKey((v) => v + 1);
+				announce("MAIN: reloading…");
+				setMainReloadKey((v) => v + 1);
 				setFocusedPane("main");
 				break;
 			case "help":
@@ -699,7 +738,7 @@ export default function App() {
 					event.preventDefault();
 					clearSequence();
 					mainViewerRef.current?.jumpToTop();
-					announce("MAIN: 先頭へ移動");
+					announce("MAIN: jump to top");
 					return;
 				}
 				lastKeyRef.current = "g";
@@ -713,43 +752,43 @@ export default function App() {
 					if (!mainActive) return;
 					event.preventDefault();
 					mainViewerRef.current?.scrollLine(LINE_SCROLL_PX);
-					announce("MAIN: 下へスクロール");
+					announce("MAIN: scroll down");
 					return;
 				case "k":
 					if (!mainActive) return;
 					event.preventDefault();
 					mainViewerRef.current?.scrollLine(-LINE_SCROLL_PX);
-					announce("MAIN: 上へスクロール");
+					announce("MAIN: scroll up");
 					return;
 				case "d":
 					if (!mainActive) return;
 					event.preventDefault();
 					mainViewerRef.current?.scrollHalfPage(1);
-					announce("MAIN: 半ページ下へ");
+					announce("MAIN: half-page down");
 					return;
 				case "u":
 					if (!mainActive) return;
 					event.preventDefault();
 					mainViewerRef.current?.scrollHalfPage(-1);
-					announce("MAIN: 半ページ上へ");
+					announce("MAIN: half-page up");
 					return;
 				case "G":
 					if (!mainActive) return;
 					event.preventDefault();
 					mainViewerRef.current?.jumpToBottom();
-					announce("MAIN: 末尾へ移動");
+					announce("MAIN: jump to bottom");
 					return;
 				case "n":
 					if (!mainActive) return;
 					event.preventDefault();
 					mainViewerRef.current?.jumpByPages(1);
-					announce("MAIN: 次のページ");
+					announce("MAIN: next page");
 					return;
 				case "p":
 					if (!mainActive) return;
 					event.preventDefault();
 					mainViewerRef.current?.jumpByPages(-1);
-					announce("MAIN: 前のページ");
+					announce("MAIN: previous page");
 					return;
 				case "+":
 					if (!mainActive) return;
@@ -770,7 +809,7 @@ export default function App() {
 					event.preventDefault();
 					if (hasSub) {
 						setFocusedPane((prev) => (prev === "main" ? "sub" : "main"));
-						announce("フォーカスを切り替えました");
+						announce("Toggled focus");
 					} else {
 						setFocusedPane("main");
 					}
@@ -778,32 +817,33 @@ export default function App() {
 				case "x":
 					event.preventDefault();
 					if (!hasSub) {
-						announce("SUB がないため入れ替えできません");
+						announce("Cannot swap without SUB");
 						return;
 					}
 					setPaneOrder((prev) => (prev === "main-first" ? "sub-first" : "main-first"));
-					announce("MAIN/SUB を入れ替えました");
+					announce("Swapped MAIN/SUB order");
 					return;
 				case "r":
 					event.preventDefault();
-					setReloadKey((v) => v + 1);
+					setMainReloadKey((v) => v + 1);
 					setFocusedPane("main");
-					announce("MAIN: 再読み込み中…");
+					announce("MAIN: reloading…");
 					return;
 				case "R":
 					event.preventDefault();
-					setReloadKey((v) => v + 1);
+					setMainReloadKey((v) => v + 1);
+					setSubRenderKey((v) => v + 1);
 					setFocusedPane("main");
-					announce("MAIN: 再読み込み (SUB 再描画)");
+					announce("MAIN: reload (re-render SUB)");
 					return;
 				case "?":
 					event.preventDefault();
 					setShowHelp((open) => !open);
-					announce("ヘルプを切り替えました");
+					announce("Toggled help");
 					return;
 				case "q":
 					event.preventDefault();
-					announce("終了するにはタブを閉じてください");
+					announce("Close the tab to quit");
 					return;
 				default:
 					return;
@@ -822,11 +862,17 @@ export default function App() {
 			<Pane
 				key="main"
 				paneRole="MAIN"
-				status="manual"
+				status={watchEnabled ? "watching" : "manual"}
 				focused={focusedPane === "main"}
 				onFocus={() => setFocusedPane("main")}
 			>
-				<MainViewer ref={mainViewerRef} onStatus={announce} reloadKey={reloadKey} />
+				<PdfViewer
+					paneRole="MAIN"
+					url="/api/main.pdf"
+					ref={mainViewerRef}
+					onStatus={announce}
+					reloadKey={mainReloadKey}
+				/>
 			</Pane>
 		);
 
@@ -837,12 +883,14 @@ export default function App() {
 				status="static"
 				focused={focusedPane === "sub"}
 				onFocus={() => setFocusedPane("sub")}
-			/>
+			>
+				<PdfViewer paneRole="SUB" url="/api/sub.pdf" onStatus={announce} reloadKey={subRenderKey} />
+			</Pane>
 		) : null;
 
 		if (!subPane) return [mainPane];
 		return paneOrder === "main-first" ? [mainPane, subPane] : [subPane, mainPane];
-	}, [announce, focusedPane, hasSub, paneOrder, reloadKey]);
+	}, [announce, focusedPane, hasSub, mainReloadKey, paneOrder, subRenderKey, watchEnabled]);
 
 	return (
 		<div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 pb-6 pt-4">

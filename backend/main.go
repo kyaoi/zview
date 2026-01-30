@@ -2,6 +2,7 @@ package main
 
 import (
 	"embed"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -92,6 +93,16 @@ func run(opts options) error {
 		return err
 	}
 
+	bootstrap := bootstrapInfo{
+		Focus:   opts.focus,
+		HasMain: opts.mainPath != "",
+		HasSub:  opts.subPath != "",
+		Watch:   opts.watch,
+	}
+	if !bootstrap.HasSub && bootstrap.Focus == "sub" {
+		bootstrap.Focus = "main"
+	}
+
 	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", opts.port))
 	if err != nil {
 		return fmt.Errorf("failed to listen on port %d: %w", opts.port, err)
@@ -102,7 +113,9 @@ func run(opts options) error {
 
 	mux := http.NewServeMux()
 	mux.Handle("/", spaHandler(staticFS))
-	mux.Handle("/api/main.pdf", mainPDFHandler(opts.mainPath))
+	mux.Handle("/api/bootstrap", bootstrapHandler(bootstrap))
+	mux.Handle("/api/main.pdf", pdfHandler("MAIN", opts.mainPath))
+	mux.Handle("/api/sub.pdf", pdfHandler("SUB", opts.subPath))
 
 	server := &http.Server{
 		Handler:           mux,
@@ -110,7 +123,13 @@ func run(opts options) error {
 		IdleTimeout:       60 * time.Second,
 	}
 
-	log.Printf("zview backend starting at %s (focus=%s watch=%t)", url, opts.focus, opts.watch)
+	log.Printf(
+		"zview backend starting at %s (focus=%s watch=%t sub=%t)",
+		url,
+		bootstrap.Focus,
+		bootstrap.Watch,
+		bootstrap.HasSub,
+	)
 
 	if opts.openBrowser {
 		go func() {
@@ -195,34 +214,54 @@ func exists(fsys fs.FS, name string) bool {
 	return err == nil
 }
 
-func mainPDFHandler(mainPath string) http.Handler {
+type bootstrapInfo struct {
+	Focus   string `json:"focus"`
+	HasMain bool   `json:"hasMain"`
+	HasSub  bool   `json:"hasSub"`
+	Watch   bool   `json:"watch"`
+}
+
+func bootstrapHandler(info bootstrapInfo) http.Handler {
+	payload, err := json.Marshal(info)
+	if err != nil {
+		panic(fmt.Errorf("failed to marshal bootstrap info: %w", err))
+	}
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if mainPath == "" {
-			http.Error(w, "Missing PDF: MAIN not provided", http.StatusNotFound)
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "no-store")
+		_, _ = w.Write(payload)
+	})
+}
+
+func pdfHandler(role string, path string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if path == "" {
+			http.Error(w, fmt.Sprintf("Missing PDF: %s not provided", role), http.StatusNotFound)
 			return
 		}
 
-		file, err := os.Open(mainPath)
+		file, err := os.Open(path)
 		if err != nil {
 			if errors.Is(err, fs.ErrNotExist) {
-				http.Error(w, "MAIN PDF not found", http.StatusNotFound)
+				http.Error(w, fmt.Sprintf("%s PDF not found", role), http.StatusNotFound)
 				return
 			}
 
-			log.Printf("failed to open MAIN PDF: %v", err)
-			http.Error(w, "failed to read MAIN PDF", http.StatusInternalServerError)
+			log.Printf("failed to open %s PDF: %v", role, err)
+			http.Error(w, fmt.Sprintf("failed to read %s PDF", role), http.StatusInternalServerError)
 			return
 		}
 		defer file.Close()
 
 		info, err := file.Stat()
 		if err != nil {
-			log.Printf("failed to stat MAIN PDF: %v", err)
-			http.Error(w, "failed to read MAIN PDF", http.StatusInternalServerError)
+			log.Printf("failed to stat %s PDF: %v", role, err)
+			http.Error(w, fmt.Sprintf("failed to read %s PDF", role), http.StatusInternalServerError)
 			return
 		}
 		if info.IsDir() {
-			http.Error(w, "MAIN PDF path is a directory", http.StatusNotFound)
+			http.Error(w, fmt.Sprintf("%s PDF path is a directory", role), http.StatusNotFound)
 			return
 		}
 
