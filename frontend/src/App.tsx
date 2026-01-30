@@ -1,4 +1,13 @@
-import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+	forwardRef,
+	type ReactNode,
+	useCallback,
+	useEffect,
+	useImperativeHandle,
+	useMemo,
+	useRef,
+	useState,
+} from "react";
 import {
 	GlobalWorkerOptions,
 	getDocument,
@@ -16,6 +25,7 @@ const ZOOM_STEP = 1.1;
 const ZOOM_MIN = 0.25;
 const ZOOM_MAX = 4;
 const PDFJS_ASSET_BASE = "/pdfjs/";
+const LINE_SCROLL_PX = 64;
 
 const toolbarActions = [
 	{ key: "openMain", label: "Open (Main)", hint: "Pick a PDF for MAIN" },
@@ -98,21 +108,27 @@ type PageSlotRef = {
 
 type ZoomMode = "fit-width" | "manual";
 
+export type MainViewerHandle = {
+	scrollLine: (deltaPx: number) => void;
+	scrollHalfPage: (direction: 1 | -1) => void;
+	jumpToTop: () => void;
+	jumpToBottom: () => void;
+	jumpByPages: (delta: number) => void;
+	zoomIn: () => void;
+	zoomOut: () => void;
+	fitToWidth: () => void;
+};
+
 function friendlyError(detail: string) {
 	if (detail.includes("Missing PDF")) return "MAIN PDF が指定されていません";
 	if (detail.includes("Unexpected server response")) return "MAIN PDF の取得に失敗しました";
 	return "MAIN を読み込めませんでした";
 }
 
-function MainViewer({
-	onStatus,
-	reloadKey,
-	isActive,
-}: {
-	onStatus: (message: string) => void;
-	reloadKey: number;
-	isActive: boolean;
-}) {
+const MainViewer = forwardRef<
+	MainViewerHandle,
+	{ onStatus: (message: string) => void; reloadKey: number }
+>(function MainViewer({ onStatus, reloadKey }, ref) {
 	const hostRef = useRef<HTMLDivElement>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
 	const [state, setState] = useState<MainViewerState>({ phase: "idle" });
@@ -127,6 +143,12 @@ function MainViewer({
 	const rafId = useRef<number | null>(null);
 	const pageSlotsRef = useRef<PageSlotRef[]>([]);
 	const manualScaleInitializedRef = useRef(false);
+	const currentPageRef = useRef(1);
+
+	const getHostTop = useCallback(
+		() => (hostRef.current ? hostRef.current.getBoundingClientRect().top + window.scrollY : 0),
+		[],
+	);
 
 	const resetPageSlots = useCallback(() => {
 		pageSlotsRef.current.forEach((slot) => {
@@ -227,6 +249,7 @@ function MainViewer({
 			if (prev[0] === start && prev[1] === end) return prev;
 			return [start, end];
 		});
+		currentPageRef.current = current + 1;
 		setCurrentPage(current + 1);
 	}, [fitScale, manualScale, pageCount, pageSize, zoomMode]);
 
@@ -373,34 +396,55 @@ function MainViewer({
 		announceZoom(fitScale, "fit-width");
 	}, [announceZoom, fitScale, pageSize]);
 
-	useEffect(() => {
-		if (!isActive) return;
-		const handleKey = (event: KeyboardEvent) => {
-			const target = event.target as HTMLElement | null;
-			const tag = target?.tagName?.toLowerCase();
-			if (event.metaKey || event.ctrlKey || event.altKey) return;
-			if (tag === "input" || tag === "textarea" || tag === "select" || target?.isContentEditable)
-				return;
+	const scrollLine = useCallback((deltaPx: number) => {
+		window.scrollBy({ top: deltaPx, behavior: "smooth" });
+	}, []);
 
-			if (event.key === "+") {
-				event.preventDefault();
-				zoomIn();
-				return;
-			}
-			if (event.key === "-") {
-				event.preventDefault();
-				zoomOut();
-				return;
-			}
-			if (event.key === "=") {
-				event.preventDefault();
-				fitToWidth();
-			}
-		};
+	const scrollHalfPage = useCallback((direction: 1 | -1) => {
+		const amount = Math.max(1, window.innerHeight / 2);
+		window.scrollBy({ top: direction * amount, behavior: "smooth" });
+	}, []);
 
-		window.addEventListener("keydown", handleKey);
-		return () => window.removeEventListener("keydown", handleKey);
-	}, [fitToWidth, isActive, zoomIn, zoomOut]);
+	const jumpToTop = useCallback(() => {
+		const hostTop = getHostTop();
+		window.scrollTo({ top: hostTop, behavior: "smooth" });
+	}, [getHostTop]);
+
+	const jumpToBottom = useCallback(() => {
+		if (!pageSize || pageCount === 0) return;
+		const pageBlock = Math.round(pageSize.height * layoutScale) + PAGE_GAP_PX;
+		const totalHeight = pageCount * pageBlock - PAGE_GAP_PX;
+		window.scrollTo({
+			top: getHostTop() + Math.max(0, totalHeight - window.innerHeight + PAGE_GAP_PX),
+			behavior: "smooth",
+		});
+	}, [getHostTop, layoutScale, pageCount, pageSize]);
+
+	const jumpByPages = useCallback(
+		(delta: number) => {
+			if (!pageSize || pageCount === 0) return;
+			const targetIndex = Math.min(pageCount - 1, Math.max(0, currentPageRef.current - 1 + delta));
+			const pageBlock = Math.round(pageSize.height * layoutScale) + PAGE_GAP_PX;
+			const offset = targetIndex * pageBlock;
+			window.scrollTo({ top: getHostTop() + offset, behavior: "smooth" });
+		},
+		[getHostTop, layoutScale, pageCount, pageSize],
+	);
+
+	useImperativeHandle(
+		ref,
+		() => ({
+			scrollLine,
+			scrollHalfPage,
+			jumpToTop,
+			jumpToBottom,
+			jumpByPages,
+			zoomIn,
+			zoomOut,
+			fitToWidth,
+		}),
+		[jumpByPages, jumpToBottom, jumpToTop, scrollHalfPage, scrollLine, fitToWidth, zoomIn, zoomOut],
+	);
 
 	const displayWidth = pageSize ? Math.round(pageSize.width * layoutScale) : null;
 	const displayHeight = pageSize ? Math.round(pageSize.height * layoutScale) : null;
@@ -514,7 +558,7 @@ function MainViewer({
 			</div>
 		</div>
 	);
-}
+});
 
 function HelpOverlay({ onClose }: { onClose: () => void }) {
 	return (
@@ -522,13 +566,50 @@ function HelpOverlay({ onClose }: { onClose: () => void }) {
 			<div className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900/90 p-5 shadow-2xl">
 				<header className="mb-3">
 					<p className="text-xs uppercase tracking-[0.2em] text-slate-400">Guide</p>
-					<h3 className="text-lg font-semibold text-slate-50">Skeleton UI</h3>
+					<h3 className="text-lg font-semibold text-slate-50">Keybindings</h3>
 				</header>
-				<ul className="mb-4 list-disc space-y-2 pl-5 text-sm text-slate-200">
-					<li>Toolbar hooks up to pickers and reloads in later tasks.</li>
-					<li>MAIN badge stays visible; SUB appears after you add it.</li>
-					<li>Focus ring shows which pane will react to keybindings.</li>
-				</ul>
+				<div className="mb-4 grid grid-cols-1 gap-3 text-sm text-slate-200">
+					<div>
+						<p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+							Navigation
+						</p>
+						<ul className="list-disc space-y-1 pl-5">
+							<li>`j` / `k` — scroll down / up</li>
+							<li>`d` / `u` — half-page down / up</li>
+							<li>`gg` — top, `G` — bottom</li>
+							<li>`n` / `p` — next / previous page</li>
+						</ul>
+					</div>
+					<div>
+						<p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+							Zoom
+						</p>
+						<ul className="list-disc space-y-1 pl-5">
+							<li>`+` / `-` — zoom in / out</li>
+							<li>`=` — fit to width</li>
+						</ul>
+					</div>
+					<div>
+						<p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+							Panes
+						</p>
+						<ul className="list-disc space-y-1 pl-5">
+							<li>`Tab` — toggle focus (MAIN ↔ SUB)</li>
+							<li>`x` — swap pane positions</li>
+						</ul>
+					</div>
+					<div>
+						<p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
+							Reload / misc
+						</p>
+						<ul className="list-disc space-y-1 pl-5">
+							<li>`r` — reload MAIN</li>
+							<li>`R` — reload MAIN (re-render SUB)</li>
+							<li>`?` — toggle this overlay</li>
+							<li>`q` — quit (close tab)</li>
+						</ul>
+					</div>
+				</div>
 				<button
 					type="button"
 					className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-100 hover:border-brand/60 hover:bg-slate-800/80"
@@ -548,6 +629,9 @@ export default function App() {
 	const [status, setStatus] = useState("Ready to open MAIN");
 	const [reloadKey, setReloadKey] = useState(0);
 	const [showHelp, setShowHelp] = useState(false);
+	const mainViewerRef = useRef<MainViewerHandle | null>(null);
+	const keySeqTimeoutRef = useRef<number | null>(null);
+	const lastKeyRef = useRef<string | null>(null);
 
 	const announce = useCallback((message: string) => setStatus(message), []);
 
@@ -583,6 +667,156 @@ export default function App() {
 		}
 	};
 
+	useEffect(() => {
+		const clearSequence = () => {
+			if (keySeqTimeoutRef.current) {
+				window.clearTimeout(keySeqTimeoutRef.current);
+				keySeqTimeoutRef.current = null;
+			}
+			lastKeyRef.current = null;
+		};
+
+		const scheduleSequenceClear = () => {
+			if (keySeqTimeoutRef.current) window.clearTimeout(keySeqTimeoutRef.current);
+			keySeqTimeoutRef.current = window.setTimeout(() => {
+				lastKeyRef.current = null;
+				keySeqTimeoutRef.current = null;
+			}, 600);
+		};
+
+		const handleKey = (event: KeyboardEvent) => {
+			const target = event.target as HTMLElement | null;
+			const tag = target?.tagName?.toLowerCase();
+			if (event.metaKey || event.ctrlKey || event.altKey) return;
+			if (tag === "input" || tag === "textarea" || tag === "select" || target?.isContentEditable)
+				return;
+
+			const mainActive = focusedPane === "main";
+
+			// multi-key: gg
+			if (event.key === "g") {
+				if (lastKeyRef.current === "g") {
+					event.preventDefault();
+					clearSequence();
+					mainViewerRef.current?.jumpToTop();
+					announce("MAIN: 先頭へ移動");
+					return;
+				}
+				lastKeyRef.current = "g";
+				scheduleSequenceClear();
+				return;
+			}
+			clearSequence();
+
+			switch (event.key) {
+				case "j":
+					if (!mainActive) return;
+					event.preventDefault();
+					mainViewerRef.current?.scrollLine(LINE_SCROLL_PX);
+					announce("MAIN: 下へスクロール");
+					return;
+				case "k":
+					if (!mainActive) return;
+					event.preventDefault();
+					mainViewerRef.current?.scrollLine(-LINE_SCROLL_PX);
+					announce("MAIN: 上へスクロール");
+					return;
+				case "d":
+					if (!mainActive) return;
+					event.preventDefault();
+					mainViewerRef.current?.scrollHalfPage(1);
+					announce("MAIN: 半ページ下へ");
+					return;
+				case "u":
+					if (!mainActive) return;
+					event.preventDefault();
+					mainViewerRef.current?.scrollHalfPage(-1);
+					announce("MAIN: 半ページ上へ");
+					return;
+				case "G":
+					if (!mainActive) return;
+					event.preventDefault();
+					mainViewerRef.current?.jumpToBottom();
+					announce("MAIN: 末尾へ移動");
+					return;
+				case "n":
+					if (!mainActive) return;
+					event.preventDefault();
+					mainViewerRef.current?.jumpByPages(1);
+					announce("MAIN: 次のページ");
+					return;
+				case "p":
+					if (!mainActive) return;
+					event.preventDefault();
+					mainViewerRef.current?.jumpByPages(-1);
+					announce("MAIN: 前のページ");
+					return;
+				case "+":
+					if (!mainActive) return;
+					event.preventDefault();
+					mainViewerRef.current?.zoomIn();
+					return;
+				case "-":
+					if (!mainActive) return;
+					event.preventDefault();
+					mainViewerRef.current?.zoomOut();
+					return;
+				case "=":
+					if (!mainActive) return;
+					event.preventDefault();
+					mainViewerRef.current?.fitToWidth();
+					return;
+				case "Tab":
+					event.preventDefault();
+					if (hasSub) {
+						setFocusedPane((prev) => (prev === "main" ? "sub" : "main"));
+						announce("フォーカスを切り替えました");
+					} else {
+						setFocusedPane("main");
+					}
+					return;
+				case "x":
+					event.preventDefault();
+					if (!hasSub) {
+						announce("SUB がないため入れ替えできません");
+						return;
+					}
+					setPaneOrder((prev) => (prev === "main-first" ? "sub-first" : "main-first"));
+					announce("MAIN/SUB を入れ替えました");
+					return;
+				case "r":
+					event.preventDefault();
+					setReloadKey((v) => v + 1);
+					setFocusedPane("main");
+					announce("MAIN: 再読み込み中…");
+					return;
+				case "R":
+					event.preventDefault();
+					setReloadKey((v) => v + 1);
+					setFocusedPane("main");
+					announce("MAIN: 再読み込み (SUB 再描画)");
+					return;
+				case "?":
+					event.preventDefault();
+					setShowHelp((open) => !open);
+					announce("ヘルプを切り替えました");
+					return;
+				case "q":
+					event.preventDefault();
+					announce("終了するにはタブを閉じてください");
+					return;
+				default:
+					return;
+			}
+		};
+
+		window.addEventListener("keydown", handleKey);
+		return () => {
+			window.removeEventListener("keydown", handleKey);
+			if (keySeqTimeoutRef.current) window.clearTimeout(keySeqTimeoutRef.current);
+		};
+	}, [announce, focusedPane, hasSub]);
+
 	const paneSequence = useMemo(() => {
 		const mainPane = (
 			<Pane
@@ -592,7 +826,7 @@ export default function App() {
 				focused={focusedPane === "main"}
 				onFocus={() => setFocusedPane("main")}
 			>
-				<MainViewer onStatus={announce} reloadKey={reloadKey} isActive={focusedPane === "main"} />
+				<MainViewer ref={mainViewerRef} onStatus={announce} reloadKey={reloadKey} />
 			</Pane>
 		);
 

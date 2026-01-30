@@ -12,7 +12,7 @@ This plan breaks development of **zview** into small, reviewable tasks.
 
 * [x] **Milestone 0:** Repo + tooling bootstrapped
 * [ ] **Milestone 1:** Single-PDF viewer works end-to-end
-* [ ] **Milestone 2:** Keybindings + zoom/fit-width
+* [x] **Milestone 2:** Keybindings + zoom/fit-width
 * [ ] **Milestone 3:** Two-pane MAIN/SUB + focus + swap
 * [ ] **Milestone 4:** Reload (manual + auto) + scroll restoration
 * [ ] **Milestone 5:** Performance hardening
@@ -268,7 +268,7 @@ A task is “done” when:
 
 #### `task/keybindings-core`
 
-* [ ] Done
+* [x] Done
 
 **Goal:** Reliable key handling for navigation and actions.
 
