@@ -114,7 +114,7 @@ A task is “done” when:
 
 #### `task/backend-go-skeleton`
 
-* [ ] Done
+* [x] Done
 
 **Goal:** Start server on localhost and serve a placeholder.
 
