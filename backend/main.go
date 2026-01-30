@@ -166,6 +166,18 @@ func spaHandler(staticFS fs.FS) http.Handler {
 			path = "index.html"
 		}
 
+		// Serve index.html directly to avoid FileServer's redirect quirks on root.
+		if path == "index.html" {
+			data, err := fs.ReadFile(staticFS, "index.html")
+			if err != nil {
+				http.Error(w, "index.html missing in embedded assets", http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			_, _ = w.Write(data)
+			return
+		}
+
 		if exists(staticFS, path) {
 			r.URL.Path = "/" + path
 			fileServer.ServeHTTP(w, r)
