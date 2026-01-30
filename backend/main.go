@@ -102,6 +102,7 @@ func run(opts options) error {
 
 	mux := http.NewServeMux()
 	mux.Handle("/", spaHandler(staticFS))
+	mux.Handle("/api/main.pdf", mainPDFHandler(opts.mainPath))
 
 	server := &http.Server{
 		Handler:           mux,
@@ -180,4 +181,14 @@ func spaHandler(staticFS fs.FS) http.Handler {
 func exists(fsys fs.FS, name string) bool {
 	_, err := fs.Stat(fsys, name)
 	return err == nil
+}
+
+func mainPDFHandler(mainPath string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if mainPath == "" {
+			http.Error(w, "main PDF not specified", http.StatusNotFound)
+			return
+		}
+		http.ServeFile(w, r, mainPath)
+	})
 }

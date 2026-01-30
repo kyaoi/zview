@@ -159,7 +159,7 @@ A task is “done” when:
 
 #### `task/pdfjs-worker-and-main-mvp`
 
-* [ ] Done
+* [x] Done
 
 **Goal:** Render a PDF (MAIN) reliably, including worker.
 
