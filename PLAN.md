@@ -343,7 +343,7 @@ A task is “done” when:
 
 #### `task/manual-reload-main`
 
-* [ ] Done
+* [x] Done
 
 **Goal:** Implement manual reload behavior, stable on failure.
 

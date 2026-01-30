@@ -27,6 +27,12 @@ const ZOOM_MAX = 4;
 const PDFJS_ASSET_BASE = "/pdfjs/";
 const LINE_SCROLL_PX = 64;
 
+function withCacheBust(url: string, token: number) {
+	if (token <= 0) return url;
+	const joiner = url.includes("?") ? "&" : "?";
+	return `${url}${joiner}cb=${token}-${Date.now()}`;
+}
+
 const toolbarActions = [
 	{ key: "openMain", label: "Open (Main)", hint: "Pick a PDF for MAIN" },
 	{ key: "openSub", label: "Open (Sub)", hint: "Use CLI --sub" },
@@ -137,6 +143,7 @@ type ViewerHandle = {
 	zoomIn: () => void;
 	zoomOut: () => void;
 	fitToWidth: () => void;
+	rerender: () => void;
 };
 
 function friendlyError(role: ViewerRole, detail: string) {
@@ -161,10 +168,12 @@ const PdfViewer = forwardRef<
 	const [manualScale, setManualScale] = useState(1);
 	const [visibleRange, setVisibleRange] = useState<[number, number]>([0, 0]);
 	const [currentPage, setCurrentPage] = useState(1);
+	const [renderNonce, setRenderNonce] = useState(0);
 	const rafId = useRef<number | null>(null);
 	const pageSlotsRef = useRef<PageSlotRef[]>([]);
 	const manualScaleInitializedRef = useRef(false);
 	const currentPageRef = useRef(1);
+	const pdfRef = useRef<PDFDocumentProxy | null>(null);
 
 	const getHostTop = useCallback(
 		() => (hostRef.current ? hostRef.current.getBoundingClientRect().top + window.scrollY : 0),
@@ -181,46 +190,59 @@ const PdfViewer = forwardRef<
 
 	useEffect(() => {
 		let cancelled = false;
-		resetPageSlots();
-		setPdf(null);
-		setPageCount(0);
-		setPageSize(null);
-		setFitScale(1);
-		setManualScale(1);
-		setVisibleRange([0, 0]);
-		setCurrentPage(1);
-		setZoomMode("fit-width");
-		manualScaleInitializedRef.current = false;
+		const requestUrl = role === "MAIN" ? withCacheBust(url, reloadKey) : url;
+
+		setState((prev) => (prev.phase === "ready" ? prev : { phase: "loading" }));
+		onStatus(reloadKey > 0 ? `${role}: Reloading…` : `${role}: Loading…`);
 
 		async function loadAndRender() {
-			setState({ phase: "loading" });
-			onStatus(reloadKey > 0 ? `${role}: Reloading…` : `${role}: Loading…`);
-
 			try {
 				const loaded = await getDocument({
-					url,
+					url: requestUrl,
 					cMapUrl: `${PDFJS_ASSET_BASE}cmaps/`,
 					cMapPacked: true,
 					standardFontDataUrl: `${PDFJS_ASSET_BASE}standard_fonts/`,
 					useSystemFonts: true,
 				}).promise;
-				if (cancelled) return;
+				if (cancelled) {
+					await loaded.destroy();
+					return;
+				}
 
 				const firstPage = await loaded.getPage(1);
-				if (cancelled) return;
+				if (cancelled) {
+					await loaded.destroy();
+					return;
+				}
 
 				const baseViewport = firstPage.getViewport({ scale: 1 });
+
+				resetPageSlots();
+				pdfRef.current?.destroy();
+
 				setPdf(loaded);
+				pdfRef.current = loaded;
 				setPageCount(loaded.numPages);
 				setPageSize({ width: baseViewport.width, height: baseViewport.height });
 				setState({ phase: "ready", summary: `Page 1 / ${loaded.numPages}` });
+				setFitScale(1);
+				setManualScale(1);
+				setVisibleRange([0, 0]);
+				setCurrentPage(1);
+				setZoomMode("fit-width");
+				setRenderNonce((v) => v + 1);
+				manualScaleInitializedRef.current = false;
 				onStatus(`${role}: showing page 1`);
 			} catch (err) {
 				if (cancelled) return;
-				resetPageSlots();
 				const detail = err instanceof Error ? err.message : String(err);
-				setState({ phase: "error", detail });
-				onStatus(`${role}: failed to load`);
+				setState((prev) => {
+					if (pdfRef.current && prev.phase === "ready") return prev;
+					return { phase: "error", detail };
+				});
+				onStatus(
+					pdfRef.current ? `${role}: reload failed; keeping previous` : `${role}: failed to load`,
+				);
 			}
 		}
 
@@ -228,9 +250,16 @@ const PdfViewer = forwardRef<
 
 		return () => {
 			cancelled = true;
-			resetPageSlots();
 		};
 	}, [onStatus, reloadKey, resetPageSlots, role, url]);
+
+	useEffect(
+		() => () => {
+			resetPageSlots();
+			pdfRef.current?.destroy();
+		},
+		[resetPageSlots],
+	);
 
 	useEffect(() => {
 		if (!pageSize || !hostRef.current) return;
@@ -330,6 +359,7 @@ const PdfViewer = forwardRef<
 	);
 
 	useEffect(() => {
+		void renderNonce;
 		const layoutScale = zoomMode === "fit-width" ? fitScale : manualScale;
 		if (!pdf || !pageSize || pageCount === 0) return;
 
@@ -356,7 +386,17 @@ const PdfViewer = forwardRef<
 				slot.renderedScale = null;
 			}
 		});
-	}, [fitScale, manualScale, pageCount, pageSize, pdf, renderPage, visibleRange, zoomMode]);
+	}, [
+		fitScale,
+		manualScale,
+		pageCount,
+		pageSize,
+		pdf,
+		renderNonce,
+		renderPage,
+		visibleRange,
+		zoomMode,
+	]);
 
 	useEffect(() => {
 		if (state.phase !== "ready" || pageCount === 0) return;
@@ -463,8 +503,25 @@ const PdfViewer = forwardRef<
 			zoomIn,
 			zoomOut,
 			fitToWidth,
+			rerender: () => {
+				resetPageSlots();
+				setRenderNonce((v) => v + 1);
+				onStatus(`${role}: re-rendering current ${role}`);
+			},
 		}),
-		[jumpByPages, jumpToBottom, jumpToTop, scrollHalfPage, scrollLine, fitToWidth, zoomIn, zoomOut],
+		[
+			fitToWidth,
+			jumpByPages,
+			jumpToBottom,
+			jumpToTop,
+			onStatus,
+			resetPageSlots,
+			scrollHalfPage,
+			scrollLine,
+			zoomIn,
+			zoomOut,
+			role,
+		],
 	);
 
 	const displayWidth = pageSize ? Math.round(pageSize.width * layoutScale) : null;
@@ -650,7 +707,6 @@ export default function App() {
 	const [paneOrder, setPaneOrder] = useState<"main-first" | "sub-first">("main-first");
 	const [status, setStatus] = useState("Fetching bootstrap info…");
 	const [mainReloadKey, setMainReloadKey] = useState(0);
-	const [subRenderKey, setSubRenderKey] = useState(0);
 	const [showHelp, setShowHelp] = useState(false);
 	const mainViewerRef = useRef<ViewerHandle | null>(null);
 	const subViewerRef = useRef<ViewerHandle | null>(null);
@@ -844,9 +900,11 @@ export default function App() {
 				case "R":
 					event.preventDefault();
 					setMainReloadKey((v) => v + 1);
-					setSubRenderKey((v) => v + 1);
+					if (hasSub) {
+						subViewerRef.current?.rerender();
+					}
 					setFocusedPane("main");
-					announce("MAIN: reload (re-render SUB)");
+					announce(hasSub ? "MAIN: reload (re-render SUB)" : "MAIN: reloading…");
 					return;
 				case "?":
 					event.preventDefault();
@@ -896,19 +954,13 @@ export default function App() {
 				focused={focusedPane === "sub"}
 				onFocus={() => setFocusedPane("sub")}
 			>
-				<PdfViewer
-					paneRole="SUB"
-					url="/api/sub.pdf"
-					onStatus={announce}
-					reloadKey={subRenderKey}
-					ref={subViewerRef}
-				/>
+				<PdfViewer paneRole="SUB" url="/api/sub.pdf" onStatus={announce} ref={subViewerRef} />
 			</Pane>
 		) : null;
 
 		if (!subPane) return [mainPane];
 		return paneOrder === "main-first" ? [mainPane, subPane] : [subPane, mainPane];
-	}, [announce, focusedPane, hasSub, mainReloadKey, paneOrder, subRenderKey, watchEnabled]);
+	}, [announce, focusedPane, hasSub, mainReloadKey, paneOrder, watchEnabled]);
 
 	return (
 		<div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 pb-6 pt-4">
