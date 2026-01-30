@@ -225,7 +225,7 @@ A task is “done” when:
 
 #### `task/zoom-and-fit-width`
 
-* [ ] Done
+* [x] Done
 
 **Goal:** Implement zoom and fit-to-width.
 
