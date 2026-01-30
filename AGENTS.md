@@ -24,6 +24,7 @@ zview is a **fast, lightweight, read-only PDF viewer** that runs in the browser.
 ### PLAN
 
 - When a task is completed, mark the corresponding task in `PLAN.md` as complete.　
+- When a task is completed, check the Progress tracking.
 
 ### Branch/worktree
 

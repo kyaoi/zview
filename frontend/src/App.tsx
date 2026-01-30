@@ -127,12 +127,12 @@ function MainViewer({
 				canvas.style.width = `${Math.floor(viewport.width / outputScale)}px`;
 				canvas.style.height = `${Math.floor(viewport.height / outputScale)}px`;
 
-					renderTask = page.render({
-						canvas,
-						canvasContext: context,
-						viewport,
-						transform: outputScale !== 1 ? [1 / outputScale, 0, 0, 1 / outputScale, 0, 0] : undefined,
-					});
+				renderTask = page.render({
+					canvas,
+					canvasContext: context,
+					viewport,
+					transform: outputScale !== 1 ? [1 / outputScale, 0, 0, 1 / outputScale, 0, 0] : undefined,
+				});
 
 				await renderTask.promise;
 				if (cancelled) return;
