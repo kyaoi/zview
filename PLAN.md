@@ -1,4 +1,4 @@
-# PLAN.md (detailed)
+# PLAN.md
 
 This plan breaks development of **zview** into small, reviewable tasks.
 
