@@ -132,6 +132,7 @@ go build -o ../zview
 Result:
 
 * `./zview` is the distributable executable.
+* Frontend assets are emitted to `backend/dist` and **embedded** into the Go binary.
 * End users do **not** need Node/pnpm.
 
 ---

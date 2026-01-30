@@ -15,6 +15,7 @@ backend/bin/
 backend/tmp/
 backend/backend
 backend/zview
+backend/dist/
 *.exe
 *.out
 *.test

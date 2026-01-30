@@ -1,9 +1,11 @@
 package main
 
 import (
+	"embed"
 	"errors"
 	"flag"
 	"fmt"
+	"io/fs"
 	"log"
 	"net"
 	"net/http"
@@ -85,6 +87,11 @@ func parseArgs(args []string) (options, error) {
 }
 
 func run(opts options) error {
+	staticFS, err := loadEmbeddedDist()
+	if err != nil {
+		return err
+	}
+
 	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", opts.port))
 	if err != nil {
 		return fmt.Errorf("failed to listen on port %d: %w", opts.port, err)
@@ -94,9 +101,7 @@ func run(opts options) error {
 	url := "http://" + addr
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		writePlaceholder(w, opts)
-	})
+	mux.Handle("/", spaHandler(staticFS))
 
 	server := &http.Server{
 		Handler:           mux,
@@ -121,22 +126,6 @@ func run(opts options) error {
 	return nil
 }
 
-func writePlaceholder(w http.ResponseWriter, opts options) {
-	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-
-	mainPath := opts.mainPath
-	if mainPath == "" {
-		mainPath = "(none)"
-	}
-
-	subPath := opts.subPath
-	if subPath == "" {
-		subPath = "(none)"
-	}
-
-	fmt.Fprintf(w, "zview backend skeleton\n\nMAIN: %s\nSUB: %s\nfocus: %s\nwatch: %t\n", mainPath, subPath, opts.focus, opts.watch)
-}
-
 func openBrowser(url string) error {
 	var cmd *exec.Cmd
 
@@ -152,4 +141,43 @@ func openBrowser(url string) error {
 	}
 
 	return cmd.Start()
+}
+
+// Embedded frontend (built via `pnpm build` → backend/dist).
+//
+//go:embed dist/* dist/**/*
+var embeddedDist embed.FS
+
+func loadEmbeddedDist() (fs.FS, error) {
+	dist, err := fs.Sub(embeddedDist, "dist")
+	if err != nil {
+		return nil, fmt.Errorf("frontend assets not embedded: %w", err)
+	}
+	return dist, nil
+}
+
+func spaHandler(staticFS fs.FS) http.Handler {
+	fileServer := http.FileServer(http.FS(staticFS))
+
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/")
+		if path == "" {
+			path = "index.html"
+		}
+
+		if exists(staticFS, path) {
+			r.URL.Path = "/" + path
+			fileServer.ServeHTTP(w, r)
+			return
+		}
+
+		// SPA fallback: serve index.html for unknown routes.
+		r.URL.Path = "/index.html"
+		fileServer.ServeHTTP(w, r)
+	})
+}
+
+func exists(fsys fs.FS, name string) bool {
+	_, err := fs.Stat(fsys, name)
+	return err == nil
 }
