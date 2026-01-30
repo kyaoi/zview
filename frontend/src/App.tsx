@@ -1,10 +1,17 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { GlobalWorkerOptions, getDocument, type RenderTask } from "pdfjs-dist";
+import {
+	GlobalWorkerOptions,
+	getDocument,
+	type PDFDocumentProxy,
+	type RenderTask,
+} from "pdfjs-dist";
 import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
 GlobalWorkerOptions.workerSrc = workerSrc;
 
 const DPR_CAP = 2;
+const PAGE_GAP_PX = 16;
+const RENDER_BUFFER = 1;
 
 const toolbarActions = [
 	{ key: "openMain", label: "Open (Main)", hint: "Pick a PDF for MAIN" },
@@ -78,6 +85,13 @@ type MainViewerState =
 	| { phase: "ready"; summary: string }
 	| { phase: "error"; detail: string };
 
+type PageSlotRef = {
+	container: HTMLDivElement | null;
+	canvas: HTMLCanvasElement | null;
+	renderTask: RenderTask | null;
+	renderedScale: number | null;
+};
+
 function friendlyError(detail: string) {
 	if (detail.includes("Missing PDF")) return "MAIN PDF が指定されていません";
 	if (detail.includes("Unexpected server response")) return "MAIN PDF の取得に失敗しました";
@@ -91,60 +105,55 @@ function MainViewer({
 	onStatus: (message: string) => void;
 	reloadKey: number;
 }) {
+	const hostRef = useRef<HTMLDivElement>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
-	const canvasRef = useRef<HTMLCanvasElement>(null);
 	const [state, setState] = useState<MainViewerState>({ phase: "idle" });
+	const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
+	const [pageCount, setPageCount] = useState(0);
+	const [pageSize, setPageSize] = useState<{ width: number; height: number } | null>(null);
+	const [layoutScale, setLayoutScale] = useState(1);
+	const [visibleRange, setVisibleRange] = useState<[number, number]>([0, 0]);
+	const [currentPage, setCurrentPage] = useState(1);
+	const rafId = useRef<number | null>(null);
+	const pageSlotsRef = useRef<PageSlotRef[]>([]);
+
+	const resetPageSlots = useCallback(() => {
+		pageSlotsRef.current.forEach((slot) => {
+			slot?.renderTask?.cancel();
+			slot.renderTask = null;
+		});
+		pageSlotsRef.current = [];
+	}, []);
 
 	useEffect(() => {
 		let cancelled = false;
-		let renderTask: RenderTask | null = null;
+		resetPageSlots();
+		setPdf(null);
+		setPageCount(0);
+		setPageSize(null);
+		setVisibleRange([0, 0]);
+		setCurrentPage(1);
 
 		async function loadAndRender() {
 			setState({ phase: "loading" });
 			onStatus(reloadKey > 0 ? "MAIN: 再読み込み中…" : "MAIN: 読み込み中…");
 
 			try {
-				const pdf = await getDocument({ url: "/api/main.pdf" }).promise;
+				const loaded = await getDocument({ url: "/api/main.pdf" }).promise;
 				if (cancelled) return;
 
-				const page = await pdf.getPage(1);
+				const firstPage = await loaded.getPage(1);
 				if (cancelled) return;
 
-				const container = containerRef.current;
-				const canvas = canvasRef.current;
-				if (!container || !canvas) return;
-
-				const baseViewport = page.getViewport({ scale: 1 });
-				const fitScale = (container.clientWidth || baseViewport.width) / baseViewport.width;
-				const outputScale = Math.min(window.devicePixelRatio || 1, DPR_CAP);
-				const viewport = page.getViewport({ scale: fitScale * outputScale });
-
-				const context = canvas.getContext("2d");
-				if (!context) throw new Error("Canvas 2D context is not available");
-
-				canvas.width = Math.floor(viewport.width);
-				canvas.height = Math.floor(viewport.height);
-				canvas.style.width = `${Math.floor(viewport.width / outputScale)}px`;
-				canvas.style.height = `${Math.floor(viewport.height / outputScale)}px`;
-
-				renderTask = page.render({
-					canvas,
-					canvasContext: context,
-					viewport,
-					transform: outputScale !== 1 ? [1 / outputScale, 0, 0, 1 / outputScale, 0, 0] : undefined,
-				});
-
-				await renderTask.promise;
-				if (cancelled) return;
-
-				const summary = `Page 1 / ${pdf.numPages} • ${Math.round(viewport.width / outputScale)}×${Math.round(viewport.height / outputScale)} px`;
-				setState({ phase: "ready", summary });
+				const baseViewport = firstPage.getViewport({ scale: 1 });
+				setPdf(loaded);
+				setPageCount(loaded.numPages);
+				setPageSize({ width: baseViewport.width, height: baseViewport.height });
+				setState({ phase: "ready", summary: `Page 1 / ${loaded.numPages}` });
 				onStatus("MAIN: 1ページ目を表示中");
 			} catch (err) {
 				if (cancelled) return;
-				if (renderTask) {
-					renderTask.cancel();
-				}
+				resetPageSlots();
 				const detail = err instanceof Error ? err.message : String(err);
 				setState({ phase: "error", detail });
 				onStatus("MAIN: 読み込みに失敗しました");
@@ -155,16 +164,143 @@ function MainViewer({
 
 		return () => {
 			cancelled = true;
-			renderTask?.cancel();
+			resetPageSlots();
 		};
-	}, [onStatus, reloadKey]);
+	}, [onStatus, reloadKey, resetPageSlots]);
+
+	useEffect(() => {
+		if (!pageSize || !hostRef.current) return;
+
+		const node = hostRef.current;
+		const updateScale = () => {
+			const width = node.clientWidth || pageSize.width;
+			const fitScale = width / pageSize.width;
+			setLayoutScale(fitScale);
+		};
+
+		updateScale();
+		const observer = new ResizeObserver(updateScale);
+		observer.observe(node);
+		return () => observer.disconnect();
+	}, [pageSize]);
+
+	const measureVisibility = useCallback(() => {
+		if (!pageSize || !hostRef.current || pageCount === 0) return;
+		const hostTop = hostRef.current.getBoundingClientRect().top + window.scrollY;
+		const viewTop = window.scrollY - hostTop;
+		const viewBottom = viewTop + window.innerHeight;
+		const pageBlock = Math.round(pageSize.height * layoutScale) + PAGE_GAP_PX;
+		const start = Math.max(0, Math.floor(viewTop / pageBlock) - RENDER_BUFFER);
+		const end = Math.min(pageCount - 1, Math.ceil(viewBottom / pageBlock) + RENDER_BUFFER);
+		const current = Math.min(pageCount - 1, Math.max(0, Math.floor(viewTop / pageBlock)));
+
+		setVisibleRange((prev) => {
+			if (prev[0] === start && prev[1] === end) return prev;
+			return [start, end];
+		});
+		setCurrentPage(current + 1);
+	}, [layoutScale, pageCount, pageSize]);
+
+	useEffect(() => {
+		const handleScroll = () => {
+			if (rafId.current) return;
+			rafId.current = requestAnimationFrame(() => {
+				rafId.current = null;
+				measureVisibility();
+			});
+		};
+
+		window.addEventListener("scroll", handleScroll, { passive: true });
+		window.addEventListener("resize", handleScroll);
+		measureVisibility();
+		return () => {
+			window.removeEventListener("scroll", handleScroll);
+			window.removeEventListener("resize", handleScroll);
+			if (rafId.current) cancelAnimationFrame(rafId.current);
+		};
+	}, [measureVisibility]);
+
+	const renderPage = useCallback(
+		async (pageIndex: number, slot: PageSlotRef, displayScale: number) => {
+			if (!pdf || !pageSize) return;
+			const canvas = slot.canvas;
+			if (!canvas) return;
+			const outputScale = Math.min(window.devicePixelRatio || 1, DPR_CAP);
+			try {
+				const page = await pdf.getPage(pageIndex + 1);
+				const viewport = page.getViewport({ scale: displayScale * outputScale });
+				const context = canvas.getContext("2d");
+				if (!context) return;
+
+				slot.renderTask?.cancel();
+				slot.renderedScale = null;
+				canvas.width = Math.floor(viewport.width);
+				canvas.height = Math.floor(viewport.height);
+				canvas.style.width = `${Math.floor(viewport.width / outputScale)}px`;
+				canvas.style.height = `${Math.floor(viewport.height / outputScale)}px`;
+				canvas.style.backgroundColor = "#0f172a";
+
+				slot.renderTask = page.render({
+					canvasContext: context,
+					viewport,
+					transform: outputScale !== 1 ? [1 / outputScale, 0, 0, 1 / outputScale, 0, 0] : undefined,
+				});
+
+				await slot.renderTask.promise;
+				slot.renderedScale = displayScale;
+			} catch (err) {
+				if (err instanceof Error && err.name === "RenderingCancelledException") return;
+				console.error(`Failed to render page ${pageIndex + 1}:`, err);
+			}
+		},
+		[pdf, pageSize],
+	);
+
+	useEffect(() => {
+		if (!pdf || !pageSize || pageCount === 0) return;
+
+		for (let i = visibleRange[0]; i <= visibleRange[1]; i += 1) {
+			if (!pageSlotsRef.current[i]) {
+				pageSlotsRef.current[i] = {
+					container: null,
+					canvas: null,
+					renderTask: null,
+					renderedScale: null,
+				};
+			}
+			const slot = pageSlotsRef.current[i];
+			if (!slot?.canvas) continue;
+			if (slot.renderedScale === layoutScale) continue;
+			renderPage(i, slot, layoutScale);
+		}
+
+		pageSlotsRef.current.forEach((slot, index) => {
+			if (!slot?.renderTask) return;
+			if (index < visibleRange[0] - 1 || index > visibleRange[1] + 1) {
+				slot.renderTask.cancel();
+				slot.renderTask = null;
+				slot.renderedScale = null;
+			}
+		});
+	}, [layoutScale, pageCount, pageSize, pdf, renderPage, visibleRange]);
+
+	useEffect(() => {
+		if (state.phase !== "ready" || pageCount === 0) return;
+		onStatus(`MAIN: ページ ${currentPage} / ${pageCount}`);
+	}, [currentPage, onStatus, pageCount, state.phase]);
+
+	const displayWidth = pageSize ? Math.round(pageSize.width * layoutScale) : null;
+	const displayHeight = pageSize ? Math.round(pageSize.height * layoutScale) : null;
+	const listStyle = { gap: `${PAGE_GAP_PX}px` };
 
 	return (
 		<div className="flex flex-col gap-3" ref={containerRef}>
 			<div className="flex items-center justify-between gap-2 text-sm text-slate-300">
 				<span>
 					{state.phase === "ready"
-						? state.summary
+						? pageCount > 0 && displayWidth && displayHeight
+							? `Page ${currentPage} / ${pageCount} • ${displayWidth}×${displayHeight} px`
+							: state.summary
 						: state.phase === "error"
 							? friendlyError(state.detail)
 							: "MAINを読み込み中"}
@@ -173,12 +309,89 @@ function MainViewer({
 					PDF.js worker bundled
 				</span>
 			</div>
-			<div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-950/60 shadow-inner">
-				<canvas
-					ref={canvasRef}
-					className="block w-full bg-slate-900"
-					aria-label="MAIN PDF page 1"
-				/>
+			<div className="flex flex-col" ref={hostRef} style={listStyle}>
+				{state.phase === "ready" && pageCount > 0 && pageSize ? (
+					<div className="flex flex-col gap-2 text-xs text-slate-400">
+						<span>Continuous scroll • gap {PAGE_GAP_PX}px</span>
+						<span>
+							Current page (top-aligned estimate): {currentPage} / {pageCount}
+						</span>
+					</div>
+				) : null}
+				<div className="flex flex-col" style={listStyle}>
+					{pageCount === 0 || !pageSize ? (
+						<div className="rounded-xl border border-slate-800/70 bg-slate-900/70 px-4 py-10 text-center text-sm text-slate-300">
+							MAIN PDF を読み込んでいます…
+						</div>
+					) : (
+						Array.from({ length: pageCount }).map((_, index) => {
+							if (!pageSlotsRef.current[index]) {
+								pageSlotsRef.current[index] = {
+									container: null,
+									canvas: null,
+									renderTask: null,
+									renderedScale: null,
+								};
+							}
+							const isVisible = index >= visibleRange[0] && index <= visibleRange[1];
+							return (
+								<div key={`page-${index + 1}`} className="flex flex-col gap-2">
+									<div className="flex items-center justify-between text-xs text-slate-400">
+										<span>Page {index + 1}</span>
+										{currentPage - 1 === index ? (
+											<span className="rounded-full bg-brand/20 px-2 py-0.5 text-[11px] text-brand">
+												viewing
+											</span>
+										) : null}
+									</div>
+									<div
+										ref={(node) => {
+											const existing = pageSlotsRef.current[index];
+											if (existing) {
+												existing.container = node;
+											} else {
+												pageSlotsRef.current[index] = {
+													container: node,
+													canvas: null,
+													renderTask: null,
+													renderedScale: null,
+												};
+											}
+										}}
+										className="relative overflow-hidden rounded-xl border border-slate-800 bg-slate-950/60 shadow-inner"
+										style={{
+											minHeight: `${Math.round(pageSize.height * layoutScale)}px`,
+										}}
+									>
+									<canvas
+										ref={(node) => {
+											const existing = pageSlotsRef.current[index];
+											if (existing) {
+												existing.canvas = node;
+											} else {
+												pageSlotsRef.current[index] = {
+													container: null,
+													canvas: node,
+													renderTask: null,
+													renderedScale: null,
+												};
+											}
+										}}
+										className="block h-full w-full bg-slate-900"
+										aria-label={`MAIN PDF page ${index + 1}`}
+										style={{
+											opacity: isVisible ? 1 : 0.4,
+											}}
+										/>
+										{!isVisible ? (
+											<div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-slate-900/70 via-slate-900/30 to-slate-900/70" />
+										) : null}
+									</div>
+								</div>
+							);
+						})
+					)}
+				</div>
 			</div>
 		</div>
 	);
