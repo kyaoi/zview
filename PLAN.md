@@ -205,7 +205,7 @@ A task is “done” when:
 
 #### `task/continuous-scroll-view`
 
-* [ ] Done
+* [x] Done
 
 **Goal:** Continuous scroll with correct layout.
 
