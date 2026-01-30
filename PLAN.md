@@ -363,7 +363,7 @@ A task is “done” when:
 
 #### `task/watch-sse-autoreload`
 
-* [ ] Done
+* [x] Done
 
 **Goal:** MAIN auto-reloads when watching is enabled.
 

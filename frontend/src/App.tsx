@@ -701,6 +701,7 @@ function HelpOverlay({ onClose }: { onClose: () => void }) {
 }
 
 export default function App() {
+	const [hasMain, setHasMain] = useState(false);
 	const [hasSub, setHasSub] = useState(false);
 	const [watchEnabled, setWatchEnabled] = useState(true);
 	const [focusedPane, setFocusedPane] = useState<"main" | "sub">("main");
@@ -728,12 +729,14 @@ export default function App() {
 					watch: boolean;
 				} = await res.json();
 				if (aborted) return;
+				setHasMain(data.hasMain);
 				setHasSub(data.hasSub);
 				setWatchEnabled(data.watch);
 				setFocusedPane(data.focus === "sub" && data.hasSub ? "sub" : "main");
 				setStatus(data.hasMain ? "Loading MAIN" : "Please provide MAIN PDF");
 			} catch (_err) {
 				if (aborted) return;
+				setHasMain(false);
 				setHasSub(false);
 				setWatchEnabled(true);
 				setFocusedPane("main");
@@ -746,6 +749,23 @@ export default function App() {
 			aborted = true;
 		};
 	}, []);
+
+	useEffect(() => {
+		if (!watchEnabled || !hasMain) return;
+		const source = new EventSource("/events");
+		const handleChange = () => {
+			setMainReloadKey((v) => v + 1);
+			announce("MAIN: file changed → auto-reload");
+		};
+		source.addEventListener("main-change", handleChange);
+		source.onerror = () => {
+			announce("MAIN: watch connection lost (retrying…)"); // EventSource auto-reconnects
+		};
+		return () => {
+			source.removeEventListener("main-change", handleChange);
+			source.close();
+		};
+	}, [announce, hasMain, watchEnabled]);
 
 	const handleAction = (key: ActionKey) => {
 		switch (key) {
