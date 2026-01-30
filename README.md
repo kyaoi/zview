@@ -174,6 +174,7 @@ This project prioritizes speed:
 ## Auto-reload details (MAIN)
 
 * Watches the file (Linux-first). Updates often occur via atomic replace; the watcher must handle rename/replace.
+* Transport: **SSE** on `/events` (only when watch is ON and MAIN exists). With `--no-watch`, `/events` is not served and no change detection occurs.
 * Uses a short debounce before reloading.
 * On reload success: restore **page + vertical position** best-effort.
 * On reload failure: do nothing visually; show a brief status message.
