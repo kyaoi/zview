@@ -180,7 +180,7 @@ A task is “done” when:
 
 #### `task/serve-main-pdf-range`
 
-* [ ] Done
+* [x] Done
 
 **Goal:** Backend serves MAIN as bytes with correct HTTP semantics.
 

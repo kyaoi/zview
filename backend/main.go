@@ -186,9 +186,34 @@ func exists(fsys fs.FS, name string) bool {
 func mainPDFHandler(mainPath string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if mainPath == "" {
-			http.Error(w, "main PDF not specified", http.StatusNotFound)
+			http.Error(w, "Missing PDF: MAIN not provided", http.StatusNotFound)
 			return
 		}
-		http.ServeFile(w, r, mainPath)
+
+		file, err := os.Open(mainPath)
+		if err != nil {
+			if errors.Is(err, fs.ErrNotExist) {
+				http.Error(w, "MAIN PDF not found", http.StatusNotFound)
+				return
+			}
+
+			log.Printf("failed to open MAIN PDF: %v", err)
+			http.Error(w, "failed to read MAIN PDF", http.StatusInternalServerError)
+			return
+		}
+		defer file.Close()
+
+		info, err := file.Stat()
+		if err != nil {
+			log.Printf("failed to stat MAIN PDF: %v", err)
+			http.Error(w, "failed to read MAIN PDF", http.StatusInternalServerError)
+			return
+		}
+		if info.IsDir() {
+			http.Error(w, "MAIN PDF path is a directory", http.StatusNotFound)
+			return
+		}
+
+		http.ServeContent(w, r, info.Name(), info.ModTime(), file)
 	})
 }
