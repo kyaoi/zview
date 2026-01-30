@@ -1,4 +1,5 @@
-@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap");
+@import "@fontsource-variable/noto-sans-jp";
+@import "@fontsource-variable/space-grotesk";
 @import "tailwindcss";
 
 @theme {
@@ -7,7 +8,9 @@
 	--color-surface: #0f182b;
 	--color-surface-strong: #121f36;
 	--shadow-glow: 0 10px 30px rgba(5, 12, 26, 0.35);
-	--font-sans: "Space Grotesk", "Inter", "system-ui", "sans-serif";
+	--font-sans:
+		"Noto Sans JP Variable", "Space Grotesk Variable", "Space Grotesk", "Inter", "system-ui",
+		"sans-serif";
 }
 
 :root {

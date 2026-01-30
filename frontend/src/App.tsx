@@ -15,6 +15,7 @@ const RENDER_BUFFER = 1;
 const ZOOM_STEP = 1.1;
 const ZOOM_MIN = 0.25;
 const ZOOM_MAX = 4;
+const PDFJS_ASSET_BASE = "/pdfjs/";
 
 const toolbarActions = [
 	{ key: "openMain", label: "Open (Main)", hint: "Pick a PDF for MAIN" },
@@ -153,7 +154,13 @@ function MainViewer({
 			onStatus(reloadKey > 0 ? "MAIN: 再読み込み中…" : "MAIN: 読み込み中…");
 
 			try {
-				const loaded = await getDocument({ url: "/api/main.pdf" }).promise;
+				const loaded = await getDocument({
+					url: "/api/main.pdf",
+					cMapUrl: `${PDFJS_ASSET_BASE}cmaps/`,
+					cMapPacked: true,
+					standardFontDataUrl: `${PDFJS_ASSET_BASE}standard_fonts/`,
+					useSystemFonts: true,
+				}).promise;
 				if (cancelled) return;
 
 				const firstPage = await loaded.getPage(1);
