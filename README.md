@@ -37,7 +37,7 @@ A **fast, lightweight, read-only PDF viewer** that runs in your browser, inspire
 
 * Two roles: **MAIN** and **SUB**
 * **SUB is static** (no reload). To change it, re-open via the UI.
-* **Swap panes:** `x` (swaps left/right positions; roles remain MAIN/SUB)
+* **Swap panes:** `s` (swaps left/right positions; roles remain MAIN/SUB)
 * **Focus toggle:** `Tab`
 
 ### Reload behavior
@@ -72,7 +72,7 @@ A **fast, lightweight, read-only PDF viewer** that runs in your browser, inspire
 ### Panes
 
 * `Tab` — toggle focus (MAIN ↔ SUB)
-* `x` — swap left/right pane positions
+* `s` — swap left/right pane positions
 
 ### Reload / Misc
 

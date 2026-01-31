@@ -6,7 +6,6 @@ import (
 	"errors"
 	"flag"
 	"fmt"
-	"github.com/fsnotify/fsnotify"
 	"io/fs"
 	"log"
 	"net"
@@ -18,9 +17,13 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/fsnotify/fsnotify"
 )
 
 const defaultPort = 8571
+
+var errShowHelp = errors.New("show help")
 
 type options struct {
 	mainPath    string
@@ -46,6 +49,14 @@ func main() {
 func parseArgs(args []string) (options, error) {
 	fs := flag.NewFlagSet("zview", flag.ContinueOnError)
 	fs.SetOutput(os.Stdout)
+	fs.Usage = func() {
+		fmt.Fprintf(fs.Output(), "Usage: zview [options] [MAIN.pdf]\n\nOptions:\n")
+		fs.PrintDefaults()
+		fmt.Fprintln(fs.Output(), "\nExamples:")
+		fmt.Fprintln(fs.Output(), "  zview doc.pdf")
+		fmt.Fprintln(fs.Output(), "  zview doc.pdf --sub ref.pdf")
+		fmt.Fprintln(fs.Output(), "  zview --sub ref.pdf --focus sub")
+	}
 
 	opts := options{
 		focus:       "main",
@@ -56,6 +67,7 @@ func parseArgs(args []string) (options, error) {
 
 	fs.StringVar(&opts.subPath, "sub", "", "path to SUB PDF")
 	fs.StringVar(&opts.focus, "focus", opts.focus, "initial focus: main|sub")
+	helpFlag := fs.Bool("help", false, "show this help and exit")
 
 	watchFlag := fs.Bool("watch", true, "enable file watching for MAIN (default)")
 	noWatchFlag := fs.Bool("no-watch", false, "disable file watching for MAIN")
@@ -64,16 +76,28 @@ func parseArgs(args []string) (options, error) {
 
 	noOpenFlag := fs.Bool("no-open", false, "do not auto-open browser tab")
 
-	if err := fs.Parse(args); err != nil {
+	reordered := reorderArgs(args)
+	if err := fs.Parse(reordered); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			fs.Usage()
+			return options{}, errShowHelp
+		}
 		return options{}, err
+	}
+	if *helpFlag {
+		fs.Usage()
+		return options{}, errShowHelp
 	}
 
 	remaining := fs.Args()
-	if len(remaining) > 1 {
-		return options{}, fmt.Errorf("expected at most one MAIN.pdf argument, got %d", len(remaining))
+	if len(remaining) > 2 {
+		return options{}, fmt.Errorf("expected at most MAIN and SUB paths, got %d", len(remaining))
 	}
-	if len(remaining) == 1 {
+	if len(remaining) >= 1 {
 		opts.mainPath = remaining[0]
+	}
+	if len(remaining) == 2 && opts.subPath == "" {
+		opts.subPath = remaining[1]
 	}
 
 	opts.watch = *watchFlag
@@ -88,6 +112,42 @@ func parseArgs(args []string) (options, error) {
 	}
 
 	return opts, nil
+}
+
+// reorderArgs permits flags to appear after positional paths by moving flag/value pairs
+// before positional arguments so the stdlib flag parser can consume them.
+func reorderArgs(args []string) []string {
+	var flags []string
+	var positionals []string
+
+	needsValue := func(name string) bool {
+		switch name {
+		case "sub", "focus", "port":
+			return true
+		default:
+			return false
+		}
+	}
+
+	for i := 0; i < len(args); {
+		arg := args[i]
+		if strings.HasPrefix(arg, "-") {
+			flags = append(flags, arg)
+			name := strings.TrimLeft(arg, "-")
+			hasValueInline := strings.Contains(arg, "=")
+			if !hasValueInline && needsValue(name) && i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+				flags = append(flags, args[i+1])
+				i += 2
+				continue
+			}
+			i++
+			continue
+		}
+		positionals = append(positionals, arg)
+		i++
+	}
+
+	return append(flags, positionals...)
 }
 
 func run(opts options) error {

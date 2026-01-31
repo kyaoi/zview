@@ -13,9 +13,9 @@ This plan breaks development of **zview** into small, reviewable tasks.
 * [x] **Milestone 0:** Repo + tooling bootstrapped
 * [ ] **Milestone 1:** Single-PDF viewer works end-to-end
 * [x] **Milestone 2:** Keybindings + zoom/fit-width
-* [ ] **Milestone 3:** Two-pane MAIN/SUB + focus + swap
+* [x] **Milestone 3:** Two-pane MAIN/SUB + focus + swap
 * [ ] **Milestone 4:** Reload (manual + auto) + scroll restoration
-* [ ] **Milestone 5:** Performance hardening
+* [x] **Milestone 5:** Performance hardening
 * [ ] **Milestone 6:** Packaging + CI + release readiness
 
 ---
@@ -280,7 +280,7 @@ A task is “done” when:
   * `j/k`, `d/u`, `gg`, `G`, `n/p`
   * `+/-`, `=`
   * `Tab` (focus toggle)
-  * `x` (swap)
+* `s` (swap)
   * `r` / `R` (reload semantics; see later tasks)
   * `?` help overlay, `q` quit
 * Ensure keys only act when app is “active” (avoid fighting browser shortcuts)
@@ -331,7 +331,7 @@ A task is “done” when:
 
 * `Tab` toggles focus MAIN ↔ SUB
 * Focus ring + header emphasis for focused pane
-* `x` swaps left/right positions while roles remain MAIN/SUB
+* `s` swaps left/right positions while roles remain MAIN/SUB
 
 **Acceptance:**
 
@@ -421,7 +421,7 @@ A task is “done” when:
 
 #### `task/perf-virtualization`
 
-* [ ] Done
+* [x] Done
 
 **Goal:** Smooth scrolling and bounded memory.
 
@@ -449,6 +449,19 @@ A task is “done” when:
 
 * [ ] Done
 
+#### `task/open-sub-from-web` (proposed)
+
+* [ ] Planned
+
+**Goal:** Allow selecting SUB PDF from the web UI when not provided via `--sub`.
+
+**Considerations / risks:**
+* Must respect “local files only”: use `<input type="file">` and never fetch remote URLs.
+* SUB remains static after selection; MAIN watch/reload semantics unchanged.
+* Likely needs backend endpoint to accept a local file upload/stream while keeping localhost-only and no persistence off-disk.
+* Large files: reuse virtualization/cancellation to avoid memory spikes.
+* Security/privacy: ensure files never leave the user’s machine and are discarded on app close.
+
 **Goal:** Clear minimal UI without clutter.
 
 **Work:**
@@ -467,6 +480,26 @@ A task is “done” when:
 **Acceptance:**
 
 * State is understandable without reading docs
+
+#### `task/viewer-interaction-polish`
+
+* [x] Done
+
+**Goal:** Smooth navigation and consistent layout.
+
+**Work:**
+
+* Continuous/held scrolling for `j/k/h/l/d/u` with faster `d/u`
+* Center PDF rendering while keeping full-width horizontal scroll
+* Keybind ON/OFF toggle to avoid conflicts with browser extensions
+* Cache-busting MAIN/SUB loads so newly chosen files always appear
+
+**Acceptance:**
+
+* Holding the keys scrolls smoothly; `d/u` is noticeably faster than `j/k`
+* Pages stay centered and fully scrollable horizontally at any zoom
+* Users can disable keybinds to let external shortcuts win
+* Switching MAIN files reflects immediately without editing the PDF
 
 ---
 
