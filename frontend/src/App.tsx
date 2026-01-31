@@ -23,9 +23,11 @@ const PAGE_GAP_PX = 16;
 const RENDER_BUFFER = 1;
 const ZOOM_STEP = 1.1;
 const ZOOM_MIN = 0.25;
-const ZOOM_MAX = 4;
+const ZOOM_MAX = 5;
 const PDFJS_ASSET_BASE = "/pdfjs/";
 const LINE_SCROLL_PX = 64;
+const CONT_SCROLL_PER_FRAME = 14;
+const CONT_SCROLL_FAST = 28;
 const clampScaleValue = (value: number) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value));
 
 function withCacheBust(url: string, token: number) {
@@ -37,7 +39,7 @@ function withCacheBust(url: string, token: number) {
 const toolbarActions = [
 	{ key: "openMain", label: "Open (Main)", hint: "Pick a PDF for MAIN" },
 	{ key: "openSub", label: "Open (Sub)", hint: "Use CLI --sub" },
-	{ key: "swap", label: "Swap", hint: "Switch left/right" },
+	{ key: "swap", label: "Swap", hint: "Switch left/right (s)" },
 	{ key: "reloadMain", label: "Reload (Main)", hint: "Refresh MAIN" },
 	{ key: "help", label: "Help", hint: "Overlay" },
 ] as const;
@@ -46,7 +48,10 @@ type ActionKey = (typeof toolbarActions)[number]["key"];
 type ViewerRole = "MAIN" | "SUB";
 
 type PaneProps = {
+	paneRole: "MAIN" | "SUB";
+	status: string;
 	focused: boolean;
+	onFocus: () => void;
 	children?: ReactNode;
 };
 
@@ -54,62 +59,62 @@ function classNames(...tokens: Array<string | false | null | undefined>) {
 	return tokens.filter(Boolean).join(" ");
 }
 
-function Pane({ focused, children }: PaneProps) {
+function Pane({ paneRole, status, focused, onFocus, children }: PaneProps) {
 	return (
 		<section
 			className={classNames(
-				"group relative flex flex-col gap-3 rounded-2xl border border-slate-700/70 bg-slate-900/70 px-4 py-4 shadow-glow transition",
+				"group relative flex w-full flex-col gap-3 rounded-2xl border border-slate-700/70 bg-slate-900/70 px-4 py-4 shadow-glow transition",
 				focused
 					? "ring-2 ring-accent/70 border-accent/70 -translate-y-0.5 shadow-[0_15px_45px_rgba(28,202,216,0.18)]"
 					: "hover:border-slate-500/70 hover:-translate-y-0.5",
 			)}
 			data-focused={focused ? "true" : "false"}
 		>
-			{/* <header */}
-			{/* 	className={classNames( */}
-			{/* 		"flex items-center justify-between gap-2 rounded-xl border px-3 py-2 transition", */}
-			{/* 		focused */}
-			{/* 			? "border-accent/70 bg-accent/10 shadow-[0_6px_28px_rgba(28,202,216,0.18)]" */}
-			{/* 			: "border-slate-700/70 bg-slate-900/50", */}
-			{/* 	)} */}
-			{/* > */}
-			{/* 	<div className="flex items-center gap-2"> */}
-			{/* 		<span */}
-			{/* 			className={classNames( */}
-			{/* 				"inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold tracking-wide", */}
-			{/* 				paneRole === "MAIN" */}
-			{/* 					? "border-brand/50 bg-brand/15 text-brand" */}
-			{/* 					: "border-accent/60 bg-accent/15 text-accent", */}
-			{/* 			)} */}
-			{/* 		> */}
-			{/* 			{paneRole} */}
-			{/* 		</span> */}
-			{/* 		<span className="text-xs font-semibold uppercase tracking-wide text-slate-200"> */}
-			{/* 			{status} */}
-			{/* 		</span> */}
-			{/* 	</div> */}
-			{/* 	<div className="flex items-center gap-2 text-xs text-slate-400"> */}
-			{/* 		<span */}
-			{/* 			className={classNames( */}
-			{/* 				"rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide transition", */}
-			{/* 				focused */}
-			{/* 					? "bg-accent/90 text-slate-950 shadow-[0_10px_30px_rgba(28,202,216,0.3)]" */}
-			{/* 					: "border border-slate-600 bg-slate-800/60 text-slate-100", */}
-			{/* 			)} */}
-			{/* 		> */}
-			{/* 			{focused ? "FOCUS" : "Press Tab"} */}
-			{/* 		</span> */}
-			{/* 		{!focused ? ( */}
-			{/* 			<button */}
-			{/* 				type="button" */}
-			{/* 				className="rounded-full border border-brand/60 bg-brand/10 px-3 py-1 text-xs font-semibold text-brand hover:border-brand hover:bg-brand/20" */}
-			{/* 				onClick={onFocus} */}
-			{/* 			> */}
-			{/* 				Focus */}
-			{/* 			</button> */}
-			{/* 		) : null} */}
-			{/* 	</div> */}
-			{/* </header> */}
+			<header
+				className={classNames(
+					"flex items-center justify-between gap-2 rounded-xl border px-3 py-2 transition",
+					focused
+						? "border-accent/70 bg-accent/10 shadow-[0_6px_28px_rgba(28,202,216,0.18)]"
+						: "border-slate-700/70 bg-slate-900/50",
+				)}
+			>
+				<div className="flex items-center gap-2">
+					<span
+						className={classNames(
+							"inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold tracking-wide",
+							paneRole === "MAIN"
+								? "border-brand/50 bg-brand/15 text-brand"
+								: "border-accent/60 bg-accent/15 text-accent",
+						)}
+					>
+						{paneRole}
+					</span>
+					<span className="text-xs font-semibold uppercase tracking-wide text-slate-200">
+						{status}
+					</span>
+				</div>
+				<div className="flex items-center gap-2 text-xs text-slate-400">
+					<span
+						className={classNames(
+							"rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide transition",
+							focused
+								? "bg-accent/90 text-slate-950 shadow-[0_10px_30px_rgba(28,202,216,0.3)]"
+								: "border border-slate-600 bg-slate-800/60 text-slate-100",
+						)}
+					>
+						{focused ? "FOCUS" : "Press Tab"}
+					</span>
+					{!focused ? (
+						<button
+							type="button"
+							className="rounded-full border border-brand/60 bg-brand/10 px-3 py-1 text-xs font-semibold text-brand hover:border-brand hover:bg-brand/20"
+							onClick={onFocus}
+						>
+							Focus
+						</button>
+					) : null}
+				</div>
+			</header>
 
 			<div className="rounded-xl border border-slate-700/50 bg-slate-900/60 px-4 py-4">
 				{children}
@@ -159,6 +164,8 @@ type ViewerHandle = {
 	scrollLine: (deltaPx: number) => void;
 	scrollHalfPage: (direction: 1 | -1) => void;
 	scrollHorizontal: (deltaPx: number) => void;
+	startContinuousScroll: (vx: number, vy: number) => void;
+	stopContinuousScroll: () => void;
 	jumpToTop: () => void;
 	jumpToBottom: () => void;
 	jumpByPages: (delta: number) => void;
@@ -178,15 +185,16 @@ const PdfViewer = forwardRef<
 	ViewerHandle,
 	{
 		paneRole: ViewerRole;
-		status: string;
-		focused: boolean;
+		status?: string;
+		focused?: boolean;
 		url: string;
 		onStatus: (message: string) => void;
-		onFocus: () => void;
+		onFocus?: () => void;
 		reloadKey?: number;
 	}
 >(function PdfViewer({ paneRole, status, focused, url, onStatus, onFocus, reloadKey = 0 }, ref) {
 	const role = paneRole;
+	const sessionNonce = useMemo(() => Math.floor(Math.random() * 1_000_000), []);
 	const scrollRef = useRef<HTMLDivElement>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
 	const [state, setState] = useState<PdfViewerState>({ phase: "idle" });
@@ -208,6 +216,8 @@ const PdfViewer = forwardRef<
 		null,
 	);
 	const anchorRef = useRef<{ x: number; y: number } | null>(null);
+	const scrollLoopRef = useRef<number | null>(null);
+	const scrollVelocityRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 
 	const resetPageSlots = useCallback(() => {
 		pageSlotsRef.current.forEach((slot) => {
@@ -216,10 +226,21 @@ const PdfViewer = forwardRef<
 		pageSlotsRef.current = [];
 	}, []);
 
+	useEffect(
+		() => () => {
+			if (scrollLoopRef.current !== null) cancelAnimationFrame(scrollLoopRef.current);
+			scrollLoopRef.current = null;
+			scrollVelocityRef.current = { x: 0, y: 0 };
+		},
+		[],
+	);
+
 	// biome-ignore lint/correctness/useExhaustiveDependencies: Reload処理はキー変化時のみ走らせ、現在の表示状態をスナップショットするため依存を限定
 	useEffect(() => {
 		let cancelled = false;
-		const requestUrl = role === "MAIN" ? withCacheBust(url, reloadKey) : url;
+		const bustToken = reloadKey + sessionNonce;
+		const requestUrl =
+			role === "MAIN" ? withCacheBust(url, bustToken) : withCacheBust(url, sessionNonce);
 
 		if (pdfRef.current) {
 			const snapshot = (() => {
@@ -328,6 +349,9 @@ const PdfViewer = forwardRef<
 		() => () => {
 			resetPageSlots();
 			pdfRef.current?.destroy();
+			if (scrollLoopRef.current !== null) cancelAnimationFrame(scrollLoopRef.current);
+			scrollLoopRef.current = null;
+			scrollVelocityRef.current = { x: 0, y: 0 };
 		},
 		[resetPageSlots],
 	);
@@ -634,6 +658,35 @@ const PdfViewer = forwardRef<
 		el.scrollBy({ left: deltaPx, behavior: "smooth" });
 	}, []);
 
+	const stopContinuousScroll = useCallback(() => {
+		scrollVelocityRef.current = { x: 0, y: 0 };
+	}, []);
+
+	const continuousScrollStep = useCallback(() => {
+		const el = scrollRef.current;
+		if (!el) {
+			scrollLoopRef.current = null;
+			return;
+		}
+		const { x, y } = scrollVelocityRef.current;
+		if (x === 0 && y === 0) {
+			scrollLoopRef.current = null;
+			return;
+		}
+		el.scrollBy({ left: x, top: y, behavior: "auto" });
+		scrollLoopRef.current = requestAnimationFrame(continuousScrollStep);
+	}, []);
+
+	const startContinuousScroll = useCallback(
+		(vx: number, vy: number) => {
+			scrollVelocityRef.current = { x: vx, y: vy };
+			if (scrollLoopRef.current === null) {
+				scrollLoopRef.current = requestAnimationFrame(continuousScrollStep);
+			}
+		},
+		[continuousScrollStep],
+	);
+
 	const jumpToTop = useCallback(() => {
 		const el = scrollRef.current;
 		if (!el) return;
@@ -684,6 +737,8 @@ const PdfViewer = forwardRef<
 			scrollLine,
 			scrollHalfPage,
 			scrollHorizontal,
+			startContinuousScroll,
+			stopContinuousScroll,
 			jumpToTop,
 			jumpToBottom,
 			jumpByPages,
@@ -705,6 +760,8 @@ const PdfViewer = forwardRef<
 			resetPageSlots,
 			scrollHalfPage,
 			scrollHorizontal,
+			startContinuousScroll,
+			stopContinuousScroll,
 			scrollLine,
 			zoomIn,
 			zoomOut,
@@ -748,11 +805,22 @@ const PdfViewer = forwardRef<
 				</span>
 			</div>
 			<div
-				className="flex flex-col overflow-auto overflow-x-auto scrollbar-hide rounded-xl border border-slate-800/40 bg-slate-950/40 p-2"
+				className="flex flex-col overflow-auto overflow-x-auto scrollbar-hide rounded-xl border border-slate-800/40 bg-slate-950/40"
 				ref={scrollRef}
-				style={{ ...listStyle, maxHeight: "calc(100vh - 120px)" }}
+				style={{
+					...listStyle,
+					maxHeight: "calc(100vh - 120px)",
+					minWidth: "100%",
+				}}
 			>
-				<div className="flex flex-col items-center" style={listStyle}>
+				<div
+					className="mx-auto flex flex-col items-center"
+					style={{
+						...listStyle,
+						width: displayWidth ? `${displayWidth}px` : "100%",
+						minWidth: displayWidth ? `${displayWidth}px` : "100%",
+					}}
+				>
 					{pageCount === 0 || !pageSize ? (
 						<div className="rounded-xl border border-slate-800/70 bg-slate-900/70 px-4 py-10 text-center text-sm text-slate-300">
 							Loading {role} PDF…
@@ -794,6 +862,7 @@ const PdfViewer = forwardRef<
 										}}
 										className="relative overflow-visible rounded-xl border border-slate-800 bg-slate-950/60 shadow-inner"
 										style={{
+											margin: "0 auto",
 											height: placeholderHeight
 												? `${placeholderHeight}px`
 												: `${Math.round(pageSize.height * layoutScale)}px`,
@@ -837,8 +906,29 @@ const PdfViewer = forwardRef<
 
 function HelpOverlay({ onClose }: { onClose: () => void }) {
 	return (
-		<div className="fixed inset-0 z-30 grid place-items-center bg-slate-950/70 px-4">
-			<div className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900/90 p-5 shadow-2xl">
+		<div
+			className="fixed inset-0 z-30 grid place-items-center bg-slate-950/70 px-4"
+			role="dialog"
+			aria-modal="true"
+			onClick={(e) => {
+				if (e.target === e.currentTarget) onClose();
+			}}
+			onKeyDown={(e) => {
+				if (e.key === "Escape" || e.key === "Enter" || e.key === " ") onClose();
+			}}
+			tabIndex={-1}
+			aria-label="Help overlay"
+		>
+			<div
+				className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900/90 p-5 shadow-2xl"
+				role="dialog"
+				aria-modal="true"
+				onClick={(e) => e.stopPropagation()}
+				onKeyDown={(e) => {
+					e.stopPropagation();
+					if (e.key === "Escape" || e.key === "Enter" || e.key === " ") onClose();
+				}}
+			>
 				<header className="mb-3">
 					<p className="text-xs uppercase tracking-[0.2em] text-slate-400">Guide</p>
 					<h3 className="text-lg font-semibold text-slate-50">Keybindings</h3>
@@ -871,7 +961,7 @@ function HelpOverlay({ onClose }: { onClose: () => void }) {
 						</p>
 						<ul className="list-disc space-y-1 pl-5">
 							<li>`Tab` — toggle focus (MAIN ↔ SUB)</li>
-							<li>`x` — swap pane positions</li>
+							<li>`s` — swap pane positions</li>
 						</ul>
 					</div>
 					<div>
@@ -904,16 +994,44 @@ export default function App() {
 	const [watchEnabled, setWatchEnabled] = useState(true);
 	const [focusedPane, setFocusedPane] = useState<"main" | "sub">("main");
 	const [paneOrder, setPaneOrder] = useState<"main-first" | "sub-first">("main-first");
-	const [status, setStatus] = useState("Fetching bootstrap info…");
+	const [_status, setStatus] = useState("Fetching bootstrap info…");
 	const [mainReloadKey, setMainReloadKey] = useState(0);
 	const [showHelp, setShowHelp] = useState(false);
 	const [menuOpen, setMenuOpen] = useState(false);
+	const [keysEnabled, setKeysEnabled] = useState(true);
 	const mainViewerRef = useRef<ViewerHandle | null>(null);
 	const subViewerRef = useRef<ViewerHandle | null>(null);
 	const keySeqTimeoutRef = useRef<number | null>(null);
 	const lastKeyRef = useRef<string | null>(null);
+	const hasSubRef = useRef(hasSub);
+	const focusedPaneRef = useRef<"main" | "sub">(focusedPane);
+	const showHelpRef = useRef(showHelp);
+	const keysEnabledRef = useRef(keysEnabled);
 
 	const announce = useCallback((message: string) => setStatus(message), []);
+
+	const swapPanes = useCallback(() => {
+		if (!hasSubRef.current) {
+			announce("Cannot swap without SUB");
+			return false;
+		}
+		setPaneOrder((prev) => (prev === "main-first" ? "sub-first" : "main-first"));
+		announce("Swapped MAIN/SUB order");
+		return true;
+	}, [announce]);
+
+	useEffect(() => {
+		hasSubRef.current = hasSub;
+	}, [hasSub]);
+	useEffect(() => {
+		focusedPaneRef.current = focusedPane;
+	}, [focusedPane]);
+	useEffect(() => {
+		showHelpRef.current = showHelp;
+	}, [showHelp]);
+	useEffect(() => {
+		keysEnabledRef.current = keysEnabled;
+	}, [keysEnabled]);
 
 	useEffect(() => {
 		let aborted = false;
@@ -974,19 +1092,14 @@ export default function App() {
 				break;
 			case "openSub":
 				if (!hasSub) {
-					announce("Specify SUB via CLI --sub");
+					announce("SUBはCLIの--sub指定でのみ追加できます");
 					return;
 				}
 				setFocusedPane("sub");
 				announce("SUB: active (static)");
 				break;
 			case "swap":
-				if (!hasSub) {
-					announce("Add a SUB pane before swapping");
-					return;
-				}
-				setPaneOrder((prev) => (prev === "main-first" ? "sub-first" : "main-first"));
-				announce("Swapped pane order");
+				swapPanes();
 				break;
 			case "reloadMain":
 				announce("MAIN: reloading…");
@@ -1019,20 +1132,33 @@ export default function App() {
 		};
 
 		const handleKey = (event: KeyboardEvent) => {
+			if (!keysEnabledRef.current) return;
 			const target = event.target as HTMLElement | null;
 			const tag = target?.tagName?.toLowerCase();
 			if (event.metaKey || event.ctrlKey || event.altKey) return;
 			if (tag === "input" || tag === "textarea" || tag === "select" || target?.isContentEditable)
 				return;
 
-			const targetRole: ViewerRole = focusedPane === "sub" && hasSub ? "SUB" : "MAIN";
+			const keyLower = event.key?.toLowerCase?.() ?? "";
+			const codeLower = event.code?.toLowerCase?.() ?? "";
+
+			const consume = () => {
+				event.preventDefault();
+				event.stopPropagation();
+				event.stopImmediatePropagation();
+			};
+
+			const targetRole: ViewerRole =
+				focusedPaneRef.current === "sub" && hasSubRef.current ? "SUB" : "MAIN";
 			const targetViewer =
-				focusedPane === "sub" && hasSub ? subViewerRef.current : mainViewerRef.current;
+				focusedPaneRef.current === "sub" && hasSubRef.current
+					? subViewerRef.current
+					: mainViewerRef.current;
 
 			// multi-key: gg
 			if (event.key === "g") {
 				if (lastKeyRef.current === "g") {
-					event.preventDefault();
+					consume();
 					clearSequence();
 					targetViewer?.jumpToTop();
 					announce(`${targetRole}: jump to top`);
@@ -1044,144 +1170,198 @@ export default function App() {
 			}
 			clearSequence();
 
+			if (codeLower === "keys" || keyLower === "s") {
+				consume();
+				if (event.repeat) return;
+				swapPanes();
+				return;
+			}
 			switch (event.key) {
 				case "j":
-					event.preventDefault();
-					targetViewer?.scrollLine(LINE_SCROLL_PX);
+					consume();
+					if (event.repeat) {
+						targetViewer?.startContinuousScroll(0, CONT_SCROLL_PER_FRAME);
+					} else {
+						targetViewer?.scrollLine(LINE_SCROLL_PX);
+					}
 					announce(`${targetRole}: scroll down`);
 					return;
 				case "k":
-					event.preventDefault();
-					targetViewer?.scrollLine(-LINE_SCROLL_PX);
+					consume();
+					if (event.repeat) {
+						targetViewer?.startContinuousScroll(0, -CONT_SCROLL_PER_FRAME);
+					} else {
+						targetViewer?.scrollLine(-LINE_SCROLL_PX);
+					}
 					announce(`${targetRole}: scroll up`);
 					return;
 				case "h":
-					event.preventDefault();
-					targetViewer?.scrollHorizontal(-LINE_SCROLL_PX);
+					consume();
+					if (event.repeat) {
+						targetViewer?.startContinuousScroll(-CONT_SCROLL_PER_FRAME, 0);
+					} else {
+						targetViewer?.scrollHorizontal(-LINE_SCROLL_PX);
+					}
 					announce(`${targetRole}: scroll left`);
 					return;
 				case "l":
-					event.preventDefault();
-					targetViewer?.scrollHorizontal(LINE_SCROLL_PX);
+					consume();
+					if (event.repeat) {
+						targetViewer?.startContinuousScroll(CONT_SCROLL_PER_FRAME, 0);
+					} else {
+						targetViewer?.scrollHorizontal(LINE_SCROLL_PX);
+					}
 					announce(`${targetRole}: scroll right`);
 					return;
 				case "d":
-					event.preventDefault();
-					targetViewer?.scrollHalfPage(1);
+					consume();
+					if (event.repeat) {
+						targetViewer?.startContinuousScroll(0, CONT_SCROLL_FAST);
+					} else {
+						targetViewer?.scrollHalfPage(1);
+					}
 					announce(`${targetRole}: half-page down`);
 					return;
 				case "u":
-					event.preventDefault();
-					targetViewer?.scrollHalfPage(-1);
+					consume();
+					if (event.repeat) {
+						targetViewer?.startContinuousScroll(0, -CONT_SCROLL_FAST);
+					} else {
+						targetViewer?.scrollHalfPage(-1);
+					}
 					announce(`${targetRole}: half-page up`);
 					return;
 				case "G":
-					event.preventDefault();
+					consume();
 					targetViewer?.jumpToBottom();
 					announce(`${targetRole}: jump to bottom`);
 					return;
 				case "n":
-					event.preventDefault();
+					consume();
 					targetViewer?.jumpByPages(1);
 					announce(`${targetRole}: next page`);
 					return;
 				case "p":
-					event.preventDefault();
+					consume();
 					targetViewer?.jumpByPages(-1);
 					announce(`${targetRole}: previous page`);
 					return;
 				case "+":
-					event.preventDefault();
+					consume();
 					targetViewer?.zoomIn();
 					return;
 				case "-":
-					event.preventDefault();
+					consume();
 					targetViewer?.zoomOut();
 					return;
 				case "=":
-					event.preventDefault();
+					consume();
 					targetViewer?.fitToWidth();
 					return;
 				case "Tab":
-					event.preventDefault();
-					if (hasSub) {
+					consume();
+					if (hasSubRef.current) {
 						setFocusedPane((prev) => (prev === "main" ? "sub" : "main"));
 						announce(`Focus: ${targetRole === "MAIN" ? "SUB" : "MAIN"}`);
 					} else {
 						setFocusedPane("main");
 					}
 					return;
-				case "x":
-					event.preventDefault();
-					if (!hasSub) {
-						announce("Cannot swap without SUB");
-						return;
-					}
-					setPaneOrder((prev) => (prev === "main-first" ? "sub-first" : "main-first"));
-					announce("Swapped MAIN/SUB order");
-					return;
 				case "r":
-					event.preventDefault();
+					consume();
 					setMainReloadKey((v) => v + 1);
 					setFocusedPane("main");
 					announce("MAIN: reloading…");
 					return;
 				case "R":
-					event.preventDefault();
+					consume();
 					setMainReloadKey((v) => v + 1);
-					if (hasSub) {
+					if (hasSubRef.current) {
 						subViewerRef.current?.rerender();
 					}
 					setFocusedPane("main");
-					announce(hasSub ? "MAIN: reload (re-render SUB)" : "MAIN: reloading…");
+					announce(hasSubRef.current ? "MAIN: reload (re-render SUB)" : "MAIN: reloading…");
 					return;
 				case "?":
-					event.preventDefault();
+					consume();
 					setShowHelp((open) => !open);
 					announce("Toggled help");
 					return;
 				case "q":
-					event.preventDefault();
-					announce("Close the tab to quit");
+					consume();
+					if (showHelpRef.current) {
+						setShowHelp(false);
+						announce("Help closed");
+					} else {
+						announce("Close the tab to quit");
+					}
 					return;
 				default:
 					return;
 			}
 		};
 
-		window.addEventListener("keydown", handleKey);
+		window.addEventListener("keydown", handleKey, { capture: true });
+		const handleKeyUp = (event: KeyboardEvent) => {
+			if (!keysEnabledRef.current) return;
+			if (["j", "k", "h", "l", "d", "u"].includes(event.key)) {
+				const targetViewer =
+					focusedPaneRef.current === "sub" && hasSubRef.current
+						? subViewerRef.current
+						: mainViewerRef.current;
+				targetViewer?.stopContinuousScroll();
+			}
+		};
+		window.addEventListener("keyup", handleKeyUp);
 		return () => {
 			window.removeEventListener("keydown", handleKey);
+			window.removeEventListener("keyup", handleKeyUp);
 			if (keySeqTimeoutRef.current) window.clearTimeout(keySeqTimeoutRef.current);
 		};
-	}, [announce, focusedPane, hasSub]);
+	}, [announce, swapPanes]);
 
 	const paneSequence = useMemo(() => {
 		const mainPane = (
-			<Pane key="main" focused={focusedPane === "main"}>
-				<PdfViewer
+			<div key="pane-main" className={classNames(hasSub ? "flex-1 basis-1/2 min-w-0" : "w-full")}>
+				<Pane
+					key="main"
+					focused={focusedPane === "main"}
 					paneRole="MAIN"
 					status={watchEnabled ? "watching" : "manual"}
 					onFocus={() => setFocusedPane("main")}
-					url="/api/main.pdf"
-					ref={mainViewerRef}
-					onStatus={announce}
-					reloadKey={mainReloadKey}
-				/>
-			</Pane>
+				>
+					<PdfViewer
+						paneRole="MAIN"
+						status={watchEnabled ? "watching" : "manual"}
+						onFocus={() => setFocusedPane("main")}
+						url="/api/main.pdf"
+						ref={mainViewerRef}
+						onStatus={announce}
+						reloadKey={mainReloadKey}
+					/>
+				</Pane>
+			</div>
 		);
 
 		const subPane = hasSub ? (
-			<Pane key="sub" focused={focusedPane === "sub"}>
-				<PdfViewer
+			<div key="pane-sub" className="flex-1 basis-1/2 min-w-0">
+				<Pane
+					key="sub"
+					focused={focusedPane === "sub"}
 					paneRole="SUB"
-					status={watchEnabled ? "watching" : "manual"}
+					status="static"
 					onFocus={() => setFocusedPane("sub")}
-					url="/api/sub.pdf"
-					ref={subViewerRef}
-					onStatus={announce}
-				/>
-			</Pane>
+				>
+					<PdfViewer
+						paneRole="SUB"
+						status="static"
+						onFocus={() => setFocusedPane("sub")}
+						url="/api/sub.pdf"
+						ref={subViewerRef}
+						onStatus={announce}
+					/>
+				</Pane>
+			</div>
 		) : null;
 
 		if (!subPane) return [mainPane];
@@ -1189,7 +1369,7 @@ export default function App() {
 	}, [announce, focusedPane, hasSub, mainReloadKey, paneOrder, watchEnabled]);
 
 	return (
-		<div className="relative mx-auto flex max-w-6xl flex-col gap-3 px-3 pb-6 pt-3">
+		<div className="relative mx-auto flex w-full flex-col gap-3 px-3 pb-6 pt-3">
 			<button
 				type="button"
 				className="fixed left-4 top-4 z-30 rounded-lg border border-slate-700/70 bg-slate-900/90 px-3 py-2 text-sm font-semibold text-slate-100 shadow-glow hover:border-brand/70"
@@ -1237,31 +1417,27 @@ export default function App() {
 								</button>
 							))}
 						</nav>
-						{/* <div className="flex flex-col gap-2 text-xs text-slate-200"> */}
-						{/* 	<span */}
-						{/* 		className={classNames( */}
-						{/* 			"inline-block rounded-lg border px-2 py-1 text-[12px] font-semibold tracking-wide", */}
-						{/* 			focusedPane === "sub" && hasSub */}
-						{/* 				? "border-accent/60 bg-accent/15 text-accent" */}
-						{/* 				: "border-brand/60 bg-brand/15 text-brand", */}
-						{/* 		)} */}
-						{/* 		aria-live="polite" */}
-						{/* 	> */}
-						{/* 		FOCUS: {focusedPane === "sub" && hasSub ? "SUB" : "MAIN"} */}
-						{/* 	</span> */}
-						{/* 	<div className="glass rounded-lg px-3 py-2 text-xs text-slate-200" aria-live="polite"> */}
-						{/* 		{status} */}
-						{/* 	</div> */}
-						{/* </div> */}
+						<div className="flex flex-col gap-2 text-xs text-slate-200">
+							<div className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-900/60 px-2 py-2">
+								<span>Keybinds</span>
+								<label className="flex items-center gap-1">
+									<input
+										type="checkbox"
+										checked={keysEnabled}
+										onChange={(e) => setKeysEnabled(e.target.checked)}
+									/>
+									<span>{keysEnabled ? "ON" : "OFF"}</span>
+								</label>
+							</div>
+						</div>
 					</aside>
 				</>
 			) : null}
 
 			<main
 				className={classNames(
-					"grid gap-3",
-					hasSub ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1",
-					paneOrder === "sub-first" && hasSub ? "md:[&>section:nth-child(1)]:order-2" : "",
+					"flex gap-3 items-start",
+					hasSub ? "flex-col md:flex-row md:flex-nowrap" : "flex-col",
 				)}
 			>
 				{paneSequence}

@@ -93,7 +93,7 @@ When changing viewer behavior, manually verify:
 * MAIN loads a PDF and renders pages in continuous scroll
 * `+` / `-` zoom and `=` fit-width work
 * `Tab` toggles focus; MAIN/SUB labels remain clear
-* `x` swaps panes (roles remain MAIN/SUB)
+* `s` swaps panes (roles remain MAIN/SUB)
 * `r` reloads MAIN; on load failure the old view remains
 * Large PDF scroll remains responsive (no runaway memory)
 

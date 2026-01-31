@@ -167,7 +167,7 @@ go build ./...
 * Zoom works: `+` / `-`
 * Fit-to-width works: `=`
 * Focus toggles with `Tab` and MAIN/SUB remain clearly labeled
-* Swap works: `x` (roles remain MAIN/SUB)
+* Swap works: `s` (roles remain MAIN/SUB)
 * Manual reload works: `r` reloads MAIN
 * Reload failure keeps current rendering (no blank)
 * Large PDFs scroll smoothly; memory remains bounded (best-effort)
