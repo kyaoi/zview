@@ -445,11 +445,7 @@ A task is “done” when:
 
 ### 15) UI status + clarity
 
-#### `task/ui-status-and-toasts`
-
-* [ ] Done
-
-#### `task/open-sub-from-web` (proposed)
+#### `task/open-sub-from-web`
 
 * [ ] Planned
 
@@ -461,6 +457,10 @@ A task is “done” when:
 * Likely needs backend endpoint to accept a local file upload/stream while keeping localhost-only and no persistence off-disk.
 * Large files: reuse virtualization/cancellation to avoid memory spikes.
 * Security/privacy: ensure files never leave the user’s machine and are discarded on app close.
+
+#### `task/ui-status-and-toasts`
+
+* [ ] Done
 
 **Goal:** Clear minimal UI without clutter.
 
