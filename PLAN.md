@@ -15,7 +15,7 @@ This plan breaks development of **zview** into small, reviewable tasks.
 * [x] **Milestone 2:** Keybindings + zoom/fit-width
 * [ ] **Milestone 3:** Two-pane MAIN/SUB + focus + swap
 * [ ] **Milestone 4:** Reload (manual + auto) + scroll restoration
-* [ ] **Milestone 5:** Performance hardening
+* [x] **Milestone 5:** Performance hardening
 * [ ] **Milestone 6:** Packaging + CI + release readiness
 
 ---
@@ -421,7 +421,7 @@ A task is “done” when:
 
 #### `task/perf-virtualization`
 
-* [ ] Done
+* [x] Done
 
 **Goal:** Smooth scrolling and bounded memory.
 

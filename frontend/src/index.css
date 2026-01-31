@@ -17,6 +17,13 @@
 	color-scheme: dark;
 }
 
+.scrollbar-hide {
+	scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+	display: none;
+}
+
 body {
 	@apply min-h-screen bg-slate-950 text-slate-100 font-sans;
 	background-image:

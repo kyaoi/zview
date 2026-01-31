@@ -46,10 +46,7 @@ type ActionKey = (typeof toolbarActions)[number]["key"];
 type ViewerRole = "MAIN" | "SUB";
 
 type PaneProps = {
-	paneRole: "MAIN" | "SUB";
-	status: string;
 	focused: boolean;
-	onFocus: () => void;
 	children?: ReactNode;
 };
 
@@ -57,7 +54,7 @@ function classNames(...tokens: Array<string | false | null | undefined>) {
 	return tokens.filter(Boolean).join(" ");
 }
 
-function Pane({ paneRole, status, focused, onFocus, children }: PaneProps) {
+function Pane({ focused, children }: PaneProps) {
 	return (
 		<section
 			className={classNames(
@@ -68,51 +65,51 @@ function Pane({ paneRole, status, focused, onFocus, children }: PaneProps) {
 			)}
 			data-focused={focused ? "true" : "false"}
 		>
-			<header
-				className={classNames(
-					"flex items-center justify-between gap-2 rounded-xl border px-3 py-2 transition",
-					focused
-						? "border-accent/70 bg-accent/10 shadow-[0_6px_28px_rgba(28,202,216,0.18)]"
-						: "border-slate-700/70 bg-slate-900/50",
-				)}
-			>
-				<div className="flex items-center gap-2">
-					<span
-						className={classNames(
-							"inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold tracking-wide",
-							paneRole === "MAIN"
-								? "border-brand/50 bg-brand/15 text-brand"
-								: "border-accent/60 bg-accent/15 text-accent",
-						)}
-					>
-						{paneRole}
-					</span>
-					<span className="text-xs font-semibold uppercase tracking-wide text-slate-200">
-						{status}
-					</span>
-				</div>
-				<div className="flex items-center gap-2 text-xs text-slate-400">
-					<span
-						className={classNames(
-							"rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide transition",
-							focused
-								? "bg-accent/90 text-slate-950 shadow-[0_10px_30px_rgba(28,202,216,0.3)]"
-								: "border border-slate-600 bg-slate-800/60 text-slate-100",
-						)}
-					>
-						{focused ? "FOCUS" : "Press Tab"}
-					</span>
-					{!focused ? (
-						<button
-							type="button"
-							className="rounded-full border border-brand/60 bg-brand/10 px-3 py-1 text-xs font-semibold text-brand hover:border-brand hover:bg-brand/20"
-							onClick={onFocus}
-						>
-							Focus
-						</button>
-					) : null}
-				</div>
-			</header>
+			{/* <header */}
+			{/* 	className={classNames( */}
+			{/* 		"flex items-center justify-between gap-2 rounded-xl border px-3 py-2 transition", */}
+			{/* 		focused */}
+			{/* 			? "border-accent/70 bg-accent/10 shadow-[0_6px_28px_rgba(28,202,216,0.18)]" */}
+			{/* 			: "border-slate-700/70 bg-slate-900/50", */}
+			{/* 	)} */}
+			{/* > */}
+			{/* 	<div className="flex items-center gap-2"> */}
+			{/* 		<span */}
+			{/* 			className={classNames( */}
+			{/* 				"inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold tracking-wide", */}
+			{/* 				paneRole === "MAIN" */}
+			{/* 					? "border-brand/50 bg-brand/15 text-brand" */}
+			{/* 					: "border-accent/60 bg-accent/15 text-accent", */}
+			{/* 			)} */}
+			{/* 		> */}
+			{/* 			{paneRole} */}
+			{/* 		</span> */}
+			{/* 		<span className="text-xs font-semibold uppercase tracking-wide text-slate-200"> */}
+			{/* 			{status} */}
+			{/* 		</span> */}
+			{/* 	</div> */}
+			{/* 	<div className="flex items-center gap-2 text-xs text-slate-400"> */}
+			{/* 		<span */}
+			{/* 			className={classNames( */}
+			{/* 				"rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide transition", */}
+			{/* 				focused */}
+			{/* 					? "bg-accent/90 text-slate-950 shadow-[0_10px_30px_rgba(28,202,216,0.3)]" */}
+			{/* 					: "border border-slate-600 bg-slate-800/60 text-slate-100", */}
+			{/* 			)} */}
+			{/* 		> */}
+			{/* 			{focused ? "FOCUS" : "Press Tab"} */}
+			{/* 		</span> */}
+			{/* 		{!focused ? ( */}
+			{/* 			<button */}
+			{/* 				type="button" */}
+			{/* 				className="rounded-full border border-brand/60 bg-brand/10 px-3 py-1 text-xs font-semibold text-brand hover:border-brand hover:bg-brand/20" */}
+			{/* 				onClick={onFocus} */}
+			{/* 			> */}
+			{/* 				Focus */}
+			{/* 			</button> */}
+			{/* 		) : null} */}
+			{/* 	</div> */}
+			{/* </header> */}
 
 			<div className="rounded-xl border border-slate-700/50 bg-slate-900/60 px-4 py-4">
 				{children}
@@ -133,6 +130,21 @@ type PageSlotRef = {
 	renderedScale: number | null;
 };
 
+const releasePageSlot = (slot: PageSlotRef | undefined) => {
+	if (!slot) return;
+	if (slot.renderTask) {
+		slot.renderTask.cancel();
+	}
+	slot.renderTask = null;
+	slot.renderedScale = null;
+	if (slot.canvas) {
+		slot.canvas.width = 0;
+		slot.canvas.height = 0;
+		slot.canvas.style.width = "0px";
+		slot.canvas.style.height = "0px";
+	}
+};
+
 type ZoomMode = "fit-width" | "manual";
 type ScrollSnapshot = {
 	topPageIndex: number;
@@ -146,6 +158,7 @@ type ScrollSnapshot = {
 type ViewerHandle = {
 	scrollLine: (deltaPx: number) => void;
 	scrollHalfPage: (direction: 1 | -1) => void;
+	scrollHorizontal: (deltaPx: number) => void;
 	jumpToTop: () => void;
 	jumpToBottom: () => void;
 	jumpByPages: (delta: number) => void;
@@ -163,10 +176,18 @@ function friendlyError(role: ViewerRole, detail: string) {
 
 const PdfViewer = forwardRef<
 	ViewerHandle,
-	{ paneRole: ViewerRole; url: string; onStatus: (message: string) => void; reloadKey?: number }
->(function PdfViewer({ paneRole, url, onStatus, reloadKey = 0 }, ref) {
+	{
+		paneRole: ViewerRole;
+		status: string;
+		focused: boolean;
+		url: string;
+		onStatus: (message: string) => void;
+		onFocus: () => void;
+		reloadKey?: number;
+	}
+>(function PdfViewer({ paneRole, status, focused, url, onStatus, onFocus, reloadKey = 0 }, ref) {
 	const role = paneRole;
-	const hostRef = useRef<HTMLDivElement>(null);
+	const scrollRef = useRef<HTMLDivElement>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
 	const [state, setState] = useState<PdfViewerState>({ phase: "idle" });
 	const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
@@ -186,16 +207,11 @@ const PdfViewer = forwardRef<
 	const pendingRestoreRef = useRef<{ reloadKey: number; snapshot: ScrollSnapshot | null } | null>(
 		null,
 	);
-
-	const getHostTop = useCallback(
-		() => (hostRef.current ? hostRef.current.getBoundingClientRect().top + window.scrollY : 0),
-		[],
-	);
+	const anchorRef = useRef<{ x: number; y: number } | null>(null);
 
 	const resetPageSlots = useCallback(() => {
 		pageSlotsRef.current.forEach((slot) => {
-			slot?.renderTask?.cancel();
-			slot.renderTask = null;
+			releasePageSlot(slot);
 		});
 		pageSlotsRef.current = [];
 	}, []);
@@ -207,11 +223,11 @@ const PdfViewer = forwardRef<
 
 		if (pdfRef.current) {
 			const snapshot = (() => {
-				if (!pageSize || pageCount === 0) return null;
+				const scrollEl = scrollRef.current;
+				if (!pageSize || pageCount === 0 || !scrollEl) return null;
 				const layoutScale = zoomMode === "fit-width" ? fitScale : manualScale;
-				if (!hostRef.current || layoutScale <= 0) return null;
-				const hostTop = getHostTop();
-				const viewTop = window.scrollY - hostTop;
+				if (layoutScale <= 0) return null;
+				const viewTop = scrollEl.scrollTop;
 				const pageBlock = Math.round(pageSize.height * layoutScale) + PAGE_GAP_PX;
 				const topPageIndex = Math.min(pageCount - 1, Math.max(0, Math.floor(viewTop / pageBlock)));
 				const offsetPx = viewTop - topPageIndex * pageBlock;
@@ -253,8 +269,8 @@ const PdfViewer = forwardRef<
 				}
 
 				const baseViewport = firstPage.getViewport({ scale: 1 });
-				const hostWidth = hostRef.current?.clientWidth || baseViewport.width;
-				const nextFitScale = hostWidth / baseViewport.width;
+				const hostHeight = scrollRef.current?.clientHeight || baseViewport.height;
+				const nextFitScale = hostHeight / baseViewport.height;
 				const restoreSnapshot =
 					pendingRestoreRef.current?.reloadKey === reloadKey
 						? pendingRestoreRef.current.snapshot
@@ -317,12 +333,12 @@ const PdfViewer = forwardRef<
 	);
 
 	useEffect(() => {
-		if (!pageSize || !hostRef.current) return;
+		if (!pageSize || !scrollRef.current) return;
 
-		const node = hostRef.current;
+		const node = scrollRef.current;
 		const updateScale = () => {
-			const width = node.clientWidth || pageSize.width;
-			const nextFit = width / pageSize.width;
+			const height = node.clientHeight || pageSize.height;
+			const nextFit = height / pageSize.height;
 			setFitScale(nextFit);
 		};
 
@@ -341,10 +357,10 @@ const PdfViewer = forwardRef<
 
 	const measureVisibility = useCallback(() => {
 		const layoutScale = zoomMode === "fit-width" ? fitScale : manualScale;
-		if (!pageSize || !hostRef.current || pageCount === 0) return;
-		const hostTop = hostRef.current.getBoundingClientRect().top + window.scrollY;
-		const viewTop = window.scrollY - hostTop;
-		const viewBottom = viewTop + window.innerHeight;
+		const scrollEl = scrollRef.current;
+		if (!pageSize || !scrollEl || pageCount === 0) return;
+		const viewTop = scrollEl.scrollTop;
+		const viewBottom = viewTop + scrollEl.clientHeight;
 		const pageBlock = Math.round(pageSize.height * layoutScale) + PAGE_GAP_PX;
 		const start = Math.max(0, Math.floor(viewTop / pageBlock) - RENDER_BUFFER);
 		const end = Math.min(pageCount - 1, Math.ceil(viewBottom / pageBlock) + RENDER_BUFFER);
@@ -359,6 +375,8 @@ const PdfViewer = forwardRef<
 	}, [fitScale, manualScale, pageCount, pageSize, zoomMode]);
 
 	useEffect(() => {
+		const scrollEl = scrollRef.current;
+		if (!scrollEl) return;
 		const handleScroll = () => {
 			if (rafId.current) return;
 			rafId.current = requestAnimationFrame(() => {
@@ -367,11 +385,11 @@ const PdfViewer = forwardRef<
 			});
 		};
 
-		window.addEventListener("scroll", handleScroll, { passive: true });
+		scrollEl.addEventListener("scroll", handleScroll, { passive: true });
 		window.addEventListener("resize", handleScroll);
 		measureVisibility();
 		return () => {
-			window.removeEventListener("scroll", handleScroll);
+			scrollEl.removeEventListener("scroll", handleScroll);
 			window.removeEventListener("resize", handleScroll);
 			if (rafId.current) cancelAnimationFrame(rafId.current);
 		};
@@ -391,10 +409,10 @@ const PdfViewer = forwardRef<
 
 		const snapshot = pending.snapshot;
 		const layoutScale = zoomMode === "fit-width" ? fitScale : manualScale;
-		if (!hostRef.current || layoutScale <= 0) return;
+		const scrollEl = scrollRef.current;
+		if (!scrollEl || layoutScale <= 0) return;
 
 		const pageBlock = Math.round(pageSize.height * layoutScale) + PAGE_GAP_PX;
-		const hostTop = getHostTop();
 		const totalHeight = Math.max(0, pageCount * pageBlock - PAGE_GAP_PX);
 		const ratio = snapshot ? Math.min(1, Math.max(0, snapshot.scrollRatio)) : 0;
 		const pageCountDropped = snapshot ? snapshot.pageCount > pageCount : false;
@@ -402,12 +420,12 @@ const PdfViewer = forwardRef<
 		let targetTop: number;
 		if (snapshot && !pageCountDropped && snapshot.topPageIndex < pageCount) {
 			const clampedOffset = Math.min(Math.max(snapshot.offsetPx, 0), pageBlock);
-			targetTop = hostTop + snapshot.topPageIndex * pageBlock + clampedOffset;
+			targetTop = snapshot.topPageIndex * pageBlock + clampedOffset;
 		} else {
-			targetTop = hostTop + Math.min(totalHeight, Math.max(0, Math.round(totalHeight * ratio)));
+			targetTop = Math.min(totalHeight, Math.max(0, Math.round(totalHeight * ratio)));
 		}
 
-		window.scrollTo({ top: targetTop, behavior: "auto" });
+		scrollEl.scrollTo({ top: targetTop, behavior: "auto" });
 		pendingRestoreRef.current = null;
 
 		requestAnimationFrame(() => {
@@ -415,7 +433,6 @@ const PdfViewer = forwardRef<
 		});
 	}, [
 		fitScale,
-		getHostTop,
 		manualScale,
 		measureVisibility,
 		pageCount,
@@ -447,6 +464,7 @@ const PdfViewer = forwardRef<
 
 				slot.renderTask = page.render({
 					canvasContext: context,
+					canvas,
 					viewport,
 					transform: outputScale !== 1 ? [1 / outputScale, 0, 0, 1 / outputScale, 0, 0] : undefined,
 				});
@@ -482,8 +500,11 @@ const PdfViewer = forwardRef<
 		}
 
 		pageSlotsRef.current.forEach((slot, index) => {
-			if (!slot?.renderTask) return;
-			if (index < visibleRange[0] - 1 || index > visibleRange[1] + 1) {
+			const outsideBuffer =
+				index < visibleRange[0] - RENDER_BUFFER || index > visibleRange[1] + RENDER_BUFFER;
+			if (outsideBuffer) {
+				releasePageSlot(slot);
+			} else if (slot?.renderTask && (index < visibleRange[0] || index > visibleRange[1])) {
 				slot.renderTask.cancel();
 				slot.renderTask = null;
 				slot.renderedScale = null;
@@ -515,7 +536,7 @@ const PdfViewer = forwardRef<
 		(nextScale: number, mode: ZoomMode) => {
 			const percent = Math.round(nextScale * 100);
 			if (mode === "fit-width") {
-				onStatus(`${role}: fit to width (${percent}%)`);
+				onStatus(`${role}: fit to height (${percent}%)`);
 				return;
 			}
 			onStatus(`${role}: zoom ${percent}%`);
@@ -525,6 +546,19 @@ const PdfViewer = forwardRef<
 
 	const zoomIn = useCallback(() => {
 		if (!pageSize) return;
+		const layoutScale = zoomMode === "fit-width" ? fitScale : manualScale;
+		const scrollEl = scrollRef.current;
+		if (scrollEl && pageCount > 0) {
+			const pageBlock = Math.round(pageSize.height * layoutScale) + PAGE_GAP_PX;
+			const totalHeight = Math.max(1, pageCount * pageBlock - PAGE_GAP_PX);
+			const totalWidth = Math.max(1, pageSize.width * layoutScale);
+			const centerY = scrollEl.scrollTop + scrollEl.clientHeight / 2;
+			const centerX = scrollEl.scrollLeft + scrollEl.clientWidth / 2;
+			anchorRef.current = {
+				x: Math.min(1, Math.max(0, centerX / totalWidth)),
+				y: Math.min(1, Math.max(0, centerY / totalHeight)),
+			};
+		}
 		let nextScale = manualScale;
 		setManualScale((prev) => {
 			const base = zoomMode === "fit-width" ? fitScale : prev;
@@ -534,10 +568,23 @@ const PdfViewer = forwardRef<
 		});
 		setZoomMode("manual");
 		announceZoom(nextScale, "manual");
-	}, [announceZoom, fitScale, manualScale, pageSize, zoomMode]);
+	}, [announceZoom, fitScale, manualScale, pageCount, pageSize, zoomMode]);
 
 	const zoomOut = useCallback(() => {
 		if (!pageSize) return;
+		const layoutScale = zoomMode === "fit-width" ? fitScale : manualScale;
+		const scrollEl = scrollRef.current;
+		if (scrollEl && pageCount > 0) {
+			const pageBlock = Math.round(pageSize.height * layoutScale) + PAGE_GAP_PX;
+			const totalHeight = Math.max(1, pageCount * pageBlock - PAGE_GAP_PX);
+			const totalWidth = Math.max(1, pageSize.width * layoutScale);
+			const centerY = scrollEl.scrollTop + scrollEl.clientHeight / 2;
+			const centerX = scrollEl.scrollLeft + scrollEl.clientWidth / 2;
+			anchorRef.current = {
+				x: Math.min(1, Math.max(0, centerX / totalWidth)),
+				y: Math.min(1, Math.max(0, centerY / totalHeight)),
+			};
+		}
 		let nextScale = manualScale;
 		setManualScale((prev) => {
 			const base = zoomMode === "fit-width" ? fitScale : prev;
@@ -547,54 +594,96 @@ const PdfViewer = forwardRef<
 		});
 		setZoomMode("manual");
 		announceZoom(nextScale, "manual");
-	}, [announceZoom, fitScale, manualScale, pageSize, zoomMode]);
+	}, [announceZoom, fitScale, manualScale, pageCount, pageSize, zoomMode]);
 
 	const fitToWidth = useCallback(() => {
 		if (!pageSize) return;
+		const layoutScale = zoomMode === "fit-width" ? fitScale : manualScale;
+		const scrollEl = scrollRef.current;
+		if (scrollEl && pageCount > 0) {
+			const pageBlock = Math.round(pageSize.height * layoutScale) + PAGE_GAP_PX;
+			const totalHeight = Math.max(1, pageCount * pageBlock - PAGE_GAP_PX);
+			const totalWidth = Math.max(1, pageSize.width * layoutScale);
+			const centerY = scrollEl.scrollTop + scrollEl.clientHeight / 2;
+			const centerX = scrollEl.scrollLeft + scrollEl.clientWidth / 2;
+			anchorRef.current = {
+				x: Math.min(1, Math.max(0, centerX / totalWidth)),
+				y: Math.min(1, Math.max(0, centerY / totalHeight)),
+			};
+		}
 		setZoomMode("fit-width");
 		announceZoom(fitScale, "fit-width");
-	}, [announceZoom, fitScale, pageSize]);
+	}, [announceZoom, fitScale, manualScale, pageCount, pageSize, zoomMode]);
 
 	const scrollLine = useCallback((deltaPx: number) => {
-		window.scrollBy({ top: deltaPx, behavior: "smooth" });
+		const el = scrollRef.current;
+		if (!el) return;
+		el.scrollBy({ top: deltaPx, behavior: "smooth" });
 	}, []);
 
 	const scrollHalfPage = useCallback((direction: 1 | -1) => {
-		const amount = Math.max(1, window.innerHeight / 2);
-		window.scrollBy({ top: direction * amount, behavior: "smooth" });
+		const el = scrollRef.current;
+		if (!el) return;
+		const amount = Math.max(1, el.clientHeight / 2);
+		el.scrollBy({ top: direction * amount, behavior: "smooth" });
+	}, []);
+
+	const scrollHorizontal = useCallback((deltaPx: number) => {
+		const el = scrollRef.current;
+		if (!el) return;
+		el.scrollBy({ left: deltaPx, behavior: "smooth" });
 	}, []);
 
 	const jumpToTop = useCallback(() => {
-		const hostTop = getHostTop();
-		window.scrollTo({ top: hostTop, behavior: "smooth" });
-	}, [getHostTop]);
+		const el = scrollRef.current;
+		if (!el) return;
+		el.scrollTo({ top: 0, behavior: "smooth" });
+	}, []);
 
 	const jumpToBottom = useCallback(() => {
-		if (!pageSize || pageCount === 0) return;
+		const el = scrollRef.current;
+		if (!pageSize || pageCount === 0 || !el) return;
 		const pageBlock = Math.round(pageSize.height * layoutScale) + PAGE_GAP_PX;
 		const totalHeight = pageCount * pageBlock - PAGE_GAP_PX;
-		window.scrollTo({
-			top: getHostTop() + Math.max(0, totalHeight - window.innerHeight + PAGE_GAP_PX),
+		el.scrollTo({
+			top: Math.max(0, totalHeight - el.clientHeight + PAGE_GAP_PX),
 			behavior: "smooth",
 		});
-	}, [getHostTop, layoutScale, pageCount, pageSize]);
+	}, [layoutScale, pageCount, pageSize]);
 
 	const jumpByPages = useCallback(
 		(delta: number) => {
-			if (!pageSize || pageCount === 0) return;
+			const el = scrollRef.current;
+			if (!pageSize || pageCount === 0 || !el) return;
 			const targetIndex = Math.min(pageCount - 1, Math.max(0, currentPageRef.current - 1 + delta));
 			const pageBlock = Math.round(pageSize.height * layoutScale) + PAGE_GAP_PX;
 			const offset = targetIndex * pageBlock;
-			window.scrollTo({ top: getHostTop() + offset, behavior: "smooth" });
+			el.scrollTo({ top: offset, behavior: "smooth" });
 		},
-		[getHostTop, layoutScale, pageCount, pageSize],
+		[layoutScale, pageCount, pageSize],
 	);
+
+	useEffect(() => {
+		const anchor = anchorRef.current;
+		const el = scrollRef.current;
+		if (!anchor || !el || !pageSize || pageCount === 0) return;
+
+		const pageBlock = Math.round(pageSize.height * layoutScale) + PAGE_GAP_PX;
+		const totalHeight = Math.max(1, pageCount * pageBlock - PAGE_GAP_PX);
+		const totalWidth = Math.max(1, pageSize.width * layoutScale);
+		const nextTop = Math.max(0, anchor.y * totalHeight - el.clientHeight / 2);
+		const nextLeft = Math.max(0, anchor.x * totalWidth - el.clientWidth / 2);
+		el.scrollTo({ top: nextTop, left: nextLeft, behavior: "auto" });
+		anchorRef.current = null;
+		requestAnimationFrame(() => measureVisibility());
+	}, [layoutScale, measureVisibility, pageCount, pageSize]);
 
 	useImperativeHandle(
 		ref,
 		() => ({
 			scrollLine,
 			scrollHalfPage,
+			scrollHorizontal,
 			jumpToTop,
 			jumpToBottom,
 			jumpByPages,
@@ -615,6 +704,7 @@ const PdfViewer = forwardRef<
 			onStatus,
 			resetPageSlots,
 			scrollHalfPage,
+			scrollHorizontal,
 			scrollLine,
 			zoomIn,
 			zoomOut,
@@ -623,41 +713,46 @@ const PdfViewer = forwardRef<
 	);
 
 	const displayWidth = pageSize ? Math.round(pageSize.width * layoutScale) : null;
-	const displayHeight = pageSize ? Math.round(pageSize.height * layoutScale) : null;
+	const placeholderHeight = pageSize ? Math.round(pageSize.height * layoutScale) : null;
 	const listStyle = { gap: `${PAGE_GAP_PX}px` };
 
 	return (
 		<div className="flex flex-col gap-3" ref={containerRef}>
-			<div className="flex flex-col gap-1 text-sm text-slate-300 sm:flex-row sm:items-center sm:justify-between">
+			<div className="flex flex-col gap-1 text-sm text-slate-200 sm:flex-row sm:items-center sm:justify-between">
 				<span>
 					{state.phase === "ready"
-						? pageCount > 0 && displayWidth && displayHeight
-							? `Page ${currentPage} / ${pageCount} • ${displayWidth}×${displayHeight} px`
-							: state.summary
+						? `Page ${currentPage} / ${pageCount}`
 						: state.phase === "error"
 							? friendlyError(role, state.detail)
 							: `${role} loading…`}
 				</span>
-				<div className="flex items-center gap-2 text-xs text-slate-200">
-					<span className="rounded-full border border-slate-700/70 bg-slate-800/80 px-2 py-1">
-						PDF.js worker bundled
-					</span>
-					<span className="rounded-full border border-brand/40 bg-brand/10 px-2 py-1 font-semibold text-brand">
-						{zoomMode === "fit-width" ? "Fit to width" : "Manual"} · {Math.round(layoutScale * 100)}
-						%
+				<div className="flex items-center gap-2">
+					<button
+						type="button"
+						className={classNames(
+							"inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold tracking-wide",
+							paneRole === "MAIN"
+								? "border-brand/50 bg-brand/15 text-brand"
+								: "border-accent/60 bg-accent/15 text-accent",
+						)}
+						onClick={!focused ? onFocus : undefined}
+					>
+						{paneRole}
+					</button>
+					<span className="text-xs font-semibold uppercase tracking-wide text-slate-200">
+						{status}
 					</span>
 				</div>
+				<span className="rounded-full border border-brand/40 bg-brand/10 px-2 py-1 text-xs font-semibold text-brand">
+					{zoomMode === "fit-width" ? "Fit to height" : "Manual"} · {Math.round(layoutScale * 100)}%
+				</span>
 			</div>
-			<div className="flex flex-col" ref={hostRef} style={listStyle}>
-				{state.phase === "ready" && pageCount > 0 && pageSize ? (
-					<div className="flex flex-col gap-2 text-xs text-slate-400">
-						<span>Continuous scroll • gap {PAGE_GAP_PX}px</span>
-						<span>
-							Current page (top-aligned estimate): {currentPage} / {pageCount}
-						</span>
-					</div>
-				) : null}
-				<div className="flex flex-col" style={listStyle}>
+			<div
+				className="flex flex-col overflow-auto overflow-x-auto scrollbar-hide rounded-xl border border-slate-800/40 bg-slate-950/40 p-2"
+				ref={scrollRef}
+				style={{ ...listStyle, maxHeight: "calc(100vh - 120px)" }}
+			>
+				<div className="flex flex-col items-center" style={listStyle}>
 					{pageCount === 0 || !pageSize ? (
 						<div className="rounded-xl border border-slate-800/70 bg-slate-900/70 px-4 py-10 text-center text-sm text-slate-300">
 							Loading {role} PDF…
@@ -674,15 +769,15 @@ const PdfViewer = forwardRef<
 							}
 							const isVisible = index >= visibleRange[0] && index <= visibleRange[1];
 							return (
-								<div key={`page-${index + 1}`} className="flex flex-col gap-2">
-									<div className="flex items-center justify-between text-xs text-slate-400">
-										<span>Page {index + 1}</span>
-										{currentPage - 1 === index ? (
-											<span className="rounded-full bg-brand/20 px-2 py-0.5 text-[11px] text-brand">
-												viewing
-											</span>
-										) : null}
-									</div>
+								<div key={`page-${index + 1}`} className="flex flex-col items-center gap-2">
+									{/* <div className="flex w-full max-w-[1200px] items-center justify-between text-xs text-slate-400 px-1"> */}
+									{/* 	<span>Page {index + 1}</span> */}
+									{/* 	{currentPage - 1 === index ? ( */}
+									{/* 		<span className="rounded-full bg-brand/20 px-2 py-0.5 text-[11px] text-brand"> */}
+									{/* 			viewing */}
+									{/* 		</span> */}
+									{/* 	) : null} */}
+									{/* </div> */}
 									<div
 										ref={(node) => {
 											const existing = pageSlotsRef.current[index];
@@ -697,9 +792,13 @@ const PdfViewer = forwardRef<
 												};
 											}
 										}}
-										className="relative overflow-hidden rounded-xl border border-slate-800 bg-slate-950/60 shadow-inner"
+										className="relative overflow-visible rounded-xl border border-slate-800 bg-slate-950/60 shadow-inner"
 										style={{
-											minHeight: `${Math.round(pageSize.height * layoutScale)}px`,
+											height: placeholderHeight
+												? `${placeholderHeight}px`
+												: `${Math.round(pageSize.height * layoutScale)}px`,
+											width: displayWidth ? `${displayWidth}px` : "auto",
+											minWidth: displayWidth ? `${displayWidth}px` : "auto",
 										}}
 									>
 										<canvas
@@ -751,6 +850,7 @@ function HelpOverlay({ onClose }: { onClose: () => void }) {
 						</p>
 						<ul className="list-disc space-y-1 pl-5">
 							<li>`j` / `k` — scroll down / up</li>
+							<li>`h` / `l` — scroll left / right</li>
 							<li>`d` / `u` — half-page down / up</li>
 							<li>`gg` — top, `G` — bottom</li>
 							<li>`n` / `p` — next / previous page</li>
@@ -807,6 +907,7 @@ export default function App() {
 	const [status, setStatus] = useState("Fetching bootstrap info…");
 	const [mainReloadKey, setMainReloadKey] = useState(0);
 	const [showHelp, setShowHelp] = useState(false);
+	const [menuOpen, setMenuOpen] = useState(false);
 	const mainViewerRef = useRef<ViewerHandle | null>(null);
 	const subViewerRef = useRef<ViewerHandle | null>(null);
 	const keySeqTimeoutRef = useRef<number | null>(null);
@@ -954,6 +1055,16 @@ export default function App() {
 					targetViewer?.scrollLine(-LINE_SCROLL_PX);
 					announce(`${targetRole}: scroll up`);
 					return;
+				case "h":
+					event.preventDefault();
+					targetViewer?.scrollHorizontal(-LINE_SCROLL_PX);
+					announce(`${targetRole}: scroll left`);
+					return;
+				case "l":
+					event.preventDefault();
+					targetViewer?.scrollHorizontal(LINE_SCROLL_PX);
+					announce(`${targetRole}: scroll right`);
+					return;
 				case "d":
 					event.preventDefault();
 					targetViewer?.scrollHalfPage(1);
@@ -1047,15 +1158,11 @@ export default function App() {
 
 	const paneSequence = useMemo(() => {
 		const mainPane = (
-			<Pane
-				key="main"
-				paneRole="MAIN"
-				status={watchEnabled ? "watching" : "manual"}
-				focused={focusedPane === "main"}
-				onFocus={() => setFocusedPane("main")}
-			>
+			<Pane key="main" focused={focusedPane === "main"}>
 				<PdfViewer
 					paneRole="MAIN"
+					status={watchEnabled ? "watching" : "manual"}
+					onFocus={() => setFocusedPane("main")}
 					url="/api/main.pdf"
 					ref={mainViewerRef}
 					onStatus={announce}
@@ -1065,14 +1172,15 @@ export default function App() {
 		);
 
 		const subPane = hasSub ? (
-			<Pane
-				key="sub"
-				paneRole="SUB"
-				status="static"
-				focused={focusedPane === "sub"}
-				onFocus={() => setFocusedPane("sub")}
-			>
-				<PdfViewer paneRole="SUB" url="/api/sub.pdf" onStatus={announce} ref={subViewerRef} />
+			<Pane key="sub" focused={focusedPane === "sub"}>
+				<PdfViewer
+					paneRole="SUB"
+					status={watchEnabled ? "watching" : "manual"}
+					onFocus={() => setFocusedPane("sub")}
+					url="/api/sub.pdf"
+					ref={subViewerRef}
+					onStatus={announce}
+				/>
 			</Pane>
 		) : null;
 
@@ -1081,55 +1189,73 @@ export default function App() {
 	}, [announce, focusedPane, hasSub, mainReloadKey, paneOrder, watchEnabled]);
 
 	return (
-		<div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 pb-6 pt-4">
-			<header className="sticky top-0 z-10 grid grid-cols-1 gap-3 rounded-2xl border border-slate-700/60 bg-slate-900/90 px-4 py-3 shadow-glow backdrop-blur md:grid-cols-[240px_1fr_220px]">
-				<div className="flex items-center gap-3">
-					<div className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-brand to-accent text-base font-bold uppercase text-slate-950">
-						zv
-					</div>
-					<div className="flex flex-col leading-tight">
-						<span className="text-base font-semibold tracking-wide text-slate-50">zview</span>
-						<span className="text-sm text-slate-300">fast, read-only PDF viewer</span>
-					</div>
-				</div>
+		<div className="relative mx-auto flex max-w-6xl flex-col gap-3 px-3 pb-6 pt-3">
+			<button
+				type="button"
+				className="fixed left-4 top-4 z-30 rounded-lg border border-slate-700/70 bg-slate-900/90 px-3 py-2 text-sm font-semibold text-slate-100 shadow-glow hover:border-brand/70"
+				onClick={() => setMenuOpen((v) => !v)}
+				aria-expanded={menuOpen}
+				aria-label="Toggle menu"
+			>
+				☰
+			</button>
 
-				<nav
-					className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5"
-					aria-label="Primary actions"
-				>
-					{toolbarActions.map(({ key, label, hint }) => (
-						<button
-							key={key}
-							type="button"
-							onClick={() => handleAction(key)}
-							className="glass flex flex-col items-start gap-0.5 rounded-xl px-3 py-2 text-sm font-semibold text-slate-100 transition hover:-translate-y-0.5 hover:border-brand/70 hover:text-slate-50"
-						>
-							<span>{label}</span>
-							<small className="text-xs font-normal text-slate-300">{hint}</small>
-						</button>
-					))}
-				</nav>
-
-				<div className="flex items-center justify-end gap-2">
-					<span
-						className={classNames(
-							"rounded-xl border px-3 py-1 text-[13px] font-semibold tracking-wide",
-							focusedPane === "sub" && hasSub
-								? "border-accent/60 bg-accent/20 text-accent"
-								: "border-brand/60 bg-brand/20 text-brand",
-						)}
-						aria-live="polite"
-					>
-						FOCUS: {focusedPane === "sub" && hasSub ? "SUB" : "MAIN"}
-					</span>
-					<div
-						className="glass max-w-full truncate rounded-xl px-3 py-2 text-sm text-slate-200"
-						aria-live="polite"
-					>
-						{status}
-					</div>
-				</div>
-			</header>
+			{menuOpen ? (
+				<>
+					<button
+						type="button"
+						className="fixed inset-0 z-20 bg-slate-950/60 backdrop-blur-sm"
+						onClick={() => setMenuOpen(false)}
+						onKeyDown={(e) => {
+							if (e.key === "Escape" || e.key === "Enter" || e.key === " ") setMenuOpen(false);
+						}}
+						aria-label="Close menu"
+					/>
+					<aside className="fixed left-4 top-16 z-30 flex h-[calc(100vh-5rem)] w-72 flex-col gap-3 overflow-auto rounded-xl border border-slate-800/70 bg-slate-950/95 p-3 shadow-2xl scrollbar-hide">
+						<div className="flex items-center gap-3">
+							<div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-brand to-accent text-sm font-bold uppercase text-slate-950">
+								zv
+							</div>
+							<div className="flex flex-col leading-tight">
+								<span className="text-sm font-semibold tracking-wide text-slate-50">zview</span>
+								<span className="text-xs text-slate-400">fast, read-only PDF viewer</span>
+							</div>
+						</div>
+						<nav className="grid grid-cols-1 gap-2" aria-label="Primary actions">
+							{toolbarActions.map(({ key, label, hint }) => (
+								<button
+									key={key}
+									type="button"
+									onClick={() => {
+										handleAction(key);
+										setMenuOpen(false);
+									}}
+									className="glass flex flex-col items-start gap-0.5 rounded-xl px-3 py-2 text-sm font-semibold text-slate-100 transition hover:-translate-y-0.5 hover:border-brand/70 hover:text-slate-50"
+								>
+									<span>{label}</span>
+									<small className="text-xs font-normal text-slate-300">{hint}</small>
+								</button>
+							))}
+						</nav>
+						{/* <div className="flex flex-col gap-2 text-xs text-slate-200"> */}
+						{/* 	<span */}
+						{/* 		className={classNames( */}
+						{/* 			"inline-block rounded-lg border px-2 py-1 text-[12px] font-semibold tracking-wide", */}
+						{/* 			focusedPane === "sub" && hasSub */}
+						{/* 				? "border-accent/60 bg-accent/15 text-accent" */}
+						{/* 				: "border-brand/60 bg-brand/15 text-brand", */}
+						{/* 		)} */}
+						{/* 		aria-live="polite" */}
+						{/* 	> */}
+						{/* 		FOCUS: {focusedPane === "sub" && hasSub ? "SUB" : "MAIN"} */}
+						{/* 	</span> */}
+						{/* 	<div className="glass rounded-lg px-3 py-2 text-xs text-slate-200" aria-live="polite"> */}
+						{/* 		{status} */}
+						{/* 	</div> */}
+						{/* </div> */}
+					</aside>
+				</>
+			) : null}
 
 			<main
 				className={classNames(
@@ -1142,17 +1268,17 @@ export default function App() {
 
 				{!hasSub && (
 					<div className="flex flex-col justify-between rounded-2xl border border-dashed border-slate-700/60 bg-slate-900/60 px-4 py-4">
-						<div className="flex items-center justify-between gap-2">
-							<div className="flex items-center gap-2">
-								<span className="inline-flex items-center gap-2 rounded-full border border-accent/60 bg-accent/10 px-3 py-1 text-xs font-semibold tracking-wide text-accent">
-									SUB
-								</span>
-								<span className="text-xs font-semibold uppercase tracking-wide text-slate-300">
-									static
-								</span>
-							</div>
-							<span className="text-xs text-slate-400">hidden until opened</span>
-						</div>
+						{/* <div className="flex items-center justify-between gap-2"> */}
+						{/* 	<div className="flex items-center gap-2"> */}
+						{/* 		<span className="inline-flex items-center gap-2 rounded-full border border-accent/60 bg-accent/10 px-3 py-1 text-xs font-semibold tracking-wide text-accent"> */}
+						{/* 			SUB */}
+						{/* 		</span> */}
+						{/* 		<span className="text-xs font-semibold uppercase tracking-wide text-slate-300"> */}
+						{/* 			static */}
+						{/* 		</span> */}
+						{/* 	</div> */}
+						{/* 	<span className="text-xs text-slate-400">hidden until opened</span> */}
+						{/* </div> */}
 						<div className="mt-4 flex items-center justify-between rounded-xl border border-slate-700/70 bg-slate-900/70 px-4 py-3 text-sm text-slate-200">
 							<span>Open Sub to reveal the second pane.</span>
 							<button
