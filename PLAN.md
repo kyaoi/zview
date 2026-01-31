@@ -445,15 +445,17 @@ A task is “done” when:
 
 ### 15) UI status + clarity
 
-#### `task/ui-status-and-toasts`
+#### `task/open-sub-from-web`
 
-* [ ] Done
-
-#### `task/open-sub-from-web` (proposed)
-
-* [ ] Planned
+* [x] Done
 
 **Goal:** Allow selecting SUB PDF from the web UI when not provided via `--sub`.
+
+**Work Done:**
+* Backend: Added `AppState` for dynamic path management and `/api/sub/upload` endpoint.
+* Frontend: Added hidden file input triggered by "Open (Sub)" button.
+* Frontend: Implemented upload logic and state updates.
+* Robustness: Fixed caching issues with strict `Cache-Control` headers and React `key` prop for reliable refreshing.
 
 **Considerations / risks:**
 * Must respect “local files only”: use `<input type="file">` and never fetch remote URLs.
@@ -461,6 +463,10 @@ A task is “done” when:
 * Likely needs backend endpoint to accept a local file upload/stream while keeping localhost-only and no persistence off-disk.
 * Large files: reuse virtualization/cancellation to avoid memory spikes.
 * Security/privacy: ensure files never leave the user’s machine and are discarded on app close.
+
+#### `task/ui-status-and-toasts`
+
+* [ ] Done
 
 **Goal:** Clear minimal UI without clutter.
 
