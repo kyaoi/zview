@@ -39,6 +39,7 @@ function withCacheBust(url: string, token: number) {
 const toolbarActions = [
 	{ key: "openMain", label: "Open (Main)", hint: "Pick a PDF for MAIN" },
 	{ key: "openSub", label: "Open (Sub)", hint: "Use CLI --sub" },
+	{ key: "closeSub", label: "Close (Sub)", hint: "Remove SUB pane" },
 	{ key: "swap", label: "Swap", hint: "Switch left/right (s)" },
 	{ key: "reloadMain", label: "Reload (Main)", hint: "Refresh MAIN" },
 	{ key: "help", label: "Help", hint: "Overlay" },
@@ -239,8 +240,7 @@ const PdfViewer = forwardRef<
 	useEffect(() => {
 		let cancelled = false;
 		const bustToken = reloadKey + sessionNonce;
-		const requestUrl =
-			role === "MAIN" ? withCacheBust(url, bustToken) : withCacheBust(url, sessionNonce);
+		const requestUrl = withCacheBust(url, bustToken);
 
 		if (pdfRef.current) {
 			const snapshot = (() => {
@@ -996,6 +996,7 @@ export default function App() {
 	const [paneOrder, setPaneOrder] = useState<"main-first" | "sub-first">("main-first");
 	const [_status, setStatus] = useState("Fetching bootstrap info…");
 	const [mainReloadKey, setMainReloadKey] = useState(0);
+	const [subReloadKey, setSubReloadKey] = useState(0);
 	const [showHelp, setShowHelp] = useState(false);
 	const [menuOpen, setMenuOpen] = useState(false);
 	const [keysEnabled, setKeysEnabled] = useState(true);
@@ -1091,12 +1092,17 @@ export default function App() {
 				setFocusedPane("main");
 				break;
 			case "openSub":
-				if (!hasSub) {
-					announce("SUBはCLIの--sub指定でのみ追加できます");
-					return;
-				}
-				setFocusedPane("sub");
-				announce("SUB: active (static)");
+				document.getElementById("sub-file-input")?.click();
+				break;
+			case "closeSub":
+				if (!hasSub) return;
+				fetch("/api/sub", { method: "DELETE" })
+					.then(() => {
+						setHasSub(false);
+						setFocusedPane("main");
+						announce("SUB: Closed");
+					})
+					.catch(() => announce("Failed to close SUB"));
 				break;
 			case "swap":
 				swapPanes();
@@ -1111,6 +1117,34 @@ export default function App() {
 				break;
 			default:
 				announce("Action pending wiring");
+		}
+	};
+
+	const handleSubFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+		const file = e.target.files?.[0];
+		if (!file) return;
+
+		// Reset value so same file can be selected again if needed
+		e.target.value = "";
+
+		const formData = new FormData();
+		formData.append("file", file);
+
+		announce("SUB: Uploading…");
+		try {
+			const res = await fetch("/api/sub/upload", {
+				method: "POST",
+				body: formData,
+			});
+			if (!res.ok) throw new Error("Upload failed");
+			
+			setHasSub(true);
+			setFocusedPane("sub");
+			setSubReloadKey((v) => v + 1); // Force reload
+			announce("SUB: Loaded " + file.name);
+		} catch (err) {
+			console.error(err);
+			announce("SUB: Upload failed");
 		}
 	};
 
@@ -1353,12 +1387,14 @@ export default function App() {
 					onFocus={() => setFocusedPane("sub")}
 				>
 					<PdfViewer
+						key={subReloadKey}
 						paneRole="SUB"
 						status="static"
 						onFocus={() => setFocusedPane("sub")}
 						url="/api/sub.pdf"
 						ref={subViewerRef}
 						onStatus={announce}
+						reloadKey={subReloadKey}
 					/>
 				</Pane>
 			</div>
@@ -1366,7 +1402,7 @@ export default function App() {
 
 		if (!subPane) return [mainPane];
 		return paneOrder === "main-first" ? [mainPane, subPane] : [subPane, mainPane];
-	}, [announce, focusedPane, hasSub, mainReloadKey, paneOrder, watchEnabled]);
+	}, [announce, focusedPane, hasSub, mainReloadKey, subReloadKey, paneOrder, watchEnabled]);
 
 	return (
 		<div className="relative mx-auto flex w-full flex-col gap-3 px-3 pb-6 pt-3">
@@ -1470,6 +1506,14 @@ export default function App() {
 			</main>
 
 			{showHelp ? <HelpOverlay onClose={() => setShowHelp(false)} /> : null}
+			
+			<input
+				type="file"
+				id="sub-file-input"
+				className="hidden"
+				accept=".pdf"
+				onChange={handleSubFileUpload}
+			/>
 		</div>
 	);
 }

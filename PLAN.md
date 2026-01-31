@@ -447,9 +447,15 @@ A task is “done” when:
 
 #### `task/open-sub-from-web`
 
-* [ ] Planned
+* [x] Done
 
 **Goal:** Allow selecting SUB PDF from the web UI when not provided via `--sub`.
+
+**Work Done:**
+* Backend: Added `AppState` for dynamic path management and `/api/sub/upload` endpoint.
+* Frontend: Added hidden file input triggered by "Open (Sub)" button.
+* Frontend: Implemented upload logic and state updates.
+* Robustness: Fixed caching issues with strict `Cache-Control` headers and React `key` prop for reliable refreshing.
 
 **Considerations / risks:**
 * Must respect “local files only”: use `<input type="file">` and never fetch remote URLs.

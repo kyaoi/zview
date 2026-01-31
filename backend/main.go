@@ -6,6 +6,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
 	"net"
@@ -22,6 +23,7 @@ import (
 )
 
 const defaultPort = 8571
+const maxUploadSize = 300 * 1024 * 1024 // 300MB
 
 var errShowHelp = errors.New("show help")
 
@@ -32,6 +34,44 @@ type options struct {
 	watch       bool
 	port        int
 	openBrowser bool
+}
+
+// AppState holds the runtime configuration of PDFs
+type AppState struct {
+	mu           sync.RWMutex
+	mainPath     string
+	subPath      string
+	tempSubFiles []string // track temp files to clean up
+}
+
+func (s *AppState) GetMainPath() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.mainPath
+}
+
+func (s *AppState) GetSubPath() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.subPath
+}
+
+func (s *AppState) SetSubPath(path string, isTemp bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.subPath = path
+	if isTemp && path != "" {
+		s.tempSubFiles = append(s.tempSubFiles, path)
+	}
+}
+
+func (s *AppState) Cleanup() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, path := range s.tempSubFiles {
+		_ = os.Remove(path)
+	}
+	s.tempSubFiles = nil
 }
 
 func main() {
@@ -156,6 +196,12 @@ func run(opts options) error {
 		return err
 	}
 
+	state := &AppState{
+		mainPath: opts.mainPath,
+		subPath:  opts.subPath,
+	}
+	defer state.Cleanup()
+
 	watchEnabled := opts.watch && opts.mainPath != ""
 
 	var broadcaster *eventBroadcaster
@@ -189,9 +235,11 @@ func run(opts options) error {
 
 	mux := http.NewServeMux()
 	mux.Handle("/", spaHandler(staticFS))
-	mux.Handle("/api/bootstrap", bootstrapHandler(bootstrap))
-	mux.Handle("/api/main.pdf", pdfHandler("MAIN", opts.mainPath))
-	mux.Handle("/api/sub.pdf", pdfHandler("SUB", opts.subPath))
+	mux.Handle("/api/bootstrap", bootstrapHandler(state, bootstrap))
+	mux.Handle("/api/main.pdf", pdfHandler(state, "MAIN"))
+	mux.Handle("/api/sub.pdf", pdfHandler(state, "SUB"))
+	mux.Handle("/api/sub/upload", uploadHandler(state))
+	mux.Handle("/api/sub", deleteHandler(state))
 	if watchEnabled && broadcaster != nil {
 		mux.Handle("/events", broadcaster)
 	}
@@ -300,21 +348,33 @@ type bootstrapInfo struct {
 	Watch   bool   `json:"watch"`
 }
 
-func bootstrapHandler(info bootstrapInfo) http.Handler {
-	payload, err := json.Marshal(info)
-	if err != nil {
-		panic(fmt.Errorf("failed to marshal bootstrap info: %w", err))
-	}
-
+func bootstrapHandler(state *AppState, initial bootstrapInfo) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		info := initial
+		info.HasSub = state.GetSubPath() != ""
+
+		payload, err := json.Marshal(info)
+		if err != nil {
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Cache-Control", "no-store")
 		_, _ = w.Write(payload)
 	})
 }
 
-func pdfHandler(role string, path string) http.Handler {
+func pdfHandler(state *AppState, role string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "no-store, no-cache, must-revalidate")
+		var path string
+		if role == "MAIN" {
+			path = state.GetMainPath()
+		} else {
+			path = state.GetSubPath()
+		}
+
 		if path == "" {
 			http.Error(w, fmt.Sprintf("Missing PDF: %s not provided", role), http.StatusNotFound)
 			return
@@ -345,6 +405,72 @@ func pdfHandler(role string, path string) http.Handler {
 		}
 
 		http.ServeContent(w, r, info.Name(), info.ModTime(), file)
+	})
+}
+
+func uploadHandler(state *AppState) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize)
+		if err := r.ParseMultipartForm(maxUploadSize); err != nil {
+			http.Error(w, "file too large", http.StatusBadRequest)
+			return
+		}
+
+		file, header, err := r.FormFile("file")
+		if err != nil {
+			http.Error(w, "invalid file", http.StatusBadRequest)
+			return
+		}
+		defer file.Close()
+
+		if filepath.Ext(header.Filename) != ".pdf" {
+			http.Error(w, "only PDF files allowed", http.StatusBadRequest)
+			return
+		}
+
+		// Create temp file
+		tempFile, err := os.CreateTemp("", "zview-sub-*.pdf")
+		if err != nil {
+			log.Printf("failed to create temp file: %v", err)
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
+		// Don't defer Remove here; handled by AppState.Cleanup
+
+		_, err = io.Copy(tempFile, file)
+		tempFile.Close()
+		if err != nil {
+			log.Printf("failed to save temp file: %v", err)
+			_ = os.Remove(tempFile.Name())
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		state.SetSubPath(tempFile.Name(), true)
+		log.Printf("Uploaded SUB PDF to %s", tempFile.Name())
+
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintln(w, "ok")
+	})
+}
+
+func deleteHandler(state *AppState) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "DELETE" {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		state.SetSubPath("", false)
+		log.Printf("Closed SUB PDF")
+
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintln(w, "ok")
 	})
 }
 
@@ -502,3 +628,4 @@ func startMainWatcher(path string, broadcaster *eventBroadcaster) (func(), error
 		wg.Wait()
 	}, nil
 }
+
