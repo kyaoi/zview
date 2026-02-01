@@ -41,8 +41,6 @@ jobs:
           pnpm install
           pnpm build
 
-
-
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v5
         with:
