@@ -25,7 +25,12 @@ import (
 const defaultPort = 8571
 const maxUploadSize = 300 * 1024 * 1024 // 300MB
 
-var errShowHelp = errors.New("show help")
+var (
+	version     = "dev"
+	commit      = "none"
+	date        = "unknown"
+	errShowHelp = errors.New("show help")
+)
 
 type options struct {
 	mainPath    string
@@ -114,7 +119,10 @@ func parseArgs(args []string) (options, error) {
 
 	fs.IntVar(&opts.port, "port", opts.port, "port to bind (0 = random)")
 
+	fs.IntVar(&opts.port, "port", opts.port, "port to bind (0 = random)")
+
 	noOpenFlag := fs.Bool("no-open", false, "do not auto-open browser tab")
+	versionFlag := fs.Bool("version", false, "print version and exit")
 
 	reordered := reorderArgs(args)
 	if err := fs.Parse(reordered); err != nil {
@@ -127,6 +135,10 @@ func parseArgs(args []string) (options, error) {
 	if *helpFlag {
 		fs.Usage()
 		return options{}, errShowHelp
+	}
+	if *versionFlag {
+		fmt.Printf("zview %s (%s) built at %s\n", version, commit, date)
+		os.Exit(0)
 	}
 
 	remaining := fs.Args()
@@ -628,4 +640,3 @@ func startMainWatcher(path string, broadcaster *eventBroadcaster) (func(), error
 		wg.Wait()
 	}, nil
 }
-

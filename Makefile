@@ -35,7 +35,7 @@ build:
 	fi
 	@if [ -f $(BACKEND_DIR)/go.mod ]; then \
 	  if command -v go >/dev/null 2>&1; then \
-	    cd $(BACKEND_DIR) && go build -o ../zview; \
+	    cd $(BACKEND_DIR) && go build -ldflags "-X main.version=$$(git describe --tags --always --dirty) -X main.commit=$$(git rev-parse --short HEAD) -X main.date=$$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o ../zview; \
 	  else \
 	    echo 'go command not found: build aborted' >&2; exit 1; \
 	  fi; \

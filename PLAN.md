@@ -15,8 +15,8 @@ This plan breaks development of **zview** into small, reviewable tasks.
 * [x] **Milestone 2:** Keybindings + zoom/fit-width
 * [x] **Milestone 3:** Two-pane MAIN/SUB + focus + swap
 * [ ] **Milestone 4:** Reload (manual + auto) + scroll restoration
-* [x] **Milestone 5:** Performance hardening
-* [ ] **Milestone 6:** Packaging + CI + release readiness
+* [ ] **Milestone 5:** Performance hardening
+* [x] **Milestone 6:** Packaging + CI + release readiness
 
 ---
 
@@ -513,7 +513,7 @@ A task is “done” when:
 
 #### `task/ci-release`
 
-* [ ] Done
+* [x] Done
 
 **Goal:** Repeatable builds and basic automation.
 
