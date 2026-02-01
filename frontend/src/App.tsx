@@ -8,7 +8,6 @@ import {
 import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import {
 	forwardRef,
-	type ReactNode,
 	useCallback,
 	useEffect,
 	useImperativeHandle,
@@ -119,7 +118,7 @@ const PdfViewer = forwardRef<
 		onFocus?: () => void;
 		reloadKey?: number;
 	}
->(function PdfViewer({ paneRole, status, focused, url, onNotify, onFocus, reloadKey = 0 }, ref) {
+>(function PdfViewer({ paneRole, url, onNotify, reloadKey = 0 }, ref) {
 	const role = paneRole;
 	const sessionNonce = useMemo(() => Math.floor(Math.random() * 1_000_000), []);
 	const scrollRef = useRef<HTMLDivElement>(null);
@@ -1105,7 +1104,7 @@ export default function App() {
 			setHasSub(true);
 			setFocusedPane("sub");
 			setSubReloadKey((v) => v + 1); // Force reload
-			addToast("SUB: Loaded " + file.name, "success");
+			addToast(`SUB: Loaded ${file.name}`, "success");
 		} catch (err) {
 			console.error(err);
 			addToast("SUB: Upload failed", "error");
