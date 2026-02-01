@@ -12,7 +12,7 @@ zview is a **web-based, read-only PDF viewer**. The Go CLI starts a local server
 
 * **Go** (recent stable version)
 * **Node.js (LTS)**
-* **pnpm** (via Corepack)
+* **pnpm** (installed via mise or equivalent; Corepack not used; version not pinned, tested with 10.19.0)
 
 Recommended:
 
@@ -34,7 +34,6 @@ Recommended:
 From `frontend/`:
 
 ```bash
-corepack enable
 pnpm install
 ```
 
@@ -133,6 +132,7 @@ go build -o ../zview
 Result:
 
 * `./zview` is the distributable executable.
+* Frontend assets are emitted to `backend/dist` and **embedded** into the Go binary.
 * End users do **not** need Node/pnpm.
 
 ---
@@ -144,8 +144,8 @@ Result:
 From `frontend/`:
 
 ```bash
-pnpm lint
-pnpm fmt
+pnpm lint     # Biome lint
+pnpm fmt      # Biome format --check
 pnpm build
 ```
 
@@ -167,7 +167,7 @@ go build ./...
 * Zoom works: `+` / `-`
 * Fit-to-width works: `=`
 * Focus toggles with `Tab` and MAIN/SUB remain clearly labeled
-* Swap works: `x` (roles remain MAIN/SUB)
+* Swap works: `s` (roles remain MAIN/SUB)
 * Manual reload works: `r` reloads MAIN
 * Reload failure keeps current rendering (no blank)
 * Large PDFs scroll smoothly; memory remains bounded (best-effort)
@@ -224,3 +224,46 @@ When behavior changes, update:
 * `TECH_STACK.md`
 * `PLAN.md`
 * `AGENTS.md` (workflow/rules)
+
+---
+
+## Release Process
+
+Releases are automated via GitHub Actions and GoReleaser.
+
+1.  **Tag release**: Create and push a new tag (e.g., `v0.1.0`).
+    ```bash
+    git tag v0.1.0
+    git push origin v0.1.0
+    ```
+2.  **CI/CD**:
+    *   GitHub Actions detects the tag.
+    *   Frontend is built.
+    *   Backend is cross-compiled for Linux, macOS, and Windows.
+    *   Version info is injected via `ldflags`.
+    *   Binaries are uploaded to GitHub Releases.
+    *   Homebrew formula is updated in `kyaoi/homebrew-tap`.
+    *   **Note**: Binaries are uploaded to `kyaoi/zview-releases` (Public) to allow installation without authentication, while keeping `zview` source Private.
+
+### Setup Requirements
+
+1.  **Repositories**:
+    *   `kyaoi/zview` (Private): Source code.
+    *   `kyaoi/zview-releases` (Public): Binary releases (empty repo).
+    *   `kyaoi/homebrew-tap` (Public): Homebrew formulae.
+
+
+2.  **Secrets (in `zview` repo)**:
+    *   **Name**: `GH_PAT`
+    *   **Value**: A Personal Access Token (Fine-grained recommended) with the following permissions:
+        *   `kyaoi/zview` (Private): **Read-only** (Metadata/Contents) to read tags.
+        *   `kyaoi/zview-releases` (Public): **Read/Write** (Contents) to create releases.
+        *   `kyaoi/homebrew-tap` (Public): **Read/Write** (Contents) to update formulae.
+
+### Manual install via Homebrew
+
+Once released, users can install via:
+
+```bash
+brew install kyaoi/tap/zview
+```
