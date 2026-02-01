@@ -117,10 +117,7 @@ func parseArgs(args []string) (options, error) {
 	watchFlag := fs.Bool("watch", true, "enable file watching for MAIN (default)")
 	noWatchFlag := fs.Bool("no-watch", false, "disable file watching for MAIN")
 
-	// Check if port flag is already defined (defensive fix for reported panic)
-	if fs.Lookup("port") == nil {
-		fs.IntVar(&opts.port, "port", opts.port, "port to bind (0 = random)")
-	}
+	fs.IntVar(&opts.port, "port", opts.port, "port to bind (0 = random)")
 
 	noOpenFlag := fs.Bool("no-open", false, "do not auto-open browser tab")
 	versionFlag := fs.Bool("version", false, "print version and exit")
