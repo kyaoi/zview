@@ -60,12 +60,12 @@ changelog:
 release:
   github:
     owner: kyaoi
-    name: zview-releases
+    name: zview
 
 brews:
   - repository:
       owner: kyaoi
-      name: homebrew-tap
+      name: homebrew-zview
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     
     homepage: "https://github.com/kyaoi/zview"
