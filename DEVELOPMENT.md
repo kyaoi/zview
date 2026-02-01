@@ -241,29 +241,25 @@ Releases are automated via GitHub Actions and GoReleaser.
     *   Frontend is built.
     *   Backend is cross-compiled for Linux, macOS, and Windows.
     *   Version info is injected via `ldflags`.
-    *   Binaries are uploaded to GitHub Releases.
-    *   Homebrew formula is updated in `kyaoi/homebrew-tap`.
-    *   **Note**: Binaries are uploaded to `kyaoi/zview-releases` (Public) to allow installation without authentication, while keeping `zview` source Private.
+    *   Binaries are uploaded to GitHub Releases (this repo).
+    *   Homebrew formula is updated in `kyaoi/homebrew-zview`.
 
 ### Setup Requirements
 
 1.  **Repositories**:
-    *   `kyaoi/zview` (Private): Source code.
-    *   `kyaoi/zview-releases` (Public): Binary releases (empty repo).
-    *   `kyaoi/homebrew-tap` (Public): Homebrew formulae.
-
+    *   `kyaoi/zview` (Public): Source code & Releases.
+    *   `kyaoi/homebrew-zview` (Public): Homebrew formulae.
 
 2.  **Secrets (in `zview` repo)**:
-    *   **Name**: `GH_PAT`
-    *   **Value**: A Personal Access Token (Fine-grained recommended) with the following permissions:
-        *   `kyaoi/zview` (Private): **Read-only** (Metadata/Contents) to read tags.
-        *   `kyaoi/zview-releases` (Public): **Read/Write** (Contents) to create releases.
-        *   `kyaoi/homebrew-tap` (Public): **Read/Write** (Contents) to update formulae.
+    *   **Name**: `HOMEBREW_TAP_GITHUB_TOKEN`
+    *   **Value**: A Personal Access Token (Classic or Fine-grained) with:
+        *   `kyaoi/homebrew-zview` (Public): **Read/Write** (Contents) to update formulae.
+        *   Note: `GITHUB_TOKEN` is used automatically for creating releases in the same repo.
 
 ### Manual install via Homebrew
 
 Once released, users can install via:
 
 ```bash
-brew install kyaoi/tap/zview
+brew install kyaoi/zview
 ```
