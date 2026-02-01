@@ -1,0 +1,43 @@
+@import "@fontsource-variable/noto-sans-jp";
+@import "@fontsource-variable/space-grotesk";
+@import "tailwindcss";
+
+@theme {
+	--color-accent: #1ccad8;
+	--color-brand: #2c7be5;
+	--color-surface: #0f182b;
+	--color-surface-strong: #121f36;
+	--shadow-glow: 0 10px 30px rgba(5, 12, 26, 0.35);
+	--font-sans:
+		"Noto Sans JP Variable", "Space Grotesk Variable", "Space Grotesk", "Inter", "system-ui",
+		"sans-serif";
+}
+
+:root {
+	color-scheme: dark;
+}
+
+.scrollbar-hide {
+	scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+	display: none;
+}
+
+body {
+	@apply min-h-screen bg-slate-950 text-slate-100 font-sans;
+	background-image:
+		radial-gradient(circle at 12% 18%, rgba(44, 123, 229, 0.22), transparent 32%),
+		radial-gradient(circle at 82% 0%, rgba(28, 202, 216, 0.2), transparent 34%),
+		linear-gradient(135deg, #050b18, #0a1427 52%, #0c152b 80%);
+}
+
+.glass {
+	@apply bg-slate-900/80 backdrop-blur border border-slate-700/60 shadow-[0_10px_30px_rgba(5,12,26,0.35)];
+}
+
+[data-focused="true"] {
+	box-shadow:
+		0 0 0 1px rgba(28, 202, 216, 0.45),
+		0 16px 42px rgba(28, 202, 216, 0.18);
+}

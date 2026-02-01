@@ -31,12 +31,13 @@ A **fast, lightweight, read-only PDF viewer** that runs in your browser, inspire
 * **Continuous scroll** with **16px** spacing between pages
 * **Zoom:** `+` / `-`
 * **Fit to width:** `=`
+* Bundled **Noto Sans JP** + PDF.js CMaps/standard fonts for offline-safe Japanese text rendering
 
 ### Two panes (max 2)
 
 * Two roles: **MAIN** and **SUB**
 * **SUB is static** (no reload). To change it, re-open via the UI.
-* **Swap panes:** `x` (swaps left/right positions; roles remain MAIN/SUB)
+* **Swap panes:** `s` (swaps left/right positions; roles remain MAIN/SUB)
 * **Focus toggle:** `Tab`
 
 ### Reload behavior
@@ -71,7 +72,7 @@ A **fast, lightweight, read-only PDF viewer** that runs in your browser, inspire
 ### Panes
 
 * `Tab` — toggle focus (MAIN ↔ SUB)
-* `x` — swap left/right pane positions
+* `s` — swap left/right pane positions
 
 ### Reload / Misc
 
@@ -124,6 +125,19 @@ Then use the **Open** button in the Web UI.
 * `--port <N>` — bind to a specific port
 * `--no-open` — don’t auto-open a browser tab
 
+## Build (single binary)
+
+```bash
+cd frontend
+pnpm install        # first time only
+pnpm build          # emits assets to ../backend/dist for embedding
+
+cd ../backend
+go build -o ../zview
+```
+
+Result: `./zview` contains the embedded frontend; end users do **not** need Node/pnpm.
+
 ---
 
 ## Web UI
@@ -160,6 +174,7 @@ This project prioritizes speed:
 ## Auto-reload details (MAIN)
 
 * Watches the file (Linux-first). Updates often occur via atomic replace; the watcher must handle rename/replace.
+* Transport: **SSE** on `/events` (only when watch is ON and MAIN exists). With `--no-watch`, `/events` is not served and no change detection occurs.
 * Uses a short debounce before reloading.
 * On reload success: restore **page + vertical position** best-effort.
 * On reload failure: do nothing visually; show a brief status message.
@@ -171,9 +186,12 @@ This project prioritizes speed:
 * The server should bind to **127.0.0.1** only.
 * Prefer a per-launch random token in the URL to avoid accidental cross-tab access.
 
+## Language
+
+Project documentation and UI text are written in English by default unless a task specifies otherwise. Use pnpm for Node installs. Styling should use Tailwind CSS v4.x.
+
 ---
 
 ## License
 
 TBD
-

@@ -7,7 +7,8 @@ This document captures the technical stack and architecture decisions for **zvie
 * **Backend (CLI + local server):** Go
 * **Frontend (Web UI):** Vite + TypeScript
 * **PDF Rendering:** PDF.js (`pdfjs-dist`)
-* **Frontend tooling (build-time):** Node.js (LTS) + **pnpm** (via Corepack)
+* **Frontend tooling (build-time):** Node.js (LTS) + **pnpm** (installed via mise or similar; Corepack not used; version not pinned)
+* **Lint/format:** Biome
 * **Runtime distribution:** **single Go binary** (no Node/pnpm required for users)
 * **Platform target:** Linux-first
 
@@ -217,4 +218,3 @@ Restore after the new layout is measured:
 * Config file for keymaps and defaults
 * Persistent UI preferences (zoom mode, last used options)
 * Optional File System Access API enhancements (not required)
-
