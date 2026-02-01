@@ -1,4 +1,12 @@
 import {
+	GlobalWorkerOptions,
+	getDocument,
+	type PDFDocumentProxy,
+	type RenderTask,
+} from "pdfjs-dist";
+// @ts-expect-error
+import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import {
 	forwardRef,
 	type ReactNode,
 	useCallback,
@@ -8,14 +16,6 @@ import {
 	useRef,
 	useState,
 } from "react";
-import {
-	GlobalWorkerOptions,
-	getDocument,
-	type PDFDocumentProxy,
-	type RenderTask,
-} from "pdfjs-dist";
-// @ts-ignore
-import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { ToastContainer, type ToastMessage, type ToastType } from "./components/Toast";
 
 GlobalWorkerOptions.workerSrc = workerSrc;
