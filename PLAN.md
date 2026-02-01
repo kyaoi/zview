@@ -11,11 +11,11 @@ This plan breaks development of **zview** into small, reviewable tasks.
 ## Progress tracking
 
 * [x] **Milestone 0:** Repo + tooling bootstrapped
-* [ ] **Milestone 1:** Single-PDF viewer works end-to-end
+* [x] **Milestone 1:** Single-PDF viewer works end-to-end
 * [x] **Milestone 2:** Keybindings + zoom/fit-width
 * [x] **Milestone 3:** Two-pane MAIN/SUB + focus + swap
-* [ ] **Milestone 4:** Reload (manual + auto) + scroll restoration
-* [ ] **Milestone 5:** Performance hardening
+* [x] **Milestone 4:** Reload (manual + auto) + scroll restoration
+* [x] **Milestone 5:** Performance hardening
 * [x] **Milestone 6:** Packaging + CI + release readiness
 
 ---
