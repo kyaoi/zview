@@ -50,12 +50,9 @@ const toolbarActions = [
 type ActionKey = (typeof toolbarActions)[number]["key"];
 type ViewerRole = "MAIN" | "SUB";
 
-
 function classNames(...tokens: Array<string | false | null | undefined>) {
 	return tokens.filter(Boolean).join(" ");
 }
-
-
 
 type PdfViewerState =
 	| { phase: "idle" | "loading" }
@@ -107,13 +104,9 @@ type ViewerHandle = {
 	zoomOut: () => void;
 	fitToWidth: () => void;
 	rerender: () => void;
+	getSnapshot: () => ScrollSnapshot | null;
+	restoreSnapshot: (snapshot: ScrollSnapshot) => void;
 };
-
-function friendlyError(role: ViewerRole, detail: string) {
-	if (detail.includes("Missing PDF")) return `${role} PDF not provided`;
-	if (detail.includes("Unexpected server response")) return `${role} PDF request failed`;
-	return `${role} failed to load`;
-}
 
 const PdfViewer = forwardRef<
 	ViewerHandle,
@@ -258,10 +251,7 @@ const PdfViewer = forwardRef<
 				setZoomMode(restoredZoomMode);
 				setRenderNonce((v) => v + 1);
 				manualScaleInitializedRef.current = Boolean(restoreSnapshot);
-				onNotify(
-					restoreSnapshot ? `${role}: restored scroll` : `${role}: loaded`,
-					"success",
-				);
+				onNotify(restoreSnapshot ? `${role}: restored scroll` : `${role}: loaded`, "success");
 			} catch (err) {
 				if (cancelled) return;
 				const detail = err instanceof Error ? err.message : String(err);
@@ -269,10 +259,7 @@ const PdfViewer = forwardRef<
 					if (pdfRef.current && prev.phase === "ready") return prev;
 					return { phase: "error", detail };
 				});
-				onNotify(
-					pdfRef.current ? `${role}: reload failed` : `${role}: failed to load`,
-					"error",
-				);
+				onNotify(pdfRef.current ? `${role}: reload failed` : `${role}: failed to load`, "error");
 			}
 		}
 
@@ -300,6 +287,7 @@ const PdfViewer = forwardRef<
 		const node = scrollRef.current;
 		const updateScale = () => {
 			const height = node.clientHeight || pageSize.height;
+			if (height <= 0) return; // Prevent invalid scale
 			const nextFit = height / pageSize.height;
 			setFitScale(nextFit);
 		};
@@ -358,6 +346,7 @@ const PdfViewer = forwardRef<
 	}, [measureVisibility]);
 
 	useEffect(() => {
+		void renderNonce; // Ensure effect runs when renderNonce changes
 		const pending = pendingRestoreRef.current;
 		if (
 			!pending ||
@@ -402,6 +391,7 @@ const PdfViewer = forwardRef<
 		reloadKey,
 		state.phase,
 		zoomMode,
+		renderNonce,
 	]);
 
 	const renderPage = useCallback(
@@ -487,7 +477,7 @@ const PdfViewer = forwardRef<
 	useEffect(() => {
 		if (state.phase !== "ready" || pageCount === 0) return;
 		// Status update for page number could go here if we had a persistent status bar
-	}, [currentPage, pageCount, role, state.phase]);
+	}, [pageCount, state.phase]);
 
 	const layoutScale = useMemo(
 		() => (zoomMode === "fit-width" ? fitScale : manualScale),
@@ -495,12 +485,12 @@ const PdfViewer = forwardRef<
 	);
 
 	const announceZoom = useCallback(
-		(nextScale: number, mode: ZoomMode) => {
+		(_nextScale: number, _mode: ZoomMode) => {
 			// Optional: could toast on zoom, but acts as noise. Keeping silent for now.
 			// const percent = Math.round(nextScale * 100);
 			// onNotify(`${role}: zoom ${percent}%`, "info");
 		},
-		[role], // removed onNotify dependency
+		[], // removed onNotify dependency
 	);
 
 	const zoomIn = useCallback(() => {
@@ -685,6 +675,32 @@ const PdfViewer = forwardRef<
 				setRenderNonce((v) => v + 1);
 				onNotify(`${role}: re-rendering`, "info");
 			},
+			getSnapshot: () => {
+				const scrollEl = scrollRef.current;
+				if (!pageSize || pageCount === 0 || !scrollEl) return null;
+				const layoutScale = zoomMode === "fit-width" ? fitScale : manualScale;
+				if (layoutScale <= 0) return null;
+				const viewTop = scrollEl.scrollTop;
+				const pageBlock = Math.round(pageSize.height * layoutScale) + PAGE_GAP_PX;
+				const topPageIndex = Math.min(pageCount - 1, Math.max(0, Math.floor(viewTop / pageBlock)));
+				const offsetPx = viewTop - topPageIndex * pageBlock;
+				const totalHeight = Math.max(1, pageCount * pageBlock - PAGE_GAP_PX);
+				const scrollRatio = Math.min(1, Math.max(0, viewTop / totalHeight));
+				return {
+					topPageIndex,
+					offsetPx,
+					zoomMode,
+					manualScale,
+					scrollRatio,
+					pageCount,
+				} satisfies ScrollSnapshot;
+			},
+			restoreSnapshot: (snapshot: ScrollSnapshot) => {
+				pendingRestoreRef.current = { reloadKey, snapshot };
+				// Trigger re-measure/re-scroll logic
+				setRenderNonce((v) => v + 1);
+				requestAnimationFrame(() => measureVisibility());
+			},
 		}),
 		[
 			fitToWidth,
@@ -701,6 +717,18 @@ const PdfViewer = forwardRef<
 			zoomIn,
 			zoomOut,
 			role,
+			// Snapshot dependencies
+			zoomMode,
+			fitScale,
+			manualScale,
+			pageCount,
+			pageSize,
+			reloadKey,
+			measureVisibility,
+			// scrollRef is static but let's include it if linter wants
+			// scrollRef // actually ref objects are stable, linter usually knows.
+			// But diagnostics complained about lines 662 which used scrollRef.current
+			// Diagnostics for lines 684-699 complained about zoomMode, fitScale, manualScale, pageCount, pageSize.
 		],
 	);
 
@@ -709,7 +737,10 @@ const PdfViewer = forwardRef<
 	const listStyle = { gap: `${PAGE_GAP_PX}px` };
 
 	return (
-		<div className="relative flex h-full w-full flex-col overflow-hidden bg-slate-900/30" ref={containerRef}>
+		<div
+			className="relative flex h-full w-full flex-col overflow-hidden bg-slate-900/30"
+			ref={containerRef}
+		>
 			{/* Floating Page Indicator */}
 			<div className="absolute bottom-6 right-6 z-10 select-none rounded-full border border-slate-700/50 bg-slate-900/80 px-3 py-1.5 text-xs font-medium text-slate-200 shadow-lg backdrop-blur transition-opacity duration-300 hover:opacity-100 opacity-60">
 				Page {currentPage} <span className="text-slate-500">/</span> {pageCount}
@@ -908,7 +939,12 @@ export default function App() {
 	const hasSubRef = useRef(hasSub);
 	const focusedPaneRef = useRef<"main" | "sub">(focusedPane);
 	const showHelpRef = useRef(showHelp);
+
 	const keysEnabledRef = useRef(keysEnabled);
+	const swapSnapshotsRef = useRef<{
+		main: ScrollSnapshot | null;
+		sub: ScrollSnapshot | null;
+	} | null>(null);
 
 	const addToast = useCallback((message: string, type: ToastType = "info") => {
 		const id = Math.random().toString(36).substring(2, 9);
@@ -924,10 +960,32 @@ export default function App() {
 			addToast("Cannot swap without SUB", "error");
 			return false;
 		}
+		// Capture snapshots before state update triggers re-render/layout
+		const mainSnap = mainViewerRef.current?.getSnapshot() ?? null;
+		const subSnap = subViewerRef.current?.getSnapshot() ?? null;
+		swapSnapshotsRef.current = { main: mainSnap, sub: subSnap };
+
 		setPaneOrder((prev) => (prev === "main-first" ? "sub-first" : "main-first"));
 		addToast("Swapped MAIN/SUB order", "info");
 		return true;
 	}, [addToast]);
+
+	// Restore snapshots after layout change (swap)
+	useEffect(() => {
+		void paneOrder; // Ensure effect runs on order change
+		const snaps = swapSnapshotsRef.current;
+		if (!snaps) return;
+
+		// Use requestAnimationFrame to ensure layout has settled?
+		// Actually useEffect fires after paint, so refs should be attached to new locations.
+		const main = mainViewerRef.current;
+		const sub = subViewerRef.current;
+
+		if (main && snaps.main) main.restoreSnapshot(snaps.main);
+		if (sub && snaps.sub) sub.restoreSnapshot(snaps.sub);
+
+		swapSnapshotsRef.current = null;
+	}, [paneOrder]);
 
 	useEffect(() => {
 		hasSubRef.current = hasSub;
@@ -973,7 +1031,7 @@ export default function App() {
 		return () => {
 			aborted = true;
 		};
-	}, []);
+	}, [addToast]);
 
 	useEffect(() => {
 		if (!watchEnabled || !hasMain) return;
@@ -1043,7 +1101,7 @@ export default function App() {
 				body: formData,
 			});
 			if (!res.ok) throw new Error("Upload failed");
-			
+
 			setHasSub(true);
 			setFocusedPane("sub");
 			setSubReloadKey((v) => v + 1); // Force reload
@@ -1088,8 +1146,8 @@ export default function App() {
 				event.stopImmediatePropagation();
 			};
 
-			const targetRole: ViewerRole =
-				focusedPaneRef.current === "sub" && hasSubRef.current ? "SUB" : "MAIN";
+			// const targetRole: ViewerRole =
+			// 	focusedPaneRef.current === "sub" && hasSubRef.current ? "SUB" : "MAIN";
 			const targetViewer =
 				focusedPaneRef.current === "sub" && hasSubRef.current
 					? subViewerRef.current
@@ -1219,10 +1277,7 @@ export default function App() {
 						subViewerRef.current?.rerender();
 					}
 					setFocusedPane("main");
-					addToast(
-						hasSubRef.current ? "MAIN: reload (re-render SUB)" : "MAIN: reloading…",
-						"info",
-					);
+					addToast(hasSubRef.current ? "MAIN: reload (re-render SUB)" : "MAIN: reloading…", "info");
 					return;
 				case "?":
 					consume();
@@ -1264,7 +1319,12 @@ export default function App() {
 
 	const paneSequence = useMemo(() => {
 		const mainPane = (
-			<div key="pane-main" className={classNames(hasSub ? "flex-1 basis-1/2 min-w-0 border-r border-slate-800" : "flex-1 w-full")}>
+			<div
+				key="pane-main"
+				className={classNames(
+					hasSub ? "flex-1 basis-1/2 min-w-0 border-r border-slate-800" : "flex-1 w-full",
+				)}
+			>
 				<Pane
 					key="main"
 					focused={focusedPane === "main"}
@@ -1319,15 +1379,15 @@ export default function App() {
 					ZView
 				</h1>
 				<div className="flex items-center gap-2">
-			<button
-				type="button"
-				className="rounded-lg border border-slate-700/70 bg-slate-900/90 px-3 py-2 text-sm font-semibold text-slate-100 shadow-glow hover:border-brand/70"
-				onClick={() => setMenuOpen((v) => !v)}
-				aria-expanded={menuOpen}
-				aria-label="Toggle menu"
-			>
-				☰
-			</button>
+					<button
+						type="button"
+						className="rounded-lg border border-slate-700/70 bg-slate-900/90 px-3 py-2 text-sm font-semibold text-slate-100 shadow-glow hover:border-brand/70"
+						onClick={() => setMenuOpen((v) => !v)}
+						aria-expanded={menuOpen}
+						aria-label="Toggle menu"
+					>
+						☰
+					</button>
 				</div>
 			</div>
 
@@ -1385,12 +1445,10 @@ export default function App() {
 				</>
 			) : null}
 
-			<div className="flex flex-1 min-h-0 w-full flex-row gap-0">
-				{paneSequence}
-			</div>
+			<div className="flex flex-1 min-h-0 w-full flex-row gap-0">{paneSequence}</div>
 
 			{showHelp ? <HelpOverlay onClose={() => setShowHelp(false)} /> : null}
-			
+
 			<input
 				type="file"
 				id="sub-file-input"
@@ -1398,7 +1456,7 @@ export default function App() {
 				accept=".pdf"
 				onChange={handleSubFileUpload}
 			/>
-			
+
 			<ToastContainer toasts={toasts} removeToast={removeToast} />
 		</div>
 	);
@@ -1418,24 +1476,27 @@ function Pane({
 	onFocus: () => void;
 }) {
 	return (
-		<div
+		<button
+			type="button"
 			className={classNames(
-				"relative flex h-full flex-col transition-all duration-200",
-				focused ? "bg-slate-900/30 z-10" : "bg-transparent opacity-60 hover:opacity-80 scale-[0.99]",
+				"w-full text-left relative flex h-full flex-col transition-all duration-200",
+				focused
+					? "bg-slate-900/30 z-10"
+					: "bg-transparent opacity-60 hover:opacity-80 scale-[0.99]",
 			)}
 			onClick={onFocus}
 		>
 			{/* Pane Header Overlay */}
-			<div className={classNames(
-				"absolute top-4 left-6 z-20 flex items-center gap-2 pointer-events-none transition-opacity duration-200",
-				focused ? "opacity-100" : "opacity-40"
-			)}>
+			<div
+				className={classNames(
+					"absolute top-4 left-6 z-20 flex items-center gap-2 pointer-events-none transition-opacity duration-200",
+					focused ? "opacity-100" : "opacity-40",
+				)}
+			>
 				<div
 					className={classNames(
 						"px-2 py-0.5 rounded text-xs font-bold shadow-sm backdrop-blur border border-white/5",
-						paneRole === "MAIN"
-							? "bg-brand/80 text-white"
-							: "bg-fuchsia-600/80 text-white",
+						paneRole === "MAIN" ? "bg-brand/80 text-white" : "bg-fuchsia-600/80 text-white",
 					)}
 				>
 					{paneRole}
@@ -1450,14 +1511,16 @@ function Pane({
 					</div>
 				)}
 			</div>
-			
+
 			{/* Content Container */}
-			<div className={classNames(
-				"flex-1 w-full h-full min-h-0 relative rounded-none",
-				focused && "ring-1 ring-inset ring-brand/30"
-			)}>
+			<div
+				className={classNames(
+					"flex-1 w-full h-full min-h-0 relative rounded-none",
+					focused && "ring-1 ring-inset ring-brand/30",
+				)}
+			>
 				{children}
 			</div>
-		</div>
+		</button>
 	);
 }
