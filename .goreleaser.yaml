@@ -2,7 +2,8 @@ version: 2
 
 before:
   hooks:
-    - go mod tidy
+    - cmd: go mod tidy
+      dir: backend
     # Frontend build is expected to be done by CI before this runs
 
 builds:
