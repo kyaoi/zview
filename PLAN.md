@@ -466,7 +466,7 @@ A task is “done” when:
 
 #### `task/ui-status-and-toasts`
 
-* [ ] Done
+* [x] Done
 
 **Goal:** Clear minimal UI without clutter.
 
