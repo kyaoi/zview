@@ -33,7 +33,7 @@ jobs:
 
       - name: Format Check
         working-directory: frontend
-        run: pnpm fmt:write --dry-run
+        run: pnpm biome format .
 
       - name: Type Check
         working-directory: frontend
@@ -51,7 +51,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.24'
+          go-version: 'stable'
 
       - name: Check Formatting
         working-directory: backend
