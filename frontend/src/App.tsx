@@ -4,7 +4,6 @@ import {
 	type PDFDocumentProxy,
 	type RenderTask,
 } from "pdfjs-dist";
-// @ts-expect-error
 import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import {
 	forwardRef,
