@@ -21,11 +21,6 @@ zview is a **fast, lightweight, read-only PDF viewer** that runs in the browser.
 
 ## Development workflow
 
-### PLAN
-
-- When a task is completed, mark the corresponding task in `PLAN.md` as complete.　
-- When a task is completed, check the Progress tracking.
-
 ### Branch/worktree
 
 * Work is organized by task branches/worktrees (recommended: `task/<slug>`).
@@ -44,7 +39,6 @@ Rules:
 * Prefer **small, atomic commits** that build and run.
 * Avoid long-running “WIP” commits on shared branches.
 * Each commit message should describe *what changed and why*.
-* **After completing a task, open a PR for that task branch** (use the template). Do not leave completed task branches without a PR.
 
 Recommended commit prefixes:
 
@@ -60,13 +54,6 @@ Example:
 
 * `feat: add fit-to-width (=) zoom mode`
 * `perf: virtualize offscreen pages and cancel render tasks`
-
-### Pull requests & review (Codex)
-
-* If you are instructed to **create a PR** (or PR creation is part of the task), you must request an automated review by adding a PR comment containing **`@codex`**.
-* The `@codex` comment triggers the automatic review workflow.
-* Do this **on the PR** (not only in local notes), as soon as the PR is opened.
-* When opening a PR, use the repository pull request template `.github/pull_request_template.md` to populate the description.
 
 ---
 
@@ -93,7 +80,7 @@ When changing viewer behavior, manually verify:
 * MAIN loads a PDF and renders pages in continuous scroll
 * `+` / `-` zoom and `=` fit-width work
 * `Tab` toggles focus; MAIN/SUB labels remain clear
-* `s` swaps panes (roles remain MAIN/SUB)
+* `x` swaps panes (roles remain MAIN/SUB)
 * `r` reloads MAIN; on load failure the old view remains
 * Large PDF scroll remains responsive (no runaway memory)
 
@@ -188,18 +175,6 @@ Keep docs short and practical.
 * Server must bind to localhost only.
 * Prefer a per-launch random token in the UI URL or headers to reduce accidental access.
 * No remote URL fetching.
-
----
-
-## Language
-
-* Default to English for code, documentation, and UI text unless a task explicitly requests another language.
-* Keep wording concise and clear when adding copy or comments.
-
-## Tooling expectations
-
-* Use **pnpm** for all Node package installs/updates; run installs from the frontend directory unless specified.
-* Tailwind CSS should be version **4.x** for styling work (prefer the latest stable in the 4.x line).
 
 ---
 
