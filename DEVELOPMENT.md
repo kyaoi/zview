@@ -100,6 +100,8 @@ zview path/to/main.pdf
 ### MAIN + SUB
 
 ```bash
+zview path/to/main.pdf path/to/sub.pdf
+# or
 zview path/to/main.pdf --sub path/to/sub.pdf
 ```
 
@@ -261,5 +263,5 @@ Releases are automated via GitHub Actions and GoReleaser.
 Once released, users can install via:
 
 ```bash
-brew install kyaoi/zview
+brew install kyaoi/zview/zview
 ```

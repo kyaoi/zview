@@ -95,12 +95,15 @@ func parseArgs(args []string) (options, error) {
 	fs := flag.NewFlagSet("zview", flag.ContinueOnError)
 	fs.SetOutput(os.Stdout)
 	fs.Usage = func() {
-		fmt.Fprintf(fs.Output(), "Usage: zview [options] [MAIN.pdf]\n\nOptions:\n")
+	fs.Usage = func() {
+		fmt.Fprintf(fs.Output(), "Usage: zview [options] [MAIN.pdf] [SUB.pdf]\n\nOptions:\n")
 		fs.PrintDefaults()
 		fmt.Fprintln(fs.Output(), "\nExamples:")
-		fmt.Fprintln(fs.Output(), "  zview doc.pdf")
-		fmt.Fprintln(fs.Output(), "  zview doc.pdf --sub ref.pdf")
-		fmt.Fprintln(fs.Output(), "  zview --sub ref.pdf --focus sub")
+		fmt.Fprintln(fs.Output(), "  zview main.pdf")
+		fmt.Fprintln(fs.Output(), "  zview main.pdf sub.pdf")
+		fmt.Fprintln(fs.Output(), "  zview main.pdf --sub sub.pdf")
+		fmt.Fprintln(fs.Output(), "  zview main.pdf sub.pdf --focus sub")
+		fmt.Fprintln(fs.Output(), "  zview main.pdf --no-watch")
 	}
 
 	opts := options{
