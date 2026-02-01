@@ -1321,7 +1321,7 @@ export default function App() {
 				<div className="flex items-center gap-2">
 			<button
 				type="button"
-				className="fixed left-4 top-4 z-30 rounded-lg border border-slate-700/70 bg-slate-900/90 px-3 py-2 text-sm font-semibold text-slate-100 shadow-glow hover:border-brand/70"
+				className="rounded-lg border border-slate-700/70 bg-slate-900/90 px-3 py-2 text-sm font-semibold text-slate-100 shadow-glow hover:border-brand/70"
 				onClick={() => setMenuOpen((v) => !v)}
 				aria-expanded={menuOpen}
 				aria-label="Toggle menu"
@@ -1342,7 +1342,7 @@ export default function App() {
 						}}
 						aria-label="Close menu"
 					/>
-					<aside className="fixed left-4 top-16 z-30 flex h-[calc(100vh-5rem)] w-72 flex-col gap-3 overflow-auto rounded-xl border border-slate-800/70 bg-slate-950/95 p-3 shadow-2xl scrollbar-hide">
+					<aside className="fixed right-4 top-16 z-30 flex h-[calc(100vh-5rem)] w-72 flex-col gap-3 overflow-auto rounded-xl border border-slate-800/70 bg-slate-950/95 p-3 shadow-2xl scrollbar-hide">
 						<div className="flex items-center gap-3">
 							<div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-brand to-accent text-sm font-bold uppercase text-slate-950">
 								zv
