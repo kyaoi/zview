@@ -94,6 +94,8 @@ zview path/to/main.pdf
 ### Two-pane view (MAIN + SUB)
 
 ```bash
+zview path/to/main.pdf path/to/other.pdf
+# or
 zview path/to/main.pdf --sub path/to/other.pdf
 ```
 
