@@ -14,7 +14,9 @@ import {
 	type PDFDocumentProxy,
 	type RenderTask,
 } from "pdfjs-dist";
+// @ts-ignore
 import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import { ToastContainer, type ToastMessage, type ToastType } from "./components/Toast";
 
 GlobalWorkerOptions.workerSrc = workerSrc;
 
@@ -48,80 +50,8 @@ const toolbarActions = [
 type ActionKey = (typeof toolbarActions)[number]["key"];
 type ViewerRole = "MAIN" | "SUB";
 
-type PaneProps = {
-	paneRole: "MAIN" | "SUB";
-	status: string;
-	focused: boolean;
-	onFocus: () => void;
-	children?: ReactNode;
-};
-
 function classNames(...tokens: Array<string | false | null | undefined>) {
 	return tokens.filter(Boolean).join(" ");
-}
-
-function Pane({ paneRole, status, focused, onFocus, children }: PaneProps) {
-	return (
-		<section
-			className={classNames(
-				"group relative flex w-full flex-col gap-3 rounded-2xl border border-slate-700/70 bg-slate-900/70 px-4 py-4 shadow-glow transition",
-				focused
-					? "ring-2 ring-accent/70 border-accent/70 -translate-y-0.5 shadow-[0_15px_45px_rgba(28,202,216,0.18)]"
-					: "hover:border-slate-500/70 hover:-translate-y-0.5",
-			)}
-			data-focused={focused ? "true" : "false"}
-		>
-			<header
-				className={classNames(
-					"flex items-center justify-between gap-2 rounded-xl border px-3 py-2 transition",
-					focused
-						? "border-accent/70 bg-accent/10 shadow-[0_6px_28px_rgba(28,202,216,0.18)]"
-						: "border-slate-700/70 bg-slate-900/50",
-				)}
-			>
-				<div className="flex items-center gap-2">
-					<span
-						className={classNames(
-							"inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold tracking-wide",
-							paneRole === "MAIN"
-								? "border-brand/50 bg-brand/15 text-brand"
-								: "border-accent/60 bg-accent/15 text-accent",
-						)}
-					>
-						{paneRole}
-					</span>
-					<span className="text-xs font-semibold uppercase tracking-wide text-slate-200">
-						{status}
-					</span>
-				</div>
-				<div className="flex items-center gap-2 text-xs text-slate-400">
-					<span
-						className={classNames(
-							"rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide transition",
-							focused
-								? "bg-accent/90 text-slate-950 shadow-[0_10px_30px_rgba(28,202,216,0.3)]"
-								: "border border-slate-600 bg-slate-800/60 text-slate-100",
-						)}
-					>
-						{focused ? "FOCUS" : "Press Tab"}
-					</span>
-					{!focused ? (
-						<button
-							type="button"
-							className="rounded-full border border-brand/60 bg-brand/10 px-3 py-1 text-xs font-semibold text-brand hover:border-brand hover:bg-brand/20"
-							onClick={onFocus}
-						>
-							Focus
-						</button>
-					) : null}
-				</div>
-			</header>
-
-			<div className="rounded-xl border border-slate-700/50 bg-slate-900/60 px-4 py-4">
-				{children}
-			</div>
-		</section>
-	);
 }
 
 type PdfViewerState =
@@ -174,13 +104,9 @@ type ViewerHandle = {
 	zoomOut: () => void;
 	fitToWidth: () => void;
 	rerender: () => void;
+	getSnapshot: () => ScrollSnapshot | null;
+	restoreSnapshot: (snapshot: ScrollSnapshot) => void;
 };
-
-function friendlyError(role: ViewerRole, detail: string) {
-	if (detail.includes("Missing PDF")) return `${role} PDF not provided`;
-	if (detail.includes("Unexpected server response")) return `${role} PDF request failed`;
-	return `${role} failed to load`;
-}
 
 const PdfViewer = forwardRef<
 	ViewerHandle,
@@ -189,11 +115,11 @@ const PdfViewer = forwardRef<
 		status?: string;
 		focused?: boolean;
 		url: string;
-		onStatus: (message: string) => void;
+		onNotify: (message: string, type: ToastType) => void;
 		onFocus?: () => void;
 		reloadKey?: number;
 	}
->(function PdfViewer({ paneRole, status, focused, url, onStatus, onFocus, reloadKey = 0 }, ref) {
+>(function PdfViewer({ paneRole, status, focused, url, onNotify, onFocus, reloadKey = 0 }, ref) {
 	const role = paneRole;
 	const sessionNonce = useMemo(() => Math.floor(Math.random() * 1_000_000), []);
 	const scrollRef = useRef<HTMLDivElement>(null);
@@ -267,7 +193,10 @@ const PdfViewer = forwardRef<
 		}
 
 		setState((prev) => (prev.phase === "ready" ? prev : { phase: "loading" }));
-		onStatus(reloadKey > 0 ? `${role}: Reloading…` : `${role}: Loading…`);
+		// Only notify if this looks like a reload (manual or verify), not initial load
+		if (reloadKey > 0) {
+			onNotify(`${role}: Reloading…`, "info");
+		}
 
 		async function loadAndRender() {
 			try {
@@ -322,9 +251,7 @@ const PdfViewer = forwardRef<
 				setZoomMode(restoredZoomMode);
 				setRenderNonce((v) => v + 1);
 				manualScaleInitializedRef.current = Boolean(restoreSnapshot);
-				onStatus(
-					restoreSnapshot ? `${role}: restoring scroll position` : `${role}: showing page 1`,
-				);
+				onNotify(restoreSnapshot ? `${role}: restored scroll` : `${role}: loaded`, "success");
 			} catch (err) {
 				if (cancelled) return;
 				const detail = err instanceof Error ? err.message : String(err);
@@ -332,9 +259,7 @@ const PdfViewer = forwardRef<
 					if (pdfRef.current && prev.phase === "ready") return prev;
 					return { phase: "error", detail };
 				});
-				onStatus(
-					pdfRef.current ? `${role}: reload failed; keeping previous` : `${role}: failed to load`,
-				);
+				onNotify(pdfRef.current ? `${role}: reload failed` : `${role}: failed to load`, "error");
 			}
 		}
 
@@ -343,7 +268,7 @@ const PdfViewer = forwardRef<
 		return () => {
 			cancelled = true;
 		};
-	}, [onStatus, reloadKey, resetPageSlots, role, url]);
+	}, [onNotify, reloadKey, resetPageSlots, role, url]);
 
 	useEffect(
 		() => () => {
@@ -362,6 +287,7 @@ const PdfViewer = forwardRef<
 		const node = scrollRef.current;
 		const updateScale = () => {
 			const height = node.clientHeight || pageSize.height;
+			if (height <= 0) return; // Prevent invalid scale
 			const nextFit = height / pageSize.height;
 			setFitScale(nextFit);
 		};
@@ -420,6 +346,7 @@ const PdfViewer = forwardRef<
 	}, [measureVisibility]);
 
 	useEffect(() => {
+		void renderNonce; // Ensure effect runs when renderNonce changes
 		const pending = pendingRestoreRef.current;
 		if (
 			!pending ||
@@ -464,6 +391,7 @@ const PdfViewer = forwardRef<
 		reloadKey,
 		state.phase,
 		zoomMode,
+		renderNonce,
 	]);
 
 	const renderPage = useCallback(
@@ -548,8 +476,8 @@ const PdfViewer = forwardRef<
 
 	useEffect(() => {
 		if (state.phase !== "ready" || pageCount === 0) return;
-		onStatus(`${role}: page ${currentPage} / ${pageCount}`);
-	}, [currentPage, onStatus, pageCount, role, state.phase]);
+		// Status update for page number could go here if we had a persistent status bar
+	}, [pageCount, state.phase]);
 
 	const layoutScale = useMemo(
 		() => (zoomMode === "fit-width" ? fitScale : manualScale),
@@ -557,15 +485,12 @@ const PdfViewer = forwardRef<
 	);
 
 	const announceZoom = useCallback(
-		(nextScale: number, mode: ZoomMode) => {
-			const percent = Math.round(nextScale * 100);
-			if (mode === "fit-width") {
-				onStatus(`${role}: fit to height (${percent}%)`);
-				return;
-			}
-			onStatus(`${role}: zoom ${percent}%`);
+		(_nextScale: number, _mode: ZoomMode) => {
+			// Optional: could toast on zoom, but acts as noise. Keeping silent for now.
+			// const percent = Math.round(nextScale * 100);
+			// onNotify(`${role}: zoom ${percent}%`, "info");
 		},
-		[onStatus, role],
+		[], // removed onNotify dependency
 	);
 
 	const zoomIn = useCallback(() => {
@@ -748,7 +673,33 @@ const PdfViewer = forwardRef<
 			rerender: () => {
 				resetPageSlots();
 				setRenderNonce((v) => v + 1);
-				onStatus(`${role}: re-rendering current ${role}`);
+				onNotify(`${role}: re-rendering`, "info");
+			},
+			getSnapshot: () => {
+				const scrollEl = scrollRef.current;
+				if (!pageSize || pageCount === 0 || !scrollEl) return null;
+				const layoutScale = zoomMode === "fit-width" ? fitScale : manualScale;
+				if (layoutScale <= 0) return null;
+				const viewTop = scrollEl.scrollTop;
+				const pageBlock = Math.round(pageSize.height * layoutScale) + PAGE_GAP_PX;
+				const topPageIndex = Math.min(pageCount - 1, Math.max(0, Math.floor(viewTop / pageBlock)));
+				const offsetPx = viewTop - topPageIndex * pageBlock;
+				const totalHeight = Math.max(1, pageCount * pageBlock - PAGE_GAP_PX);
+				const scrollRatio = Math.min(1, Math.max(0, viewTop / totalHeight));
+				return {
+					topPageIndex,
+					offsetPx,
+					zoomMode,
+					manualScale,
+					scrollRatio,
+					pageCount,
+				} satisfies ScrollSnapshot;
+			},
+			restoreSnapshot: (snapshot: ScrollSnapshot) => {
+				pendingRestoreRef.current = { reloadKey, snapshot };
+				// Trigger re-measure/re-scroll logic
+				setRenderNonce((v) => v + 1);
+				requestAnimationFrame(() => measureVisibility());
 			},
 		}),
 		[
@@ -756,7 +707,7 @@ const PdfViewer = forwardRef<
 			jumpByPages,
 			jumpToBottom,
 			jumpToTop,
-			onStatus,
+			onNotify,
 			resetPageSlots,
 			scrollHalfPage,
 			scrollHorizontal,
@@ -766,6 +717,18 @@ const PdfViewer = forwardRef<
 			zoomIn,
 			zoomOut,
 			role,
+			// Snapshot dependencies
+			zoomMode,
+			fitScale,
+			manualScale,
+			pageCount,
+			pageSize,
+			reloadKey,
+			measureVisibility,
+			// scrollRef is static but let's include it if linter wants
+			// scrollRef // actually ref objects are stable, linter usually knows.
+			// But diagnostics complained about lines 662 which used scrollRef.current
+			// Diagnostics for lines 684-699 complained about zoomMode, fitScale, manualScale, pageCount, pageSize.
 		],
 	);
 
@@ -774,47 +737,24 @@ const PdfViewer = forwardRef<
 	const listStyle = { gap: `${PAGE_GAP_PX}px` };
 
 	return (
-		<div className="flex flex-col gap-3" ref={containerRef}>
-			<div className="flex flex-col gap-1 text-sm text-slate-200 sm:flex-row sm:items-center sm:justify-between">
-				<span>
-					{state.phase === "ready"
-						? `Page ${currentPage} / ${pageCount}`
-						: state.phase === "error"
-							? friendlyError(role, state.detail)
-							: `${role} loading…`}
-				</span>
-				<div className="flex items-center gap-2">
-					<button
-						type="button"
-						className={classNames(
-							"inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold tracking-wide",
-							paneRole === "MAIN"
-								? "border-brand/50 bg-brand/15 text-brand"
-								: "border-accent/60 bg-accent/15 text-accent",
-						)}
-						onClick={!focused ? onFocus : undefined}
-					>
-						{paneRole}
-					</button>
-					<span className="text-xs font-semibold uppercase tracking-wide text-slate-200">
-						{status}
-					</span>
-				</div>
-				<span className="rounded-full border border-brand/40 bg-brand/10 px-2 py-1 text-xs font-semibold text-brand">
-					{zoomMode === "fit-width" ? "Fit to height" : "Manual"} · {Math.round(layoutScale * 100)}%
-				</span>
+		<div
+			className="relative flex h-full w-full flex-col overflow-hidden bg-slate-900/30"
+			ref={containerRef}
+		>
+			{/* Floating Page Indicator */}
+			<div className="absolute bottom-6 right-6 z-10 select-none rounded-full border border-slate-700/50 bg-slate-900/80 px-3 py-1.5 text-xs font-medium text-slate-200 shadow-lg backdrop-blur transition-opacity duration-300 hover:opacity-100 opacity-60">
+				Page {currentPage} <span className="text-slate-500">/</span> {pageCount}
 			</div>
+
 			<div
-				className="flex flex-col overflow-auto overflow-x-auto scrollbar-hide rounded-xl border border-slate-800/40 bg-slate-950/40"
 				ref={scrollRef}
+				className="flex-1 w-full overflow-auto scrollbar-hide overscroll-none"
 				style={{
 					...listStyle,
-					maxHeight: "calc(100vh - 120px)",
-					minWidth: "100%",
 				}}
 			>
 				<div
-					className="mx-auto flex flex-col items-center"
+					className="mx-auto flex flex-col items-center py-4"
 					style={{
 						...listStyle,
 						width: displayWidth ? `${displayWidth}px` : "100%",
@@ -838,14 +778,6 @@ const PdfViewer = forwardRef<
 							const isVisible = index >= visibleRange[0] && index <= visibleRange[1];
 							return (
 								<div key={`page-${index + 1}`} className="flex flex-col items-center gap-2">
-									{/* <div className="flex w-full max-w-[1200px] items-center justify-between text-xs text-slate-400 px-1"> */}
-									{/* 	<span>Page {index + 1}</span> */}
-									{/* 	{currentPage - 1 === index ? ( */}
-									{/* 		<span className="rounded-full bg-brand/20 px-2 py-0.5 text-[11px] text-brand"> */}
-									{/* 			viewing */}
-									{/* 		</span> */}
-									{/* 	) : null} */}
-									{/* </div> */}
 									<div
 										ref={(node) => {
 											const existing = pageSlotsRef.current[index];
@@ -860,7 +792,7 @@ const PdfViewer = forwardRef<
 												};
 											}
 										}}
-										className="relative overflow-visible rounded-xl border border-slate-800 bg-slate-950/60 shadow-inner"
+										className="relative overflow-visible bg-slate-950/60 shadow-lg"
 										style={{
 											margin: "0 auto",
 											height: placeholderHeight
@@ -994,7 +926,7 @@ export default function App() {
 	const [watchEnabled, setWatchEnabled] = useState(true);
 	const [focusedPane, setFocusedPane] = useState<"main" | "sub">("main");
 	const [paneOrder, setPaneOrder] = useState<"main-first" | "sub-first">("main-first");
-	const [_status, setStatus] = useState("Fetching bootstrap info…");
+	const [toasts, setToasts] = useState<ToastMessage[]>([]);
 	const [mainReloadKey, setMainReloadKey] = useState(0);
 	const [subReloadKey, setSubReloadKey] = useState(0);
 	const [showHelp, setShowHelp] = useState(false);
@@ -1007,19 +939,53 @@ export default function App() {
 	const hasSubRef = useRef(hasSub);
 	const focusedPaneRef = useRef<"main" | "sub">(focusedPane);
 	const showHelpRef = useRef(showHelp);
-	const keysEnabledRef = useRef(keysEnabled);
 
-	const announce = useCallback((message: string) => setStatus(message), []);
+	const keysEnabledRef = useRef(keysEnabled);
+	const swapSnapshotsRef = useRef<{
+		main: ScrollSnapshot | null;
+		sub: ScrollSnapshot | null;
+	} | null>(null);
+
+	const addToast = useCallback((message: string, type: ToastType = "info") => {
+		const id = Math.random().toString(36).substring(2, 9);
+		setToasts((prev) => [...prev, { id, message, type }]);
+	}, []);
+
+	const removeToast = useCallback((id: string) => {
+		setToasts((prev) => prev.filter((t) => t.id !== id));
+	}, []);
 
 	const swapPanes = useCallback(() => {
 		if (!hasSubRef.current) {
-			announce("Cannot swap without SUB");
+			addToast("Cannot swap without SUB", "error");
 			return false;
 		}
+		// Capture snapshots before state update triggers re-render/layout
+		const mainSnap = mainViewerRef.current?.getSnapshot() ?? null;
+		const subSnap = subViewerRef.current?.getSnapshot() ?? null;
+		swapSnapshotsRef.current = { main: mainSnap, sub: subSnap };
+
 		setPaneOrder((prev) => (prev === "main-first" ? "sub-first" : "main-first"));
-		announce("Swapped MAIN/SUB order");
+		addToast("Swapped MAIN/SUB order", "info");
 		return true;
-	}, [announce]);
+	}, [addToast]);
+
+	// Restore snapshots after layout change (swap)
+	useEffect(() => {
+		void paneOrder; // Ensure effect runs on order change
+		const snaps = swapSnapshotsRef.current;
+		if (!snaps) return;
+
+		// Use requestAnimationFrame to ensure layout has settled?
+		// Actually useEffect fires after paint, so refs should be attached to new locations.
+		const main = mainViewerRef.current;
+		const sub = subViewerRef.current;
+
+		if (main && snaps.main) main.restoreSnapshot(snaps.main);
+		if (sub && snaps.sub) sub.restoreSnapshot(snaps.sub);
+
+		swapSnapshotsRef.current = null;
+	}, [paneOrder]);
 
 	useEffect(() => {
 		hasSubRef.current = hasSub;
@@ -1051,14 +1017,13 @@ export default function App() {
 				setHasSub(data.hasSub);
 				setWatchEnabled(data.watch);
 				setFocusedPane(data.focus === "sub" && data.hasSub ? "sub" : "main");
-				setStatus(data.hasMain ? "Loading MAIN" : "Please provide MAIN PDF");
 			} catch (_err) {
 				if (aborted) return;
 				setHasMain(false);
 				setHasSub(false);
 				setWatchEnabled(true);
 				setFocusedPane("main");
-				setStatus("Failed to fetch bootstrap info");
+				addToast("Failed to fetch bootstrap info", "error");
 			}
 		}
 
@@ -1066,29 +1031,29 @@ export default function App() {
 		return () => {
 			aborted = true;
 		};
-	}, []);
+	}, [addToast]);
 
 	useEffect(() => {
 		if (!watchEnabled || !hasMain) return;
 		const source = new EventSource("/events");
 		const handleChange = () => {
 			setMainReloadKey((v) => v + 1);
-			announce("MAIN: file changed → auto-reload");
+			addToast("MAIN: file changed", "info");
 		};
 		source.addEventListener("main-change", handleChange);
 		source.onerror = () => {
-			announce("MAIN: watch connection lost (retrying…)"); // EventSource auto-reconnects
+			// Silent retry used by EventSource
 		};
 		return () => {
 			source.removeEventListener("main-change", handleChange);
 			source.close();
 		};
-	}, [announce, hasMain, watchEnabled]);
+	}, [addToast, hasMain, watchEnabled]);
 
 	const handleAction = (key: ActionKey) => {
 		switch (key) {
 			case "openMain":
-				announce("MAIN: open dialog (stub)");
+				addToast("MAIN: open dialog not implemented", "info");
 				setFocusedPane("main");
 				break;
 			case "openSub":
@@ -1100,15 +1065,14 @@ export default function App() {
 					.then(() => {
 						setHasSub(false);
 						setFocusedPane("main");
-						announce("SUB: Closed");
+						addToast("SUB: Closed", "info");
 					})
-					.catch(() => announce("Failed to close SUB"));
+					.catch(() => addToast("Failed to close SUB", "error"));
 				break;
 			case "swap":
 				swapPanes();
 				break;
 			case "reloadMain":
-				announce("MAIN: reloading…");
 				setMainReloadKey((v) => v + 1);
 				setFocusedPane("main");
 				break;
@@ -1116,7 +1080,7 @@ export default function App() {
 				setShowHelp((open) => !open);
 				break;
 			default:
-				announce("Action pending wiring");
+				addToast("Action pending wiring", "info");
 		}
 	};
 
@@ -1130,21 +1094,21 @@ export default function App() {
 		const formData = new FormData();
 		formData.append("file", file);
 
-		announce("SUB: Uploading…");
+		addToast("SUB: Uploading…", "info");
 		try {
 			const res = await fetch("/api/sub/upload", {
 				method: "POST",
 				body: formData,
 			});
 			if (!res.ok) throw new Error("Upload failed");
-			
+
 			setHasSub(true);
 			setFocusedPane("sub");
 			setSubReloadKey((v) => v + 1); // Force reload
-			announce("SUB: Loaded " + file.name);
+			addToast("SUB: Loaded " + file.name, "success");
 		} catch (err) {
 			console.error(err);
-			announce("SUB: Upload failed");
+			addToast("SUB: Upload failed", "error");
 		}
 	};
 
@@ -1182,8 +1146,8 @@ export default function App() {
 				event.stopImmediatePropagation();
 			};
 
-			const targetRole: ViewerRole =
-				focusedPaneRef.current === "sub" && hasSubRef.current ? "SUB" : "MAIN";
+			// const targetRole: ViewerRole =
+			// 	focusedPaneRef.current === "sub" && hasSubRef.current ? "SUB" : "MAIN";
 			const targetViewer =
 				focusedPaneRef.current === "sub" && hasSubRef.current
 					? subViewerRef.current
@@ -1195,7 +1159,7 @@ export default function App() {
 					consume();
 					clearSequence();
 					targetViewer?.jumpToTop();
-					announce(`${targetRole}: jump to top`);
+					// announce(`${targetRole}: jump to top`);
 					return;
 				}
 				lastKeyRef.current = "g";
@@ -1218,7 +1182,7 @@ export default function App() {
 					} else {
 						targetViewer?.scrollLine(LINE_SCROLL_PX);
 					}
-					announce(`${targetRole}: scroll down`);
+					// announce(`${targetRole}: scroll down`);
 					return;
 				case "k":
 					consume();
@@ -1227,7 +1191,7 @@ export default function App() {
 					} else {
 						targetViewer?.scrollLine(-LINE_SCROLL_PX);
 					}
-					announce(`${targetRole}: scroll up`);
+					// announce(`${targetRole}: scroll up`);
 					return;
 				case "h":
 					consume();
@@ -1236,7 +1200,7 @@ export default function App() {
 					} else {
 						targetViewer?.scrollHorizontal(-LINE_SCROLL_PX);
 					}
-					announce(`${targetRole}: scroll left`);
+					// announce(`${targetRole}: scroll left`);
 					return;
 				case "l":
 					consume();
@@ -1245,7 +1209,7 @@ export default function App() {
 					} else {
 						targetViewer?.scrollHorizontal(LINE_SCROLL_PX);
 					}
-					announce(`${targetRole}: scroll right`);
+					// announce(`${targetRole}: scroll right`);
 					return;
 				case "d":
 					consume();
@@ -1254,7 +1218,7 @@ export default function App() {
 					} else {
 						targetViewer?.scrollHalfPage(1);
 					}
-					announce(`${targetRole}: half-page down`);
+					// announce(`${targetRole}: half-page down`);
 					return;
 				case "u":
 					consume();
@@ -1263,22 +1227,22 @@ export default function App() {
 					} else {
 						targetViewer?.scrollHalfPage(-1);
 					}
-					announce(`${targetRole}: half-page up`);
+					// announce(`${targetRole}: half-page up`);
 					return;
 				case "G":
 					consume();
 					targetViewer?.jumpToBottom();
-					announce(`${targetRole}: jump to bottom`);
+					// announce(`${targetRole}: jump to bottom`);
 					return;
 				case "n":
 					consume();
 					targetViewer?.jumpByPages(1);
-					announce(`${targetRole}: next page`);
+					// announce(`${targetRole}: next page`);
 					return;
 				case "p":
 					consume();
 					targetViewer?.jumpByPages(-1);
-					announce(`${targetRole}: previous page`);
+					// announce(`${targetRole}: previous page`);
 					return;
 				case "+":
 					consume();
@@ -1296,7 +1260,6 @@ export default function App() {
 					consume();
 					if (hasSubRef.current) {
 						setFocusedPane((prev) => (prev === "main" ? "sub" : "main"));
-						announce(`Focus: ${targetRole === "MAIN" ? "SUB" : "MAIN"}`);
 					} else {
 						setFocusedPane("main");
 					}
@@ -1305,7 +1268,7 @@ export default function App() {
 					consume();
 					setMainReloadKey((v) => v + 1);
 					setFocusedPane("main");
-					announce("MAIN: reloading…");
+					addToast("MAIN: reloading…", "info");
 					return;
 				case "R":
 					consume();
@@ -1314,20 +1277,20 @@ export default function App() {
 						subViewerRef.current?.rerender();
 					}
 					setFocusedPane("main");
-					announce(hasSubRef.current ? "MAIN: reload (re-render SUB)" : "MAIN: reloading…");
+					addToast(hasSubRef.current ? "MAIN: reload (re-render SUB)" : "MAIN: reloading…", "info");
 					return;
 				case "?":
 					consume();
 					setShowHelp((open) => !open);
-					announce("Toggled help");
+					// announce("Toggled help");
 					return;
 				case "q":
 					consume();
 					if (showHelpRef.current) {
 						setShowHelp(false);
-						announce("Help closed");
+						// announce("Help closed");
 					} else {
-						announce("Close the tab to quit");
+						addToast("Close the tab to quit", "info");
 					}
 					return;
 				default:
@@ -1352,11 +1315,16 @@ export default function App() {
 			window.removeEventListener("keyup", handleKeyUp);
 			if (keySeqTimeoutRef.current) window.clearTimeout(keySeqTimeoutRef.current);
 		};
-	}, [announce, swapPanes]);
+	}, [addToast, swapPanes]);
 
 	const paneSequence = useMemo(() => {
 		const mainPane = (
-			<div key="pane-main" className={classNames(hasSub ? "flex-1 basis-1/2 min-w-0" : "w-full")}>
+			<div
+				key="pane-main"
+				className={classNames(
+					hasSub ? "flex-1 basis-1/2 min-w-0 border-r border-slate-800" : "flex-1 w-full",
+				)}
+			>
 				<Pane
 					key="main"
 					focused={focusedPane === "main"}
@@ -1370,7 +1338,7 @@ export default function App() {
 						onFocus={() => setFocusedPane("main")}
 						url="/api/main.pdf"
 						ref={mainViewerRef}
-						onStatus={announce}
+						onNotify={addToast}
 						reloadKey={mainReloadKey}
 					/>
 				</Pane>
@@ -1393,7 +1361,7 @@ export default function App() {
 						onFocus={() => setFocusedPane("sub")}
 						url="/api/sub.pdf"
 						ref={subViewerRef}
-						onStatus={announce}
+						onNotify={addToast}
 						reloadKey={subReloadKey}
 					/>
 				</Pane>
@@ -1402,19 +1370,26 @@ export default function App() {
 
 		if (!subPane) return [mainPane];
 		return paneOrder === "main-first" ? [mainPane, subPane] : [subPane, mainPane];
-	}, [announce, focusedPane, hasSub, mainReloadKey, subReloadKey, paneOrder, watchEnabled]);
+	}, [addToast, focusedPane, hasSub, mainReloadKey, subReloadKey, paneOrder, watchEnabled]);
 
 	return (
-		<div className="relative mx-auto flex w-full flex-col gap-3 px-3 pb-6 pt-3">
-			<button
-				type="button"
-				className="fixed left-4 top-4 z-30 rounded-lg border border-slate-700/70 bg-slate-900/90 px-3 py-2 text-sm font-semibold text-slate-100 shadow-glow hover:border-brand/70"
-				onClick={() => setMenuOpen((v) => !v)}
-				aria-expanded={menuOpen}
-				aria-label="Toggle menu"
-			>
-				☰
-			</button>
+		<div className="relative mx-auto flex h-screen w-full flex-col gap-0 bg-slate-950 text-slate-100 overflow-hidden">
+			<div className="flex-none p-2 border-b border-slate-800 bg-slate-900/50 backdrop-blur flex items-center justify-between">
+				<h1 className="text-lg font-bold tracking-tight bg-gradient-to-r from-accent to-brand bg-clip-text text-transparent px-2">
+					ZView
+				</h1>
+				<div className="flex items-center gap-2">
+					<button
+						type="button"
+						className="rounded-lg border border-slate-700/70 bg-slate-900/90 px-3 py-2 text-sm font-semibold text-slate-100 shadow-glow hover:border-brand/70"
+						onClick={() => setMenuOpen((v) => !v)}
+						aria-expanded={menuOpen}
+						aria-label="Toggle menu"
+					>
+						☰
+					</button>
+				</div>
+			</div>
 
 			{menuOpen ? (
 				<>
@@ -1427,7 +1402,7 @@ export default function App() {
 						}}
 						aria-label="Close menu"
 					/>
-					<aside className="fixed left-4 top-16 z-30 flex h-[calc(100vh-5rem)] w-72 flex-col gap-3 overflow-auto rounded-xl border border-slate-800/70 bg-slate-950/95 p-3 shadow-2xl scrollbar-hide">
+					<aside className="fixed right-4 top-16 z-30 flex h-[calc(100vh-5rem)] w-72 flex-col gap-3 overflow-auto rounded-xl border border-slate-800/70 bg-slate-950/95 p-3 shadow-2xl scrollbar-hide">
 						<div className="flex items-center gap-3">
 							<div className="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-brand to-accent text-sm font-bold uppercase text-slate-950">
 								zv
@@ -1470,43 +1445,10 @@ export default function App() {
 				</>
 			) : null}
 
-			<main
-				className={classNames(
-					"flex gap-3 items-start",
-					hasSub ? "flex-col md:flex-row md:flex-nowrap" : "flex-col",
-				)}
-			>
-				{paneSequence}
-
-				{!hasSub && (
-					<div className="flex flex-col justify-between rounded-2xl border border-dashed border-slate-700/60 bg-slate-900/60 px-4 py-4">
-						{/* <div className="flex items-center justify-between gap-2"> */}
-						{/* 	<div className="flex items-center gap-2"> */}
-						{/* 		<span className="inline-flex items-center gap-2 rounded-full border border-accent/60 bg-accent/10 px-3 py-1 text-xs font-semibold tracking-wide text-accent"> */}
-						{/* 			SUB */}
-						{/* 		</span> */}
-						{/* 		<span className="text-xs font-semibold uppercase tracking-wide text-slate-300"> */}
-						{/* 			static */}
-						{/* 		</span> */}
-						{/* 	</div> */}
-						{/* 	<span className="text-xs text-slate-400">hidden until opened</span> */}
-						{/* </div> */}
-						<div className="mt-4 flex items-center justify-between rounded-xl border border-slate-700/70 bg-slate-900/70 px-4 py-3 text-sm text-slate-200">
-							<span>Open Sub to reveal the second pane.</span>
-							<button
-								type="button"
-								className="rounded-lg border border-accent/60 bg-accent/15 px-3 py-1.5 text-xs font-semibold text-accent hover:border-accent hover:bg-accent/25"
-								onClick={() => handleAction("openSub")}
-							>
-								Open Sub
-							</button>
-						</div>
-					</div>
-				)}
-			</main>
+			<div className="flex flex-1 min-h-0 w-full flex-row gap-0">{paneSequence}</div>
 
 			{showHelp ? <HelpOverlay onClose={() => setShowHelp(false)} /> : null}
-			
+
 			<input
 				type="file"
 				id="sub-file-input"
@@ -1514,6 +1456,71 @@ export default function App() {
 				accept=".pdf"
 				onChange={handleSubFileUpload}
 			/>
+
+			<ToastContainer toasts={toasts} removeToast={removeToast} />
 		</div>
+	);
+}
+
+function Pane({
+	children,
+	focused,
+	paneRole,
+	status,
+	onFocus,
+}: {
+	children: React.ReactNode;
+	focused: boolean;
+	paneRole: "MAIN" | "SUB";
+	status: string;
+	onFocus: () => void;
+}) {
+	return (
+		<button
+			type="button"
+			className={classNames(
+				"w-full text-left relative flex h-full flex-col transition-all duration-200",
+				focused
+					? "bg-slate-900/30 z-10"
+					: "bg-transparent opacity-60 hover:opacity-80 scale-[0.99]",
+			)}
+			onClick={onFocus}
+		>
+			{/* Pane Header Overlay */}
+			<div
+				className={classNames(
+					"absolute top-4 left-6 z-20 flex items-center gap-2 pointer-events-none transition-opacity duration-200",
+					focused ? "opacity-100" : "opacity-40",
+				)}
+			>
+				<div
+					className={classNames(
+						"px-2 py-0.5 rounded text-xs font-bold shadow-sm backdrop-blur border border-white/5",
+						paneRole === "MAIN" ? "bg-brand/80 text-white" : "bg-fuchsia-600/80 text-white",
+					)}
+				>
+					{paneRole}
+				</div>
+				{status === "watching" && (
+					<div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 backdrop-blur">
+						<span className="relative flex h-1.5 w-1.5">
+							<span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75"></span>
+							<span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+						</span>
+						<span className="text-[10px] font-bold text-emerald-400 tracking-wide">LIVE</span>
+					</div>
+				)}
+			</div>
+
+			{/* Content Container */}
+			<div
+				className={classNames(
+					"flex-1 w-full h-full min-h-0 relative rounded-none",
+					focused && "ring-1 ring-inset ring-brand/30",
+				)}
+			>
+				{children}
+			</div>
+		</button>
 	);
 }
