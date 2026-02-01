@@ -143,6 +143,7 @@ const PdfViewer = forwardRef<
 	const anchorRef = useRef<{ x: number; y: number } | null>(null);
 	const scrollLoopRef = useRef<number | null>(null);
 	const scrollVelocityRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+	const loadedKeyRef = useRef(-1);
 
 	const resetPageSlots = useCallback(() => {
 		pageSlotsRef.current.forEach((slot) => {
@@ -190,7 +191,7 @@ const PdfViewer = forwardRef<
 			pendingRestoreRef.current = { reloadKey, snapshot };
 		}
 
-		setState((prev) => (prev.phase === "ready" ? prev : { phase: "loading" }));
+		setState({ phase: "loading" });
 		// Only notify if this looks like a reload (manual or verify), not initial load
 		if (reloadKey > 0) {
 			onNotify(`${role}: Reloading…`, "info");
@@ -235,6 +236,7 @@ const PdfViewer = forwardRef<
 
 				setPdf(loaded);
 				pdfRef.current = loaded;
+				loadedKeyRef.current = reloadKey;
 				setPageCount(loaded.numPages);
 				setPageSize({ width: baseViewport.width, height: baseViewport.height });
 				setState({ phase: "ready", summary: `Page 1 / ${loaded.numPages}` });
@@ -350,6 +352,7 @@ const PdfViewer = forwardRef<
 			!pending ||
 			pending.reloadKey !== reloadKey ||
 			state.phase !== "ready" ||
+			loadedKeyRef.current !== reloadKey ||
 			!pageSize ||
 			pageCount === 0
 		) {
@@ -1353,7 +1356,6 @@ export default function App() {
 					onFocus={() => setFocusedPane("sub")}
 				>
 					<PdfViewer
-						key={subReloadKey}
 						paneRole="SUB"
 						status="static"
 						onFocus={() => setFocusedPane("sub")}
