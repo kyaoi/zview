@@ -1,9 +1,5 @@
 version: 2
 
-before:
-  hooks:
-    - cmd: cd backend && go mod tidy
-    # Frontend build is expected to be done by CI before this runs
 
 builds:
   - id: zview
