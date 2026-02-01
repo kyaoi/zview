@@ -41,10 +41,7 @@ jobs:
           pnpm install
           pnpm build
 
-      - name: Prepare Backend Assets
-        run: |
-          rm -rf backend/dist
-          cp -r frontend/dist backend/
+
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v5
