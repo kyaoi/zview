@@ -119,8 +119,6 @@ func parseArgs(args []string) (options, error) {
 
 	fs.IntVar(&opts.port, "port", opts.port, "port to bind (0 = random)")
 
-	fs.IntVar(&opts.port, "port", opts.port, "port to bind (0 = random)")
-
 	noOpenFlag := fs.Bool("no-open", false, "do not auto-open browser tab")
 	versionFlag := fs.Bool("version", false, "print version and exit")
 
