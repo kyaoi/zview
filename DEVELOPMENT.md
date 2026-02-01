@@ -224,3 +224,46 @@ When behavior changes, update:
 * `TECH_STACK.md`
 * `PLAN.md`
 * `AGENTS.md` (workflow/rules)
+
+---
+
+## Release Process
+
+Releases are automated via GitHub Actions and GoReleaser.
+
+1.  **Tag release**: Create and push a new tag (e.g., `v0.1.0`).
+    ```bash
+    git tag v0.1.0
+    git push origin v0.1.0
+    ```
+2.  **CI/CD**:
+    *   GitHub Actions detects the tag.
+    *   Frontend is built.
+    *   Backend is cross-compiled for Linux, macOS, and Windows.
+    *   Version info is injected via `ldflags`.
+    *   Binaries are uploaded to GitHub Releases.
+    *   Homebrew formula is updated in `kyaoi/homebrew-tap`.
+    *   **Note**: Binaries are uploaded to `kyaoi/zview-releases` (Public) to allow installation without authentication, while keeping `zview` source Private.
+
+### Setup Requirements
+
+1.  **Repositories**:
+    *   `kyaoi/zview` (Private): Source code.
+    *   `kyaoi/zview-releases` (Public): Binary releases (empty repo).
+    *   `kyaoi/homebrew-tap` (Public): Homebrew formulae.
+
+
+2.  **Secrets (in `zview` repo)**:
+    *   **Name**: `GH_PAT`
+    *   **Value**: A Personal Access Token (Fine-grained recommended) with the following permissions:
+        *   `kyaoi/zview` (Private): **Read-only** (Metadata/Contents) to read tags.
+        *   `kyaoi/zview-releases` (Public): **Read/Write** (Contents) to create releases.
+        *   `kyaoi/homebrew-tap` (Public): **Read/Write** (Contents) to update formulae.
+
+### Manual install via Homebrew
+
+Once released, users can install via:
+
+```bash
+brew install kyaoi/tap/zview
+```
