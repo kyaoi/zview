@@ -411,8 +411,17 @@ export default function App() {
 										onFocus={() => setFocusedPane("sub")}
 										url={`/api/sub.pdf?id=${tab.id}`}
 										ref={(el) => {
-											if (el) subViewerRefs.current.set(tab.id, el);
-											else subViewerRefs.current.delete(tab.id);
+											if (el) {
+												subViewerRefs.current.set(tab.id, el);
+												if (tab.id === activeSubId) {
+													subViewerRef.current = el;
+												}
+											} else {
+												subViewerRefs.current.delete(tab.id);
+												if (tab.id === activeSubId) {
+													subViewerRef.current = null;
+												}
+											}
 										}}
 										onNotify={addToast}
 										reloadKey={subReloadKey}
