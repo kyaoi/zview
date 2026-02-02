@@ -92,25 +92,6 @@ export default function App() {
 	}, [paneOrder, swapSnapshotsRef]);
 
 	// File watcher: SSE for MAIN changes
-	const handleMainChange = useCallback(() => {
-		setMainReloadKey((v) => v + 1);
-	}, []);
-	useFileWatcher(watchEnabled, hasMain, handleMainChange, addToast);
-
-	// Keyboard navigation
-	useKeyboardNavigation({
-		keysEnabled,
-		focusedPane,
-		hasSub,
-		showHelp,
-		mainViewerRef,
-		subViewerRef,
-		setFocusedPane,
-		setMainReloadKey,
-		setShowHelp,
-		swapPanes,
-		addToast,
-	});
 
 	const handleTabSelect = useCallback(
 		(id: string) => {
@@ -163,6 +144,47 @@ export default function App() {
 		},
 		[activeSubId, addToast, setActiveSubId, setSubTabs],
 	);
+
+	const handleTabSwitch = useCallback(
+		(direction: "prev" | "next") => {
+			if (subTabs.length <= 1) return;
+
+			const currentIndex = subTabs.findIndex((t) => t.id === activeSubId);
+			if (currentIndex === -1) return;
+
+			let nextIndex: number;
+			if (direction === "prev") {
+				nextIndex = (currentIndex - 1 + subTabs.length) % subTabs.length;
+			} else {
+				nextIndex = (currentIndex + 1) % subTabs.length;
+			}
+
+			handleTabSelect(subTabs[nextIndex].id);
+		},
+		[subTabs, activeSubId, handleTabSelect],
+	);
+
+	// File watcher: SSE for MAIN changes
+	const handleMainChange = useCallback(() => {
+		setMainReloadKey((v) => v + 1);
+	}, []);
+	useFileWatcher(watchEnabled, hasMain, handleMainChange, addToast);
+
+	// Keyboard navigation
+	useKeyboardNavigation({
+		keysEnabled,
+		focusedPane,
+		hasSub,
+		showHelp,
+		mainViewerRef,
+		subViewerRef,
+		setFocusedPane,
+		setMainReloadKey,
+		setShowHelp,
+		swapPanes,
+		addToast,
+		onTabSwitch: handleTabSwitch,
+	});
 
 	const handleAction = (key: ActionKey) => {
 		switch (key) {

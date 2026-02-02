@@ -10,15 +10,21 @@ interface PaneProps {
 
 export function Pane({ children, focused, paneRole, status, onFocus }: PaneProps) {
 	return (
-		<button
-			type="button"
+		<section
 			className={classNames(
-				"w-full text-left relative flex h-full flex-col transition-all duration-200",
+				"w-full text-left relative flex h-full flex-col transition-all duration-200 outline-none",
 				focused
 					? "bg-slate-900/30 z-10"
 					: "bg-transparent opacity-60 hover:opacity-80 scale-[0.99]",
 			)}
 			onClick={onFocus}
+			onKeyDown={(e) => {
+				if (e.key === "Enter" || e.key === " ") {
+					onFocus();
+				}
+			}}
+			tabIndex={-1}
+			aria-label={`${paneRole} pane`}
 		>
 			{/* Pane Header Overlay */}
 			<div
@@ -55,6 +61,6 @@ export function Pane({ children, focused, paneRole, status, onFocus }: PaneProps
 			>
 				{children}
 			</div>
-		</button>
+		</section>
 	);
 }

@@ -12,7 +12,7 @@ export function SubTabBar({ tabs, activeTabId, onSelect, onClose }: SubTabBarPro
 	if (tabs.length === 0) return null;
 
 	return (
-		<div className="flex w-full items-center bg-slate-900/80 border-b border-slate-800 overflow-x-auto no-scrollbar">
+		<div className="flex w-full items-center bg-slate-900/80 border-b border-slate-800 overflow-x-auto no-scrollbar pl-24">
 			{tabs.map((tab) => (
 				<div
 					key={tab.id}
