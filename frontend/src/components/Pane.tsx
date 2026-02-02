@@ -12,10 +12,10 @@ export function Pane({ children, focused, paneRole, status, onFocus }: PaneProps
 	return (
 		<section
 			className={classNames(
-				"w-full text-left relative flex h-full flex-col transition-all duration-200 outline-none",
+				"w-full text-left relative flex h-full flex-col transition-all duration-300 outline-none rounded-lg overflow-hidden",
 				focused
-					? "bg-slate-900/30 z-10"
-					: "bg-transparent opacity-60 hover:opacity-80 scale-[0.99]",
+					? "bg-slate-900/30 z-10 ring-2 ring-brand shadow-2xl shadow-brand/20"
+					: "bg-transparent border border-white/5",
 			)}
 			onClick={onFocus}
 			onKeyDown={(e) => {
@@ -29,14 +29,16 @@ export function Pane({ children, focused, paneRole, status, onFocus }: PaneProps
 			{/* Pane Header Overlay */}
 			<div
 				className={classNames(
-					"absolute top-4 left-6 z-20 flex items-center gap-2 pointer-events-none transition-opacity duration-200",
-					focused ? "opacity-100" : "opacity-40",
+					"absolute top-4 left-6 z-20 flex items-center gap-2 pointer-events-none transition-all duration-300 origin-left",
+					focused ? "opacity-100 scale-100 translate-x-0" : "opacity-80 scale-90 -translate-x-2",
 				)}
 			>
 				<div
 					className={classNames(
-						"px-2 py-0.5 rounded text-xs font-bold shadow-sm backdrop-blur border border-white/5",
-						paneRole === "MAIN" ? "bg-brand/80 text-white" : "bg-fuchsia-600/80 text-white",
+						"px-2.5 py-1 rounded-md text-xs font-bold shadow-md backdrop-blur border border-white/10 tracking-wide",
+						paneRole === "MAIN"
+							? "bg-brand/90 text-white shadow-brand/20"
+							: "bg-fuchsia-600/90 text-white shadow-fuchsia-500/20",
 					)}
 				>
 					{paneRole}
@@ -53,12 +55,7 @@ export function Pane({ children, focused, paneRole, status, onFocus }: PaneProps
 			</div>
 
 			{/* Content Container */}
-			<div
-				className={classNames(
-					"flex-1 w-full h-full min-h-0 relative rounded-none",
-					focused && "ring-1 ring-inset ring-brand/30",
-				)}
-			>
+			<div className={classNames("flex-1 w-full h-full min-h-0 relative rounded-none")}>
 				{children}
 			</div>
 		</section>

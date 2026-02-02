@@ -111,6 +111,7 @@ export function useKeyboardNavigation({
 			if (codeLower === "keys" || keyLower === "s") {
 				consume();
 				if (event.repeat) return;
+				targetViewer?.stopContinuousScroll();
 				swapPanes();
 				return;
 			}
@@ -189,6 +190,7 @@ export function useKeyboardNavigation({
 					return;
 				case "Tab":
 					consume();
+					targetViewer?.stopContinuousScroll();
 					if (hasSubRef.current) {
 						setFocusedPane(focusedPaneRef.current === "main" ? "sub" : "main");
 					} else {
