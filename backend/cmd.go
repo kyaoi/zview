@@ -83,7 +83,7 @@ func parseArgs(args []string) (options, error) {
 	reordered := reorderArgs(args)
 	if err := fs.Parse(reordered); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
-			fs.Usage()
+			// Usage() is already called by flag package
 			return options{}, errShowHelp
 		}
 		return options{}, err
