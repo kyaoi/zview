@@ -9,9 +9,9 @@ import (
 )
 
 type Config struct {
-	Watch      bool    `toml:"watch" json:"watch"`
-	ZoomStep   float64 `toml:"zoom_step" json:"zoom_step"`
-	DprCap     float64 `toml:"dpr_cap" json:"dpr_cap"`
+	Watch                bool    `toml:"watch" json:"watch"`
+	ZoomStep             float64 `toml:"zoom_step" json:"zoom_step"`
+	DprCap               float64 `toml:"dpr_cap" json:"dpr_cap"`
 	ScrollStepVertical   float64 `toml:"scroll_step_vertical" json:"scroll_step_vertical"`
 	ScrollStepHorizontal float64 `toml:"scroll_step_horizontal" json:"scroll_step_horizontal"`
 	PageScrollRatio      float64 `toml:"page_scroll_ratio" json:"page_scroll_ratio"`
