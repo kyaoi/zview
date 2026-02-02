@@ -43,7 +43,7 @@ A task is “done” when:
 
 #### `task/dynamic-port-selection`
 
-* [ ] Done
+* [x] Done
 
 **Goal:** Automatically find and use an available port, and provide robust CLI commands to list and manage running `zview` instances.
 
@@ -80,7 +80,7 @@ A task is “done” when:
 
 #### `task/dynamic-main-selection`
 
-* [ ] Done
+* [x] Done
 
 **Goal:** Allow opening the viewer without any CLI arguments and selecting the MAIN PDF from the web interface.
 

@@ -10,6 +10,7 @@ interface BootstrapData {
 
 interface UseBootstrapResult {
 	hasMain: boolean;
+	setHasMain: (value: boolean) => void;
 	hasSub: boolean;
 	setHasSub: (value: boolean) => void;
 	watchEnabled: boolean;
@@ -60,8 +61,13 @@ export function useBootstrap(
 		setHasSub(value);
 	}, []);
 
+	const setHasMainExternal = useCallback((value: boolean) => {
+		setHasMain(value);
+	}, []);
+
 	return {
 		hasMain,
+		setHasMain: setHasMainExternal,
 		hasSub,
 		setHasSub: setHasSubExternal,
 		watchEnabled,
