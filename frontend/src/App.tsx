@@ -234,7 +234,13 @@ export default function App() {
 								onClick={() => document.getElementById("main-file-input")?.click()}
 								className="flex items-center gap-2 rounded-lg bg-brand px-6 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:bg-brand/90 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-brand/50 focus:ring-offset-2 focus:ring-offset-slate-900"
 							>
-								<svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<svg
+									aria-hidden="true"
+									className="h-5 w-5"
+									fill="none"
+									stroke="currentColor"
+									viewBox="0 0 24 24"
+								>
 									<path
 										strokeLinecap="round"
 										strokeLinejoin="round"
