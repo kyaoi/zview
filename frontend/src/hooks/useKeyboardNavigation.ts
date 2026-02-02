@@ -238,7 +238,15 @@ export function useKeyboardNavigation({
 			window.removeEventListener("keyup", handleKeyUp);
 			if (keySeqTimeoutRef.current) window.clearTimeout(keySeqTimeoutRef.current);
 		};
-	}, [addToast, swapPanes, mainViewerRef, subViewerRef, setFocusedPane, setMainReloadKey, setShowHelp]);
+	}, [
+		addToast,
+		swapPanes,
+		mainViewerRef,
+		subViewerRef,
+		setFocusedPane,
+		setMainReloadKey,
+		setShowHelp,
+	]);
 }
 
 export function useSwapPanes(
@@ -247,7 +255,10 @@ export function useSwapPanes(
 	subViewerRef: React.RefObject<ViewerHandle | null>,
 	setPaneOrder: React.Dispatch<React.SetStateAction<"main-first" | "sub-first">>,
 	addToast: (message: string, type: ToastType) => void,
-): [() => boolean, React.MutableRefObject<{ main: ScrollSnapshot | null; sub: ScrollSnapshot | null } | null>] {
+): [
+	() => boolean,
+	React.MutableRefObject<{ main: ScrollSnapshot | null; sub: ScrollSnapshot | null } | null>,
+] {
 	const swapSnapshotsRef = useRef<{
 		main: ScrollSnapshot | null;
 		sub: ScrollSnapshot | null;

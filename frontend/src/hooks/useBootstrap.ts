@@ -17,7 +17,9 @@ interface UseBootstrapResult {
 	isLoaded: boolean;
 }
 
-export function useBootstrap(addToast: (message: string, type: ToastType) => void): UseBootstrapResult {
+export function useBootstrap(
+	addToast: (message: string, type: ToastType) => void,
+): UseBootstrapResult {
 	const [hasMain, setHasMain] = useState(false);
 	const [hasSub, setHasSub] = useState(false);
 	const [watchEnabled, setWatchEnabled] = useState(true);

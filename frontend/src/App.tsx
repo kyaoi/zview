@@ -35,7 +35,8 @@ export default function App() {
 	}, []);
 
 	// Bootstrap: fetch initial state from backend
-	const { hasMain, hasSub, setHasSub, watchEnabled, initialFocus, isLoaded } = useBootstrap(addToast);
+	const { hasMain, hasSub, setHasSub, watchEnabled, initialFocus, isLoaded } =
+		useBootstrap(addToast);
 
 	// Set initial focus when bootstrap loads
 	useEffect(() => {
