@@ -28,6 +28,7 @@ export default function App() {
 
 	// Snapshots for tabs to restore state when switching back
 	const tabSnapshotsRef = useRef<Map<string, import("./lib/types").ScrollSnapshot>>(new Map());
+	const subViewerRefs = useRef<Map<string, ViewerHandle>>(new Map());
 
 	const addToast = useCallback((message: string, type: ToastType = "info") => {
 		const id = Math.random().toString(36).substring(2, 9);
@@ -66,6 +67,16 @@ export default function App() {
 	useEffect(() => {
 		hasSubRef.current = hasSub;
 	}, [hasSub]);
+
+	// Sync subViewerRef (for keyboard nav) with active sub tab
+	useEffect(() => {
+		if (activeSubId && hasSub) {
+			const ref = subViewerRefs.current.get(activeSubId);
+			subViewerRef.current = ref || null;
+		} else {
+			subViewerRef.current = null;
+		}
+	}, [activeSubId, hasSub]);
 
 	// Swap panes logic
 	const [swapPanes, swapSnapshotsRef] = useSwapPanes(
@@ -370,18 +381,7 @@ export default function App() {
 
 		const subPane = hasSub ? (
 			<div key="pane-sub" className="flex-1 basis-1/2 min-w-0 flex flex-col">
-				{/* Tab Bar within the Pane area but above the Pane content wrapper logic? 
-				    Actually Pane component renders its children inside a wrapper.
-				    Ideally we want TabBar to be fixed at top of SUB pane area. 
-				    But Pane component assumes full height.
-				    Let's put SubTabBar at the top of this div, and Pane below it. 
-				    BUT visual design might require TabBar to be visually integrated with Pane header.
-				    Or SubTabBar can be passed AS children to Pane, and standard children below it.
-				    But Pane renders children in a flex-1 container.
-				    Let's put SubTabBar inside Pane as first child? 
-				    Or better, put it here above Pane, and adjust Pane height. 
-				    Actually Pane is 100% height. If we put TabBar above, we need flex-col.
-				*/}
+				{/* Tab Bar within the Pane area */}
 				<Pane
 					key="sub"
 					focused={focusedPane === "sub"}
@@ -397,16 +397,31 @@ export default function App() {
 							onClose={handleSubClose}
 						/>
 						<div className="flex-1 min-h-0 relative">
-							<PdfViewer
-								paneRole="SUB"
-								status="static"
-								onFocus={() => setFocusedPane("sub")}
-								url={activeSubId ? `/api/sub.pdf?id=${activeSubId}` : "/api/sub.pdf"}
-								ref={subViewerRef}
-								onNotify={addToast}
-								reloadKey={subReloadKey} // We might want independent keys for tabs, but ID change triggers load.
-								initialSnapshot={activeSubId ? tabSnapshotsRef.current.get(activeSubId) : undefined}
-							/>
+							{subTabs.map((tab) => (
+								<div
+									key={tab.id}
+									className={classNames(
+										"absolute inset-0 h-full w-full bg-slate-900", // absolute to stack them
+										activeSubId === tab.id ? "z-10 visible" : "z-0 invisible",
+									)}
+								>
+									<PdfViewer
+										paneRole="SUB"
+										status="static"
+										onFocus={() => setFocusedPane("sub")}
+										url={`/api/sub.pdf?id=${tab.id}`}
+										ref={(el) => {
+											if (el) subViewerRefs.current.set(tab.id, el);
+											else subViewerRefs.current.delete(tab.id);
+										}}
+										onNotify={addToast}
+										reloadKey={subReloadKey}
+										initialSnapshot={
+											activeSubId === tab.id ? tabSnapshotsRef.current.get(tab.id) : undefined
+										}
+									/>
+								</div>
+							))}
 						</div>
 					</div>
 				</Pane>

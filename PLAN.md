@@ -12,7 +12,7 @@ This plan breaks development of **zview** into small, reviewable tasks.
 
 * [x] **Task 0:** Dynamic Port Selection
 * [x] **Task 1:** Launch Viewer without specifying MAIN PDF via CLI
-* [ ] **Task 2:** Multi-tab support for SUB PDFs
+* [x] **Task 2:** Multi-tab support for SUB PDFs
 * [ ] **Task 3:** Improve focus indication
 * [ ] **Task 4:** Config file support
 
@@ -106,7 +106,7 @@ A task is “done” when:
 
 #### `task/multi-tab-sub-pane`
 
-* [ ] Done
+* [x] Done
 
 **Goal:** Support loading multiple reference PDFs (SUB) and switching between them via tabs, while displaying at most one MAIN and one SUB pane at a time.
 

@@ -121,10 +121,27 @@ func main() {
 	mux.HandleFunc("/events", broadcaster.HandleSSE)
 
 	// Start server with dynamic port selection
-	addr := fmt.Sprintf("127.0.0.1:%d", opts.port)
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		log.Fatalf("failed to listen on %s: %v", addr, err)
+	var listener net.Listener
+
+	if opts.portSpecified {
+		// User requested specific port (or 0 for random). Fail if unavailable.
+		addr := fmt.Sprintf("127.0.0.1:%d", opts.port)
+		listener, err = net.Listen("tcp", addr)
+		if err != nil {
+			log.Fatalf("failed to listen on %s: %v", addr, err)
+		}
+	} else {
+		// Default behavior: try default port, fallback to random
+		addr := fmt.Sprintf("127.0.0.1:%d", opts.port)
+		listener, err = net.Listen("tcp", addr)
+		if err != nil {
+			// If default port failed, try random
+			log.Printf("Port %d is busy, trying a random port...", opts.port)
+			listener, err = net.Listen("tcp", "127.0.0.1:0")
+			if err != nil {
+				log.Fatalf("failed to listen on random port: %v", err)
+			}
+		}
 	}
 
 	// Get actual port (important for dynamic port selection with port=0)
