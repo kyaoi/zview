@@ -15,7 +15,7 @@ export function Pane({ children, focused, paneRole, status, onFocus }: PaneProps
 				"w-full text-left relative flex h-full flex-col transition-all duration-300 outline-none rounded-lg overflow-hidden",
 				focused
 					? "bg-slate-900/30 z-10 ring-2 ring-brand shadow-2xl shadow-brand/20"
-					: "bg-transparent border border-white/5 opacity-80 hover:opacity-100 brightness-90 hover:brightness-100",
+					: "bg-transparent border border-white/5",
 			)}
 			onClick={onFocus}
 			onKeyDown={(e) => {
@@ -30,7 +30,7 @@ export function Pane({ children, focused, paneRole, status, onFocus }: PaneProps
 			<div
 				className={classNames(
 					"absolute top-4 left-6 z-20 flex items-center gap-2 pointer-events-none transition-all duration-300 origin-left",
-					focused ? "opacity-100 scale-100 translate-x-0" : "opacity-60 scale-90 -translate-x-2 grayscale",
+					focused ? "opacity-100 scale-100 translate-x-0" : "opacity-80 scale-90 -translate-x-2",
 				)}
 			>
 				<div
@@ -55,11 +55,7 @@ export function Pane({ children, focused, paneRole, status, onFocus }: PaneProps
 			</div>
 
 			{/* Content Container */}
-			<div
-				className={classNames(
-					"flex-1 w-full h-full min-h-0 relative rounded-none",
-				)}
-			>
+			<div className={classNames("flex-1 w-full h-full min-h-0 relative rounded-none")}>
 				{children}
 			</div>
 		</section>
