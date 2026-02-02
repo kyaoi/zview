@@ -10,6 +10,7 @@ import { useFileWatcher } from "./hooks/useFileWatcher";
 import { useKeyboardNavigation, useSwapPanes } from "./hooks/useKeyboardNavigation";
 import type { ActionKey, ToastType, ViewerHandle } from "./lib/types";
 import { classNames } from "./lib/utils";
+import { SubTabBar } from "./components/SubTabBar";
 
 export default function App() {
 	const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -25,6 +26,9 @@ export default function App() {
 	const subViewerRef = useRef<ViewerHandle | null>(null);
 	const hasSubRef = useRef(false);
 
+	// Snapshots for tabs to restore state when switching back
+	const tabSnapshotsRef = useRef<Map<string, import("./lib/types").ScrollSnapshot>>(new Map());
+
 	const addToast = useCallback((message: string, type: ToastType = "info") => {
 		const id = Math.random().toString(36).substring(2, 9);
 		setToasts((prev) => [...prev, { id, message, type }]);
@@ -35,8 +39,21 @@ export default function App() {
 	}, []);
 
 	// Bootstrap: fetch initial state from backend
-	const { hasMain, setHasMain, hasSub, setHasSub, watchEnabled, initialFocus, isLoaded } =
-		useBootstrap(addToast);
+	const {
+		hasMain,
+		setHasMain,
+		// hasSub is derived from subTabs length now
+		watchEnabled,
+		initialFocus,
+		isLoaded,
+		subTabs,
+		setSubTabs,
+		activeSubId,
+		setActiveSubId,
+	} = useBootstrap(addToast);
+
+	// Derived hasSub based on tabs presence
+	const hasSub = subTabs.length > 0;
 
 	// Set initial focus when bootstrap loads
 	useEffect(() => {
@@ -95,6 +112,58 @@ export default function App() {
 		addToast,
 	});
 
+	const handleTabSelect = useCallback(
+		(id: string) => {
+			if (id === activeSubId) return;
+
+			// Save current snapshot
+			if (activeSubId && subViewerRef.current) {
+				const snap = subViewerRef.current.getSnapshot();
+				if (snap) {
+					tabSnapshotsRef.current.set(activeSubId, snap);
+				}
+			}
+
+			setActiveSubId(id);
+		},
+		[activeSubId, setActiveSubId],
+	);
+
+	const handleSubClose = useCallback(
+		async (id: string) => {
+			try {
+				const res = await fetch(`/api/sub?id=${id}`, { method: "DELETE" });
+				if (!res.ok) throw new Error("Failed to close tab");
+
+				// Remove snapshot
+				tabSnapshotsRef.current.delete(id);
+
+				setSubTabs((prev) => {
+					const next = prev.filter((t) => t.id !== id);
+					// If we closed the active tab, switch to another one
+					if (id === activeSubId) {
+						// Logic to pick next tab: previous one, or next one, or null
+						if (next.length > 0) {
+							// Simple logic: pick the last one or the one at same index?
+							// Let's pick the last one for now or just the first in list.
+							const closedIndex = prev.findIndex((t) => t.id === id);
+							const nextActive = next[Math.min(closedIndex, next.length - 1)];
+							setActiveSubId(nextActive.id);
+						} else {
+							setActiveSubId(null);
+							setFocusedPane("main");
+						}
+					}
+					return next;
+				});
+			} catch (e) {
+				console.error(e);
+				addToast("Failed to close tab", "error");
+			}
+		},
+		[activeSubId, addToast, setActiveSubId, setSubTabs],
+	);
+
 	const handleAction = (key: ActionKey) => {
 		switch (key) {
 			case "openMain":
@@ -105,13 +174,21 @@ export default function App() {
 				break;
 			case "closeSub":
 				if (!hasSub) return;
-				fetch("/api/sub", { method: "DELETE" })
+				// Close all tabs (legacy behavior implies clearing SUB pane)
+				fetch("/api/sub", { method: "DELETE" }) // No ID means clear all/active? Handlers need check.
 					.then(() => {
-						setHasSub(false);
+						setSubTabs([]);
+						setActiveSubId(null);
+						tabSnapshotsRef.current.clear();
 						setFocusedPane("main");
-						addToast("SUB: Closed", "info");
+						addToast("SUB: Closed all", "info");
 					})
 					.catch(() => addToast("Failed to close SUB", "error"));
+				break;
+			case "closeSubTab":
+				if (activeSubId) {
+					handleSubClose(activeSubId);
+				}
 				break;
 			case "swap":
 				swapPanes();
@@ -146,9 +223,22 @@ export default function App() {
 			});
 			if (!res.ok) throw new Error("Upload failed");
 
-			setHasSub(true);
+			const data: { id: string; name: string } = await res.json();
+
+			setSubTabs((prev) => {
+				// Don't duplicate if already exists? ID is random so new upload = new tab always.
+				return [...prev, data];
+			});
+
+			// Save snapshot of current before switching
+			if (activeSubId && subViewerRef.current) {
+				const snap = subViewerRef.current.getSnapshot();
+				if (snap) tabSnapshotsRef.current.set(activeSubId, snap);
+			}
+
+			setActiveSubId(data.id);
 			setFocusedPane("sub");
-			setSubReloadKey((v) => v + 1); // Force reload
+			setSubReloadKey((v) => v + 1); // Force reload (though ID change triggers it too)
 			addToast(`SUB: Loaded ${file.name}`, "success");
 		} catch (err) {
 			console.error(err);
@@ -257,7 +347,19 @@ export default function App() {
 		);
 
 		const subPane = hasSub ? (
-			<div key="pane-sub" className="flex-1 basis-1/2 min-w-0">
+			<div key="pane-sub" className="flex-1 basis-1/2 min-w-0 flex flex-col">
+				{/* Tab Bar within the Pane area but above the Pane content wrapper logic? 
+				    Actually Pane component renders its children inside a wrapper.
+				    Ideally we want TabBar to be fixed at top of SUB pane area. 
+				    But Pane component assumes full height.
+				    Let's put SubTabBar at the top of this div, and Pane below it. 
+				    BUT visual design might require TabBar to be visually integrated with Pane header.
+				    Or SubTabBar can be passed AS children to Pane, and standard children below it.
+				    But Pane renders children in a flex-1 container.
+				    Let's put SubTabBar inside Pane as first child? 
+				    Or better, put it here above Pane, and adjust Pane height. 
+				    Actually Pane is 100% height. If we put TabBar above, we need flex-col.
+				*/}
 				<Pane
 					key="sub"
 					focused={focusedPane === "sub"}
@@ -265,15 +367,26 @@ export default function App() {
 					status="static"
 					onFocus={() => setFocusedPane("sub")}
 				>
-					<PdfViewer
-						paneRole="SUB"
-						status="static"
-						onFocus={() => setFocusedPane("sub")}
-						url="/api/sub.pdf"
-						ref={subViewerRef}
-						onNotify={addToast}
-						reloadKey={subReloadKey}
-					/>
+					<div className="flex flex-col h-full w-full">
+						<SubTabBar
+							tabs={subTabs}
+							activeTabId={activeSubId}
+							onSelect={handleTabSelect}
+							onClose={handleSubClose}
+						/>
+						<div className="flex-1 min-h-0 relative">
+							<PdfViewer
+								paneRole="SUB"
+								status="static"
+								onFocus={() => setFocusedPane("sub")}
+								url={activeSubId ? `/api/sub.pdf?id=${activeSubId}` : "/api/sub.pdf"}
+								ref={subViewerRef}
+								onNotify={addToast}
+								reloadKey={subReloadKey} // We might want independent keys for tabs, but ID change triggers load.
+								initialSnapshot={activeSubId ? tabSnapshotsRef.current.get(activeSubId) : undefined}
+							/>
+						</div>
+					</div>
 				</Pane>
 			</div>
 		) : null;
@@ -289,6 +402,10 @@ export default function App() {
 		subReloadKey,
 		paneOrder,
 		watchEnabled,
+		subTabs,
+		activeSubId,
+		handleTabSelect,
+		handleSubClose,
 	]);
 
 	return (

@@ -21,7 +21,19 @@ func handleMainPDF(state *AppState) http.HandlerFunc {
 
 func handleSubPDF(state *AppState) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		path := state.GetSubPath()
+		id := r.URL.Query().Get("id")
+		var path string
+
+		if id != "" {
+			tab := state.GetSubTab(id)
+			if tab != nil {
+				path = tab.Path
+			}
+		} else {
+			// Legacy/Compatibility: return active sub path if no ID provided
+			path = state.GetSubPath()
+		}
+
 		if path == "" {
 			http.Error(w, "SUB not loaded", http.StatusNotFound)
 			return
@@ -33,10 +45,12 @@ func handleSubPDF(state *AppState) http.HandlerFunc {
 func handleBootstrap(state *AppState, opts options) http.HandlerFunc {
 	return func(w http.ResponseWriter, _ *http.Request) {
 		resp := map[string]interface{}{
-			"focus":   opts.focus,
-			"hasMain": state.GetMainPath() != "",
-			"hasSub":  state.GetSubPath() != "",
-			"watch":   opts.watch,
+			"focus":       opts.focus,
+			"hasMain":     state.GetMainPath() != "",
+			"hasSub":      state.HasSub(),
+			"watch":       opts.watch,
+			"subTabs":     state.GetSubTabs(),
+			"activeSubId": state.GetActiveSubId(),
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(resp)
@@ -46,7 +60,7 @@ func handleBootstrap(state *AppState, opts options) http.HandlerFunc {
 func handleSubUpload(state *AppState) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize)
-		file, _, err := r.FormFile("file")
+		file, header, err := r.FormFile("file")
 		if err != nil {
 			http.Error(w, "failed to read file", http.StatusBadRequest)
 			return
@@ -68,14 +82,37 @@ func handleSubUpload(state *AppState) http.HandlerFunc {
 		}
 		tmpFile.Close()
 
-		state.SetSubPath(tmpFile.Name(), true)
-		w.WriteHeader(http.StatusOK)
+		// Add as new tab
+		id := state.AddSubTab(header.Filename, tmpFile.Name(), true)
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{
+			"id":   id,
+			"name": header.Filename,
+		})
 	}
 }
 
 func handleSubDelete(state *AppState) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		state.SetSubPath("", false)
+		id := r.URL.Query().Get("id")
+		if id == "" {
+			// If no ID, try to remove active tab or all?
+			// For safety, let's require ID or clear all if specific param is set?
+			// Current requirement implies tab closing. If no ID, maybe clear all?
+			// Let's support clearing all if "all" is passed, or specific ID.
+			// Or if no ID, clear all (legacy behavior was "close sub").
+			state.Cleanup() // Only cleans temp files, but we need to clear state too
+			// Actually state.Cleanup() resets the map. That works for "close all".
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		removed := state.RemoveSubTab(id)
+		if !removed {
+			http.Error(w, "Tab not found", http.StatusNotFound)
+			return
+		}
 		w.WriteHeader(http.StatusOK)
 	}
 }

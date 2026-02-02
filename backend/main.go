@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"syscall"
 )
@@ -78,9 +79,11 @@ func main() {
 	}
 
 	// Initialize state
-	state := &AppState{
-		mainPath: opts.mainPath,
-		subPath:  opts.subPath,
+	state := NewAppState(opts.mainPath)
+	if opts.subPath != "" {
+		// Use filename as tab name
+		name := filepath.Base(opts.subPath)
+		state.AddSubTab(name, opts.subPath, false)
 	}
 	defer state.Cleanup()
 
@@ -131,7 +134,9 @@ func main() {
 	log.Printf("Serving at %s", url)
 
 	// Register session
-	if err := registerSession(actualPort, opts.mainPath, opts.subPath); err != nil {
+	// For session registration, we just pass the active/first sub path or empty
+	initialSubPath := state.GetSubPath()
+	if err := registerSession(actualPort, opts.mainPath, initialSubPath); err != nil {
 		log.Printf("Warning: failed to register session: %v", err)
 	}
 

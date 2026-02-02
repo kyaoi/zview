@@ -2,7 +2,19 @@ import type { RenderTask } from "pdfjs-dist";
 
 export type ViewerRole = "MAIN" | "SUB";
 
-export type ActionKey = "openMain" | "openSub" | "closeSub" | "swap" | "reloadMain" | "help";
+export type ActionKey =
+	| "openMain"
+	| "openSub"
+	| "closeSub"
+	| "closeSubTab"
+	| "swap"
+	| "reloadMain"
+	| "help";
+
+export type SubTab = {
+	id: string;
+	name: string;
+};
 
 export type PdfViewerState =
 	| { phase: "idle" | "loading" }

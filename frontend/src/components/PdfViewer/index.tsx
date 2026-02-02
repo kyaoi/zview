@@ -52,10 +52,11 @@ interface PdfViewerProps {
 	onNotify: (message: string, type: ToastType) => void;
 	onFocus?: () => void;
 	reloadKey?: number;
+	initialSnapshot?: ScrollSnapshot | null;
 }
 
 export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfViewer(
-	{ paneRole, url, onNotify, reloadKey = 0 },
+	{ paneRole, url, onNotify, reloadKey = 0, initialSnapshot },
 	ref,
 ) {
 	const role = paneRole;
@@ -107,7 +108,9 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 		const bustToken = reloadKey + sessionNonce;
 		const requestUrl = withCacheBust(url, bustToken);
 
-		if (pdfRef.current) {
+		if (initialSnapshot) {
+			pendingRestoreRef.current = { reloadKey, snapshot: initialSnapshot };
+		} else if (pdfRef.current) {
 			const snapshot = (() => {
 				const scrollEl = scrollRef.current;
 				if (!pageSize || pageCount === 0 || !scrollEl) return null;
