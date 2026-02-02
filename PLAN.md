@@ -10,6 +10,7 @@ This plan breaks development of **zview** into small, reviewable tasks.
 
 ## Progress tracking
 
+* [ ] **Task 0:** Dynamic Port Selection
 * [ ] **Task 1:** Launch Viewer without specifying MAIN PDF via CLI
 * [ ] **Task 2:** Multi-tab support for SUB PDFs
 * [ ] **Task 3:** Improve focus indication
@@ -37,6 +38,43 @@ A task is “done” when:
 ---
 
 ## Task list
+
+### 0) Dynamic Port Selection
+
+#### `task/dynamic-port-selection`
+
+* [ ] Done
+
+**Goal:** Automatically find and use an available port, and provide robust CLI commands to list and manage running `zview` instances.
+
+**Work:**
+
+* Backend:
+  * **State Management:**
+    * On startup, register the new `zview` instance (PID, port, MAIN PDF, SUB PDF, start time) in a state file located at `~/.config/zview/sessions.json`.
+    * On graceful shutdown, the instance should remove itself from this file.
+  * **Dynamic Port Selection:**
+    * If `--port` is not specified, scan for an open port and use it.
+  * **Process Listing:**
+    * Implement `zview ps` (or `zview --list`) to read the state file and display a formatted table of running instances with:
+      * Port Number
+      * MAIN PDF path
+      * SUB PDF path
+      * Start Time (e.g., "YYYY-MM-DD HH:MM:SS")
+  * **Process Termination:**
+    * Implement `zview kill` (or `zview --kill`):
+      * With a port number (`zview kill 8080`), it should terminate the specified process.
+      * Without arguments, it should enter an interactive mode: display the list of running processes and prompt the user to select one or more to terminate.
+
+**Acceptance:**
+
+* Running `zview` without a `--port` flag starts successfully on a free port.
+* The `~/.config/zview/sessions.json` file is created and correctly updated on startup and shutdown.
+* `zview ps` displays a clear, accurate list of all running `zview` instances, including their port, PDF paths, and start time.
+* `zview kill <port>` terminates the correct process.
+* `zview kill` in interactive mode allows the user to select and successfully terminate one or more processes.
+
+---
 
 ### 1) Launch Viewer without specifying MAIN PDF via CLI
 
