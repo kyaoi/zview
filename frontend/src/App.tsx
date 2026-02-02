@@ -10,6 +10,7 @@ import { useFileWatcher } from "./hooks/useFileWatcher";
 import { useKeyboardNavigation, useSwapPanes } from "./hooks/useKeyboardNavigation";
 import type { ActionKey, ToastType, ViewerHandle } from "./lib/types";
 import { classNames } from "./lib/utils";
+import { SubTabBar } from "./components/SubTabBar";
 
 export default function App() {
 	const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -25,6 +26,10 @@ export default function App() {
 	const subViewerRef = useRef<ViewerHandle | null>(null);
 	const hasSubRef = useRef(false);
 
+	// Snapshots for tabs to restore state when switching back
+	const tabSnapshotsRef = useRef<Map<string, import("./lib/types").ScrollSnapshot>>(new Map());
+	const subViewerRefs = useRef<Map<string, ViewerHandle>>(new Map());
+
 	const addToast = useCallback((message: string, type: ToastType = "info") => {
 		const id = Math.random().toString(36).substring(2, 9);
 		setToasts((prev) => [...prev, { id, message, type }]);
@@ -35,8 +40,21 @@ export default function App() {
 	}, []);
 
 	// Bootstrap: fetch initial state from backend
-	const { hasMain, setHasMain, hasSub, setHasSub, watchEnabled, initialFocus, isLoaded } =
-		useBootstrap(addToast);
+	const {
+		hasMain,
+		setHasMain,
+		// hasSub is derived from subTabs length now
+		watchEnabled,
+		initialFocus,
+		isLoaded,
+		subTabs,
+		setSubTabs,
+		activeSubId,
+		setActiveSubId,
+	} = useBootstrap(addToast);
+
+	// Derived hasSub based on tabs presence
+	const hasSub = subTabs.length > 0;
 
 	// Set initial focus when bootstrap loads
 	useEffect(() => {
@@ -49,6 +67,16 @@ export default function App() {
 	useEffect(() => {
 		hasSubRef.current = hasSub;
 	}, [hasSub]);
+
+	// Sync subViewerRef (for keyboard nav) with active sub tab
+	useEffect(() => {
+		if (activeSubId && hasSub) {
+			const ref = subViewerRefs.current.get(activeSubId);
+			subViewerRef.current = ref || null;
+		} else {
+			subViewerRef.current = null;
+		}
+	}, [activeSubId, hasSub]);
 
 	// Swap panes logic
 	const [swapPanes, swapSnapshotsRef] = useSwapPanes(
@@ -75,6 +103,79 @@ export default function App() {
 	}, [paneOrder, swapSnapshotsRef]);
 
 	// File watcher: SSE for MAIN changes
+
+	const handleTabSelect = useCallback(
+		(id: string) => {
+			if (id === activeSubId) return;
+
+			// Save current snapshot
+			if (activeSubId && subViewerRef.current) {
+				const snap = subViewerRef.current.getSnapshot();
+				if (snap) {
+					tabSnapshotsRef.current.set(activeSubId, snap);
+				}
+			}
+
+			setActiveSubId(id);
+		},
+		[activeSubId, setActiveSubId],
+	);
+
+	const handleSubClose = useCallback(
+		async (id: string) => {
+			try {
+				const res = await fetch(`/api/sub?id=${id}`, { method: "DELETE" });
+				if (!res.ok) throw new Error("Failed to close tab");
+
+				// Remove snapshot
+				tabSnapshotsRef.current.delete(id);
+
+				setSubTabs((prev) => {
+					const next = prev.filter((t) => t.id !== id);
+					// If we closed the active tab, switch to another one
+					if (id === activeSubId) {
+						// Logic to pick next tab: previous one, or next one, or null
+						if (next.length > 0) {
+							// Simple logic: pick the last one or the one at same index?
+							// Let's pick the last one for now or just the first in list.
+							const closedIndex = prev.findIndex((t) => t.id === id);
+							const nextActive = next[Math.min(closedIndex, next.length - 1)];
+							setActiveSubId(nextActive.id);
+						} else {
+							setActiveSubId(null);
+							setFocusedPane("main");
+						}
+					}
+					return next;
+				});
+			} catch (e) {
+				console.error(e);
+				addToast("Failed to close tab", "error");
+			}
+		},
+		[activeSubId, addToast, setActiveSubId, setSubTabs],
+	);
+
+	const handleTabSwitch = useCallback(
+		(direction: "prev" | "next") => {
+			if (subTabs.length <= 1) return;
+
+			const currentIndex = subTabs.findIndex((t) => t.id === activeSubId);
+			if (currentIndex === -1) return;
+
+			let nextIndex: number;
+			if (direction === "prev") {
+				nextIndex = (currentIndex - 1 + subTabs.length) % subTabs.length;
+			} else {
+				nextIndex = (currentIndex + 1) % subTabs.length;
+			}
+
+			handleTabSelect(subTabs[nextIndex].id);
+		},
+		[subTabs, activeSubId, handleTabSelect],
+	);
+
+	// File watcher: SSE for MAIN changes
 	const handleMainChange = useCallback(() => {
 		setMainReloadKey((v) => v + 1);
 	}, []);
@@ -93,6 +194,7 @@ export default function App() {
 		setShowHelp,
 		swapPanes,
 		addToast,
+		onTabSwitch: handleTabSwitch,
 	});
 
 	const handleAction = (key: ActionKey) => {
@@ -105,13 +207,21 @@ export default function App() {
 				break;
 			case "closeSub":
 				if (!hasSub) return;
-				fetch("/api/sub", { method: "DELETE" })
+				// Close all tabs (legacy behavior implies clearing SUB pane)
+				fetch("/api/sub", { method: "DELETE" }) // No ID means clear all/active? Handlers need check.
 					.then(() => {
-						setHasSub(false);
+						setSubTabs([]);
+						setActiveSubId(null);
+						tabSnapshotsRef.current.clear();
 						setFocusedPane("main");
-						addToast("SUB: Closed", "info");
+						addToast("SUB: Closed all", "info");
 					})
 					.catch(() => addToast("Failed to close SUB", "error"));
+				break;
+			case "closeSubTab":
+				if (activeSubId) {
+					handleSubClose(activeSubId);
+				}
 				break;
 			case "swap":
 				swapPanes();
@@ -146,9 +256,22 @@ export default function App() {
 			});
 			if (!res.ok) throw new Error("Upload failed");
 
-			setHasSub(true);
+			const data: { id: string; name: string } = await res.json();
+
+			setSubTabs((prev) => {
+				// Don't duplicate if already exists? ID is random so new upload = new tab always.
+				return [...prev, data];
+			});
+
+			// Save snapshot of current before switching
+			if (activeSubId && subViewerRef.current) {
+				const snap = subViewerRef.current.getSnapshot();
+				if (snap) tabSnapshotsRef.current.set(activeSubId, snap);
+			}
+
+			setActiveSubId(data.id);
 			setFocusedPane("sub");
-			setSubReloadKey((v) => v + 1); // Force reload
+			setSubReloadKey((v) => v + 1); // Force reload (though ID change triggers it too)
 			addToast(`SUB: Loaded ${file.name}`, "success");
 		} catch (err) {
 			console.error(err);
@@ -257,7 +380,8 @@ export default function App() {
 		);
 
 		const subPane = hasSub ? (
-			<div key="pane-sub" className="flex-1 basis-1/2 min-w-0">
+			<div key="pane-sub" className="flex-1 basis-1/2 min-w-0 flex flex-col">
+				{/* Tab Bar within the Pane area */}
 				<Pane
 					key="sub"
 					focused={focusedPane === "sub"}
@@ -265,15 +389,41 @@ export default function App() {
 					status="static"
 					onFocus={() => setFocusedPane("sub")}
 				>
-					<PdfViewer
-						paneRole="SUB"
-						status="static"
-						onFocus={() => setFocusedPane("sub")}
-						url="/api/sub.pdf"
-						ref={subViewerRef}
-						onNotify={addToast}
-						reloadKey={subReloadKey}
-					/>
+					<div className="flex flex-col h-full w-full">
+						<SubTabBar
+							tabs={subTabs}
+							activeTabId={activeSubId}
+							onSelect={handleTabSelect}
+							onClose={handleSubClose}
+						/>
+						<div className="flex-1 min-h-0 relative">
+							{subTabs.map((tab) => (
+								<div
+									key={tab.id}
+									className={classNames(
+										"absolute inset-0 h-full w-full bg-slate-900", // absolute to stack them
+										activeSubId === tab.id ? "z-10 visible" : "z-0 invisible",
+									)}
+								>
+									<PdfViewer
+										paneRole="SUB"
+										status="static"
+										onFocus={() => setFocusedPane("sub")}
+										url={`/api/sub.pdf?id=${tab.id}`}
+										ref={(el) => {
+											if (el) subViewerRefs.current.set(tab.id, el);
+											else subViewerRefs.current.delete(tab.id);
+										}}
+										onNotify={addToast}
+										reloadKey={subReloadKey}
+										initialSnapshot={
+											activeSubId === tab.id ? tabSnapshotsRef.current.get(tab.id) : undefined
+										}
+									/>
+								</div>
+							))}
+						</div>
+					</div>
 				</Pane>
 			</div>
 		) : null;
@@ -289,6 +439,10 @@ export default function App() {
 		subReloadKey,
 		paneOrder,
 		watchEnabled,
+		subTabs,
+		activeSubId,
+		handleTabSelect,
+		handleSubClose,
 	]);
 
 	return (

@@ -14,6 +14,7 @@ interface UseKeyboardNavigationOptions {
 	setShowHelp: React.Dispatch<React.SetStateAction<boolean>>;
 	swapPanes: () => boolean;
 	addToast: (message: string, type: ToastType) => void;
+	onTabSwitch?: (direction: "prev" | "next") => void;
 }
 
 export function useKeyboardNavigation({
@@ -28,6 +29,7 @@ export function useKeyboardNavigation({
 	setShowHelp,
 	swapPanes,
 	addToast,
+	onTabSwitch,
 }: UseKeyboardNavigationOptions) {
 	const keySeqTimeoutRef = useRef<number | null>(null);
 	const lastKeyRef = useRef<string | null>(null);
@@ -35,6 +37,10 @@ export function useKeyboardNavigation({
 	const focusedPaneRef = useRef<"main" | "sub">(focusedPane);
 	const showHelpRef = useRef(showHelp);
 	const keysEnabledRef = useRef(keysEnabled);
+	const onTabSwitchRef = useRef(onTabSwitch);
+	useEffect(() => {
+		onTabSwitchRef.current = onTabSwitch;
+	}, [onTabSwitch]);
 
 	useEffect(() => {
 		hasSubRef.current = hasSub;
@@ -204,6 +210,23 @@ export function useKeyboardNavigation({
 					setFocusedPane("main");
 					addToast(hasSubRef.current ? "MAIN: reload (re-render SUB)" : "MAIN: reloading…", "info");
 					return;
+				case "H":
+					consume();
+					if (hasSubRef.current && focusedPaneRef.current === "sub") {
+						onTabSwitchRef.current?.("prev");
+					} else {
+						// Fallback or do nothing
+						targetViewer?.scrollHorizontal(-LINE_SCROLL_PX * 5); // Faster scroll? Or just ignore
+					}
+					return;
+				case "L":
+					consume();
+					if (hasSubRef.current && focusedPaneRef.current === "sub") {
+						onTabSwitchRef.current?.("next");
+					} else {
+						targetViewer?.scrollHorizontal(LINE_SCROLL_PX * 5);
+					}
+					return;
 				case "?":
 					consume();
 					setShowHelp((open) => !open);
@@ -246,6 +269,7 @@ export function useKeyboardNavigation({
 		setFocusedPane,
 		setMainReloadKey,
 		setShowHelp,
+		// onTabSwitch removed from deps, ref used
 	]);
 }
 

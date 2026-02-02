@@ -26,9 +26,11 @@ func (b *Broadcaster) AddClient(ch chan string) {
 
 func (b *Broadcaster) RemoveClient(ch chan string) {
 	b.mu.Lock()
-	delete(b.clients, ch)
-	close(ch)
-	b.mu.Unlock()
+	defer b.mu.Unlock()
+	if _, ok := b.clients[ch]; ok {
+		delete(b.clients, ch)
+		close(ch)
+	}
 }
 
 func (b *Broadcaster) Broadcast(event, data string) {
@@ -58,12 +60,6 @@ func (b *Broadcaster) HandleSSE(w http.ResponseWriter, r *http.Request) {
 	ch := make(chan string, 10)
 	b.AddClient(ch)
 	defer b.RemoveClient(ch)
-
-	// Keep-alive
-	go func() {
-		<-r.Context().Done()
-		b.RemoveClient(ch)
-	}()
 
 	for {
 		select {

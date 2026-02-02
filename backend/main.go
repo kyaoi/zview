@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"syscall"
 )
@@ -78,9 +79,11 @@ func main() {
 	}
 
 	// Initialize state
-	state := &AppState{
-		mainPath: opts.mainPath,
-		subPath:  opts.subPath,
+	state := NewAppState(opts.mainPath)
+	if opts.subPath != "" {
+		// Use filename as tab name
+		name := filepath.Base(opts.subPath)
+		state.AddSubTab(name, opts.subPath, false)
 	}
 	defer state.Cleanup()
 
@@ -118,10 +121,27 @@ func main() {
 	mux.HandleFunc("/events", broadcaster.HandleSSE)
 
 	// Start server with dynamic port selection
-	addr := fmt.Sprintf("127.0.0.1:%d", opts.port)
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		log.Fatalf("failed to listen on %s: %v", addr, err)
+	var listener net.Listener
+
+	if opts.portSpecified {
+		// User requested specific port (or 0 for random). Fail if unavailable.
+		addr := fmt.Sprintf("127.0.0.1:%d", opts.port)
+		listener, err = net.Listen("tcp", addr)
+		if err != nil {
+			log.Fatalf("failed to listen on %s: %v", addr, err)
+		}
+	} else {
+		// Default behavior: try default port, fallback to random
+		addr := fmt.Sprintf("127.0.0.1:%d", opts.port)
+		listener, err = net.Listen("tcp", addr)
+		if err != nil {
+			// If default port failed, try random
+			log.Printf("Port %d is busy, trying a random port...", opts.port)
+			listener, err = net.Listen("tcp", "127.0.0.1:0")
+			if err != nil {
+				log.Fatalf("failed to listen on random port: %v", err)
+			}
+		}
 	}
 
 	// Get actual port (important for dynamic port selection with port=0)
@@ -131,7 +151,9 @@ func main() {
 	log.Printf("Serving at %s", url)
 
 	// Register session
-	if err := registerSession(actualPort, opts.mainPath, opts.subPath); err != nil {
+	// For session registration, we just pass the active/first sub path or empty
+	initialSubPath := state.GetSubPath()
+	if err := registerSession(actualPort, opts.mainPath, initialSubPath); err != nil {
 		log.Printf("Warning: failed to register session: %v", err)
 	}
 

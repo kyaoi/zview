@@ -1,11 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
-import type { ToastType } from "../lib/types";
+import type { SubTab, ToastType } from "../lib/types";
 
 interface BootstrapData {
 	focus: "main" | "sub";
 	hasMain: boolean;
 	hasSub: boolean;
 	watch: boolean;
+	subTabs?: SubTab[];
+	activeSubId?: string;
 }
 
 interface UseBootstrapResult {
@@ -16,6 +18,10 @@ interface UseBootstrapResult {
 	watchEnabled: boolean;
 	initialFocus: "main" | "sub";
 	isLoaded: boolean;
+	subTabs: SubTab[];
+	setSubTabs: React.Dispatch<React.SetStateAction<SubTab[]>>;
+	activeSubId: string | null;
+	setActiveSubId: React.Dispatch<React.SetStateAction<string | null>>;
 }
 
 export function useBootstrap(
@@ -26,6 +32,8 @@ export function useBootstrap(
 	const [watchEnabled, setWatchEnabled] = useState(true);
 	const [initialFocus, setInitialFocus] = useState<"main" | "sub">("main");
 	const [isLoaded, setIsLoaded] = useState(false);
+	const [subTabs, setSubTabs] = useState<SubTab[]>([]);
+	const [activeSubId, setActiveSubId] = useState<string | null>(null);
 
 	useEffect(() => {
 		let aborted = false;
@@ -39,6 +47,8 @@ export function useBootstrap(
 				setHasSub(data.hasSub);
 				setWatchEnabled(data.watch);
 				setInitialFocus(data.focus === "sub" && data.hasSub ? "sub" : "main");
+				if (data.subTabs) setSubTabs(data.subTabs);
+				if (data.activeSubId) setActiveSubId(data.activeSubId);
 				setIsLoaded(true);
 			} catch (_err) {
 				if (aborted) return;
@@ -73,5 +83,9 @@ export function useBootstrap(
 		watchEnabled,
 		initialFocus,
 		isLoaded,
+		subTabs,
+		setSubTabs,
+		activeSubId,
+		setActiveSubId,
 	};
 }

@@ -20,14 +20,15 @@ const (
 )
 
 type options struct {
-	command     CommandType
-	killArgs    []string // args for kill command
-	mainPath    string
-	subPath     string
-	focus       string
-	watch       bool
-	port        int
-	openBrowser bool
+	command       CommandType
+	killArgs      []string // args for kill command
+	mainPath      string
+	subPath       string
+	focus         string
+	watch         bool
+	port          int
+	portSpecified bool
+	openBrowser   bool
 }
 
 func parseArgs(args []string) (options, error) {
@@ -113,6 +114,13 @@ func parseArgs(args []string) (options, error) {
 		opts.watch = false
 	}
 	opts.openBrowser = !*noOpenFlag
+
+	// Check if port was explicitly specified
+	fs.Visit(func(f *flag.Flag) {
+		if f.Name == "port" {
+			opts.portSpecified = true
+		}
+	})
 
 	opts.focus = strings.ToLower(opts.focus)
 	if opts.focus != "main" && opts.focus != "sub" {
