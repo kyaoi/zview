@@ -80,6 +80,42 @@ func handleSubDelete(state *AppState) http.HandlerFunc {
 	}
 }
 
+func handleMainUpload(state *AppState, broadcaster *Broadcaster) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize)
+		file, _, err := r.FormFile("file")
+		if err != nil {
+			http.Error(w, "failed to read file", http.StatusBadRequest)
+			return
+		}
+		defer file.Close()
+
+		tmpDir := os.TempDir()
+		tmpFile, err := os.CreateTemp(tmpDir, "zview-main-*.pdf")
+		if err != nil {
+			http.Error(w, "failed to create temp file", http.StatusInternalServerError)
+			return
+		}
+
+		if _, err := io.Copy(tmpFile, file); err != nil {
+			tmpFile.Close()
+			os.Remove(tmpFile.Name())
+			http.Error(w, "failed to write file", http.StatusInternalServerError)
+			return
+		}
+		tmpFile.Close()
+
+		state.SetMainPath(tmpFile.Name(), true)
+
+		// Notify clients that MAIN has changed
+		if broadcaster != nil {
+			broadcaster.Broadcast("main-changed", "")
+		}
+
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
 func serveFile(w http.ResponseWriter, r *http.Request, path string) {
 	absPath, err := filepath.Abs(path)
 	if err != nil {

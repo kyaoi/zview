@@ -35,7 +35,7 @@ export default function App() {
 	}, []);
 
 	// Bootstrap: fetch initial state from backend
-	const { hasMain, hasSub, setHasSub, watchEnabled, initialFocus, isLoaded } =
+	const { hasMain, setHasMain, hasSub, setHasSub, watchEnabled, initialFocus, isLoaded } =
 		useBootstrap(addToast);
 
 	// Set initial focus when bootstrap loads
@@ -98,8 +98,7 @@ export default function App() {
 	const handleAction = (key: ActionKey) => {
 		switch (key) {
 			case "openMain":
-				addToast("MAIN: open dialog not implemented", "info");
-				setFocusedPane("main");
+				document.getElementById("main-file-input")?.click();
 				break;
 			case "openSub":
 				document.getElementById("sub-file-input")?.click();
@@ -157,6 +156,34 @@ export default function App() {
 		}
 	};
 
+	const handleMainFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+		const file = e.target.files?.[0];
+		if (!file) return;
+
+		// Reset value so same file can be selected again if needed
+		e.target.value = "";
+
+		const formData = new FormData();
+		formData.append("file", file);
+
+		addToast("MAIN: Uploading…", "info");
+		try {
+			const res = await fetch("/api/main/upload", {
+				method: "POST",
+				body: formData,
+			});
+			if (!res.ok) throw new Error("Upload failed");
+
+			setHasMain(true);
+			setFocusedPane("main");
+			setMainReloadKey((v) => v + 1); // Force reload
+			addToast(`MAIN: Loaded ${file.name}`, "success");
+		} catch (err) {
+			console.error(err);
+			addToast("MAIN: Upload failed", "error");
+		}
+	};
+
 	const paneSequence = useMemo(() => {
 		const mainPane = (
 			<div
@@ -172,15 +199,53 @@ export default function App() {
 					status={watchEnabled ? "watching" : "manual"}
 					onFocus={() => setFocusedPane("main")}
 				>
-					<PdfViewer
-						paneRole="MAIN"
-						status={watchEnabled ? "watching" : "manual"}
-						onFocus={() => setFocusedPane("main")}
-						url="/api/main.pdf"
-						ref={mainViewerRef}
-						onNotify={addToast}
-						reloadKey={mainReloadKey}
-					/>
+					{hasMain ? (
+						<PdfViewer
+							paneRole="MAIN"
+							status={watchEnabled ? "watching" : "manual"}
+							onFocus={() => setFocusedPane("main")}
+							url="/api/main.pdf"
+							ref={mainViewerRef}
+							onNotify={addToast}
+							reloadKey={mainReloadKey}
+						/>
+					) : (
+						<div className="flex h-full w-full flex-col items-center justify-center gap-6 bg-slate-900/50">
+							<div className="text-center">
+								<svg
+									aria-hidden="true"
+									className="mx-auto h-16 w-16 text-slate-600"
+									fill="none"
+									stroke="currentColor"
+									viewBox="0 0 24 24"
+								>
+									<path
+										strokeLinecap="round"
+										strokeLinejoin="round"
+										strokeWidth={1.5}
+										d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+									/>
+								</svg>
+								<p className="mt-4 text-lg font-medium text-slate-400">No PDF Loaded</p>
+								<p className="mt-1 text-sm text-slate-500">Select a PDF file to start viewing</p>
+							</div>
+							<button
+								type="button"
+								onClick={() => document.getElementById("main-file-input")?.click()}
+								className="flex items-center gap-2 rounded-lg bg-brand px-6 py-3 text-sm font-semibold text-white shadow-lg transition-all hover:bg-brand/90 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-brand/50 focus:ring-offset-2 focus:ring-offset-slate-900"
+							>
+								<svg aria-hidden="true" className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+									<path
+										strokeLinecap="round"
+										strokeLinejoin="round"
+										strokeWidth={2}
+										d="M12 6v6m0 0v6m0-6h6m-6 0H6"
+									/>
+								</svg>
+								Open Main PDF
+							</button>
+						</div>
+					)}
 				</Pane>
 			</div>
 		);
@@ -209,7 +274,16 @@ export default function App() {
 
 		if (!subPane) return [mainPane];
 		return paneOrder === "main-first" ? [mainPane, subPane] : [subPane, mainPane];
-	}, [addToast, focusedPane, hasSub, mainReloadKey, subReloadKey, paneOrder, watchEnabled]);
+	}, [
+		addToast,
+		focusedPane,
+		hasMain,
+		hasSub,
+		mainReloadKey,
+		subReloadKey,
+		paneOrder,
+		watchEnabled,
+	]);
 
 	return (
 		<div className="relative mx-auto flex h-screen w-full flex-col gap-0 bg-slate-950 text-slate-100 overflow-hidden">
@@ -233,6 +307,14 @@ export default function App() {
 				className="hidden"
 				accept=".pdf"
 				onChange={handleSubFileUpload}
+			/>
+
+			<input
+				type="file"
+				id="main-file-input"
+				className="hidden"
+				accept=".pdf"
+				onChange={handleMainFileUpload}
 			/>
 
 			<ToastContainer toasts={toasts} removeToast={removeToast} />

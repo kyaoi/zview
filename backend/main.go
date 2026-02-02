@@ -107,6 +107,7 @@ func main() {
 	mux.HandleFunc("/api/sub.pdf", handleSubPDF(state))
 	mux.HandleFunc("/api/bootstrap", handleBootstrap(state, opts))
 	mux.HandleFunc("/api/sub/upload", handleSubUpload(state))
+	mux.HandleFunc("/api/main/upload", handleMainUpload(state, broadcaster))
 	mux.HandleFunc("/api/sub", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodDelete {
 			handleSubDelete(state)(w, r)

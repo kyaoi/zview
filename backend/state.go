@@ -7,10 +7,11 @@ import (
 
 // AppState holds the runtime configuration of PDFs
 type AppState struct {
-	mu           sync.RWMutex
-	mainPath     string
-	subPath      string
-	tempSubFiles []string // track temp files to clean up
+	mu            sync.RWMutex
+	mainPath      string
+	subPath       string
+	tempMainFiles []string // track temp files for MAIN to clean up
+	tempSubFiles  []string // track temp files for SUB to clean up
 }
 
 func (s *AppState) GetMainPath() string {
@@ -25,6 +26,15 @@ func (s *AppState) GetSubPath() string {
 	return s.subPath
 }
 
+func (s *AppState) SetMainPath(path string, isTemp bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.mainPath = path
+	if isTemp && path != "" {
+		s.tempMainFiles = append(s.tempMainFiles, path)
+	}
+}
+
 func (s *AppState) SetSubPath(path string, isTemp bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -37,8 +47,12 @@ func (s *AppState) SetSubPath(path string, isTemp bool) {
 func (s *AppState) Cleanup() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	for _, path := range s.tempMainFiles {
+		_ = os.Remove(path)
+	}
 	for _, path := range s.tempSubFiles {
 		_ = os.Remove(path)
 	}
+	s.tempMainFiles = nil
 	s.tempSubFiles = nil
 }
