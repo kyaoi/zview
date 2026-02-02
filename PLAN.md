@@ -11,7 +11,7 @@ This plan breaks development of **zview** into small, reviewable tasks.
 ## Progress tracking
 
 * [x] **Task 0:** Dynamic Port Selection
-* [ ] **Task 1:** Launch Viewer without specifying MAIN PDF via CLI
+* [x] **Task 1:** Launch Viewer without specifying MAIN PDF via CLI
 * [ ] **Task 2:** Multi-tab support for SUB PDFs
 * [ ] **Task 3:** Improve focus indication
 * [ ] **Task 4:** Config file support
