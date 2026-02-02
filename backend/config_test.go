@@ -41,6 +41,10 @@ dpr_cap = 1.0
 	if cfg.DprCap != 1.0 {
 		t.Errorf("Expected DprCap to be 1.0, got %f", cfg.DprCap)
 	}
+	// Default ScrollSteps since not in file
+	if cfg.ScrollStepVertical != 64.0 {
+		t.Errorf("Expected ScrollStepVertical to be 64.0, got %f", cfg.ScrollStepVertical)
+	}
 }
 
 func TestDefaultConfig(t *testing.T) {
@@ -63,5 +67,14 @@ func TestDefaultConfig(t *testing.T) {
 	}
 	if cfg.DprCap != 2.0 {
 		t.Errorf("Expected DprCap to be 2.0")
+	}
+	if cfg.ScrollStepVertical != 64.0 {
+		t.Errorf("Expected ScrollStepVertical to be 64.0")
+	}
+	if cfg.ScrollStepHorizontal != 64.0 {
+		t.Errorf("Expected ScrollStepHorizontal to be 64.0")
+	}
+	if cfg.PageScrollRatio != 0.5 {
+		t.Errorf("Expected PageScrollRatio to be 0.5")
 	}
 }

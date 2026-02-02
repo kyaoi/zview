@@ -9,16 +9,22 @@ import (
 )
 
 type Config struct {
-	Watch    bool    `toml:"watch" json:"watch"`
-	ZoomStep float64 `toml:"zoom_step" json:"zoom_step"`
-	DprCap   float64 `toml:"dpr_cap" json:"dpr_cap"`
+	Watch      bool    `toml:"watch" json:"watch"`
+	ZoomStep   float64 `toml:"zoom_step" json:"zoom_step"`
+	DprCap     float64 `toml:"dpr_cap" json:"dpr_cap"`
+	ScrollStepVertical   float64 `toml:"scroll_step_vertical" json:"scroll_step_vertical"`
+	ScrollStepHorizontal float64 `toml:"scroll_step_horizontal" json:"scroll_step_horizontal"`
+	PageScrollRatio      float64 `toml:"page_scroll_ratio" json:"page_scroll_ratio"`
 }
 
 func DefaultConfig() Config {
 	return Config{
-		Watch:    true,
-		ZoomStep: 1.2,
-		DprCap:   2.0,
+		Watch:                true,
+		ZoomStep:             1.2,
+		DprCap:               2.0,
+		ScrollStepVertical:   64.0,
+		ScrollStepHorizontal: 64.0,
+		PageScrollRatio:      0.5,
 	}
 }
 
