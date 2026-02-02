@@ -2,6 +2,8 @@ package main
 
 import (
 	"embed"
+	"encoding/json"
+	"fmt"
 	"io/fs"
 	"net/http"
 	"strings"
@@ -20,8 +22,12 @@ func loadEmbeddedDist() (fs.FS, error) {
 	return dist, nil
 }
 
-func spaHandler(staticFS fs.FS) http.Handler {
+func spaHandler(staticFS fs.FS, config Config) http.Handler {
 	fileServer := http.FileServer(http.FS(staticFS))
+
+	// Marshal config to JSON for injection
+	configJSON, _ := json.Marshal(config)
+	configScript := fmt.Sprintf("<script>window.ZVIEW_CONFIG = %s;</script>", string(configJSON))
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := strings.TrimPrefix(r.URL.Path, "/")
@@ -29,15 +35,24 @@ func spaHandler(staticFS fs.FS) http.Handler {
 			path = "index.html"
 		}
 
-		// Serve index.html directly to avoid FileServer's redirect quirks on root.
+		// Serve index.html directly with config injection
 		if path == "index.html" {
 			data, err := fs.ReadFile(staticFS, "index.html")
 			if err != nil {
 				http.Error(w, "index.html missing in embedded assets", http.StatusInternalServerError)
 				return
 			}
+
+			// Inject config script before </head>, or append to body if not found
+			htmlContent := string(data)
+			if strings.Contains(htmlContent, "</head>") {
+				htmlContent = strings.Replace(htmlContent, "</head>", configScript+"</head>", 1)
+			} else {
+				htmlContent += configScript
+			}
+
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			_, _ = w.Write(data)
+			_, _ = w.Write([]byte(htmlContent))
 			return
 		}
 
@@ -49,7 +64,26 @@ func spaHandler(staticFS fs.FS) http.Handler {
 
 		// SPA fallback: serve index.html for unknown routes.
 		r.URL.Path = "/index.html"
-		fileServer.ServeHTTP(w, r)
+		// Recurse to handle index.html logic (injection)
+		// But we can't easily recurse with modified request path to serve modified content.
+		// Instead, we just call the injection logic again or refactor.
+		// Refactoring:
+
+		data, err := fs.ReadFile(staticFS, "index.html")
+		if err != nil {
+			http.Error(w, "index.html missing", http.StatusInternalServerError)
+			return
+		}
+
+		htmlContent := string(data)
+		if strings.Contains(htmlContent, "</head>") {
+			htmlContent = strings.Replace(htmlContent, "</head>", configScript+"</head>", 1)
+		} else {
+			htmlContent += configScript
+		}
+
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write([]byte(htmlContent))
 	})
 }
 

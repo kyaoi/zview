@@ -1,8 +1,10 @@
+import { getConfig } from "./config";
+
 // PDF Viewer constants
-export const DPR_CAP = 2;
+export const DPR_CAP = getConfig().dpr_cap;
 export const PAGE_GAP_PX = 16;
 export const RENDER_BUFFER = 1;
-export const ZOOM_STEP = 1.1;
+export const ZOOM_STEP = getConfig().zoom_step;
 export const ZOOM_MIN = 0.25;
 export const ZOOM_MAX = 5;
 export const PDFJS_ASSET_BASE = "/pdfjs/";

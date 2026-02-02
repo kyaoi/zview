@@ -153,7 +153,7 @@ A task is “done” when:
 
 #### `task/config-file`
 
-* [ ] Done
+* [x] Done
 
 **Goal:** Allow configuration (keymaps/defaults) without adding runtime deps.
 

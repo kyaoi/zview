@@ -105,7 +105,7 @@ func main() {
 
 	// Set up HTTP routes
 	mux := http.NewServeMux()
-	mux.Handle("/", spaHandler(dist))
+	mux.Handle("/", spaHandler(dist, opts.config))
 	mux.HandleFunc("/api/main.pdf", handleMainPDF(state))
 	mux.HandleFunc("/api/sub.pdf", handleSubPDF(state))
 	mux.HandleFunc("/api/bootstrap", handleBootstrap(state, opts))
