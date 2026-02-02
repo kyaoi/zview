@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -8,7 +9,9 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"runtime"
+	"syscall"
 )
 
 const defaultPort = 8571
@@ -29,6 +32,24 @@ func main() {
 		fmt.Fprintln(os.Stderr, "Error:", err)
 		os.Exit(1)
 	}
+
+	// Handle subcommands
+	switch opts.command {
+	case CommandPs:
+		if err := runPsCommand(); err != nil {
+			fmt.Fprintln(os.Stderr, "Error:", err)
+			os.Exit(1)
+		}
+		return
+	case CommandKill:
+		if err := runKillCommand(opts.killArgs); err != nil {
+			fmt.Fprintln(os.Stderr, "Error:", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	// CommandView: run the viewer server
 
 	// Validate MAIN path if provided
 	if opts.mainPath != "" {
@@ -95,22 +116,51 @@ func main() {
 	})
 	mux.HandleFunc("/events", broadcaster.HandleSSE)
 
-	// Start server
+	// Start server with dynamic port selection
 	addr := fmt.Sprintf("127.0.0.1:%d", opts.port)
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		log.Fatalf("failed to listen on %s: %v", addr, err)
 	}
-	actualAddr := listener.Addr().String()
-	url := fmt.Sprintf("http://%s", actualAddr)
+
+	// Get actual port (important for dynamic port selection with port=0)
+	tcpAddr := listener.Addr().(*net.TCPAddr)
+	actualPort := tcpAddr.Port
+	url := fmt.Sprintf("http://127.0.0.1:%d", actualPort)
 	log.Printf("Serving at %s", url)
+
+	// Register session
+	if err := registerSession(actualPort, opts.mainPath, opts.subPath); err != nil {
+		log.Printf("Warning: failed to register session: %v", err)
+	}
+
+	// Set up signal handling for graceful shutdown
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
+	server := &http.Server{Handler: mux}
+
+	go func() {
+		<-sigChan
+		log.Println("Shutting down...")
+
+		// Unregister session
+		if err := unregisterSession(); err != nil {
+			log.Printf("Warning: failed to unregister session: %v", err)
+		}
+
+		// Gracefully shutdown the server
+		if err := server.Shutdown(context.Background()); err != nil {
+			log.Printf("Error during shutdown: %v", err)
+		}
+	}()
 
 	// Open browser if requested
 	if opts.openBrowser {
 		openBrowser(url)
 	}
 
-	if err := http.Serve(listener, mux); err != nil {
+	if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
 		log.Fatal(err)
 	}
 }

@@ -10,7 +10,18 @@ import (
 
 var errShowHelp = errors.New("show help")
 
+// CommandType represents the type of command to run
+type CommandType int
+
+const (
+	CommandView CommandType = iota
+	CommandPs
+	CommandKill
+)
+
 type options struct {
+	command     CommandType
+	killArgs    []string // args for kill command
 	mainPath    string
 	subPath     string
 	focus       string
@@ -20,10 +31,24 @@ type options struct {
 }
 
 func parseArgs(args []string) (options, error) {
+	// Check for subcommands first
+	if len(args) > 0 {
+		switch args[0] {
+		case "ps":
+			return options{command: CommandPs}, nil
+		case "kill":
+			return options{command: CommandKill, killArgs: args[1:]}, nil
+		}
+	}
+
+	// Parse as a view command
 	fs := flag.NewFlagSet("zview", flag.ContinueOnError)
 	fs.SetOutput(os.Stdout)
 	fs.Usage = func() {
-		fmt.Fprintf(fs.Output(), "Usage: zview [options] [MAIN.pdf] [SUB.pdf]\n\nOptions:\n")
+		fmt.Fprintf(fs.Output(), "Usage: zview [options] [MAIN.pdf] [SUB.pdf]\n")
+		fmt.Fprintf(fs.Output(), "       zview ps                  - list running instances\n")
+		fmt.Fprintf(fs.Output(), "       zview kill [port]         - terminate instance(s)\n")
+		fmt.Fprintln(fs.Output(), "\nOptions:")
 		fs.PrintDefaults()
 		fmt.Fprintln(fs.Output(), "\nExamples:")
 		fmt.Fprintln(fs.Output(), "  zview main.pdf")
@@ -31,9 +56,12 @@ func parseArgs(args []string) (options, error) {
 		fmt.Fprintln(fs.Output(), "  zview main.pdf --sub sub.pdf")
 		fmt.Fprintln(fs.Output(), "  zview main.pdf sub.pdf --focus sub")
 		fmt.Fprintln(fs.Output(), "  zview main.pdf --no-watch")
+		fmt.Fprintln(fs.Output(), "  zview ps")
+		fmt.Fprintln(fs.Output(), "  zview kill 8571")
 	}
 
 	opts := options{
+		command:     CommandView,
 		focus:       "main",
 		watch:       true,
 		port:        defaultPort,
@@ -47,7 +75,7 @@ func parseArgs(args []string) (options, error) {
 	watchFlag := fs.Bool("watch", true, "enable file watching for MAIN (default)")
 	noWatchFlag := fs.Bool("no-watch", false, "disable file watching for MAIN")
 
-	fs.IntVar(&opts.port, "port", opts.port, "port to bind (0 = random)")
+	fs.IntVar(&opts.port, "port", opts.port, "port to bind (0 = auto-select)")
 
 	noOpenFlag := fs.Bool("no-open", false, "do not auto-open browser tab")
 	versionFlag := fs.Bool("version", false, "print version and exit")

@@ -119,12 +119,32 @@ zview
 
 Then use the **Open** button in the Web UI.
 
-### Options (planned / typical)
+### Session Management
+
+#### List running instances
+
+```bash
+zview ps
+```
+
+Displays a table of all running `zview` instances with their port, PDF paths, and start time.
+
+#### Terminate an instance
+
+```bash
+# By port
+zview kill 8571
+
+# Interactive mode (shows list and prompts for selection)
+zview kill
+```
+
+### Options
 
 * `--sub <PATH>` — open a second PDF as SUB
 * `--focus main|sub` — initial focus
 * `--watch / --no-watch` — enable/disable filesystem watching for MAIN (default: watch)
-* `--port <N>` — bind to a specific port
+* `--port <N>` — bind to a specific port (default: 8571, 0 = auto-select available port)
 * `--no-open` — don’t auto-open a browser tab
 
 ## Build (single binary)
