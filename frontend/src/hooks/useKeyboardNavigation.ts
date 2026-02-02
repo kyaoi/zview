@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useRef } from "react";
-import { CONT_SCROLL_FAST, CONT_SCROLL_PER_FRAME, LINE_SCROLL_PX } from "../lib/constants";
+import {
+	CONT_SCROLL_FAST,
+	CONT_SCROLL_PER_FRAME,
+	SCROLL_STEP_HORIZONTAL,
+	SCROLL_STEP_VERTICAL,
+} from "../lib/constants";
 import type { ScrollSnapshot, ToastType, ViewerHandle } from "../lib/types";
 
 interface UseKeyboardNavigationOptions {
@@ -121,7 +126,7 @@ export function useKeyboardNavigation({
 					if (event.repeat) {
 						targetViewer?.startContinuousScroll(0, CONT_SCROLL_PER_FRAME);
 					} else {
-						targetViewer?.scrollLine(LINE_SCROLL_PX);
+						targetViewer?.scrollLine(SCROLL_STEP_VERTICAL);
 					}
 					return;
 				case "k":
@@ -129,7 +134,7 @@ export function useKeyboardNavigation({
 					if (event.repeat) {
 						targetViewer?.startContinuousScroll(0, -CONT_SCROLL_PER_FRAME);
 					} else {
-						targetViewer?.scrollLine(-LINE_SCROLL_PX);
+						targetViewer?.scrollLine(-SCROLL_STEP_VERTICAL);
 					}
 					return;
 				case "h":
@@ -137,7 +142,7 @@ export function useKeyboardNavigation({
 					if (event.repeat) {
 						targetViewer?.startContinuousScroll(-CONT_SCROLL_PER_FRAME, 0);
 					} else {
-						targetViewer?.scrollHorizontal(-LINE_SCROLL_PX);
+						targetViewer?.scrollHorizontal(-SCROLL_STEP_HORIZONTAL);
 					}
 					return;
 				case "l":
@@ -145,7 +150,7 @@ export function useKeyboardNavigation({
 					if (event.repeat) {
 						targetViewer?.startContinuousScroll(CONT_SCROLL_PER_FRAME, 0);
 					} else {
-						targetViewer?.scrollHorizontal(LINE_SCROLL_PX);
+						targetViewer?.scrollHorizontal(SCROLL_STEP_HORIZONTAL);
 					}
 					return;
 				case "d":
@@ -218,7 +223,7 @@ export function useKeyboardNavigation({
 						onTabSwitchRef.current?.("prev");
 					} else {
 						// Fallback or do nothing
-						targetViewer?.scrollHorizontal(-LINE_SCROLL_PX * 5); // Faster scroll? Or just ignore
+						targetViewer?.scrollHorizontal(-SCROLL_STEP_HORIZONTAL * 5); // Faster scroll? Or just ignore
 					}
 					return;
 				case "L":
@@ -226,7 +231,7 @@ export function useKeyboardNavigation({
 					if (hasSubRef.current && focusedPaneRef.current === "sub") {
 						onTabSwitchRef.current?.("next");
 					} else {
-						targetViewer?.scrollHorizontal(LINE_SCROLL_PX * 5);
+						targetViewer?.scrollHorizontal(SCROLL_STEP_HORIZONTAL * 5);
 					}
 					return;
 				case "?":

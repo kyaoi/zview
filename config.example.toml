@@ -1,0 +1,27 @@
+# zview configuration file
+# Place this file at ~/.config/zview/config.toml
+
+# Enable file watching for MAIN PDF (default: true)
+# If set to false, zview won't auto-reload when the file changes.
+watch = true
+
+# Zoom step factor (default: 1.2)
+# Controls how much the zoom changes when using + / - keys.
+zoom_step = 1.2
+
+# Device Pixel Ratio cap (default: 2.0)
+# Limits the rendering resolution to save memory and performance.
+# Set to 1.0 for lower memory usage on high-DPI screens.
+dpr_cap = 2.0
+
+# Scroll step in pixels (default: 64.0)
+# Controls how many pixels to scroll when using j/k keys.
+scroll_step_vertical = 64.0
+
+# Horizontal scroll step in pixels (default: 64.0)
+# Controls how many pixels to scroll when using h/l keys.
+scroll_step_horizontal = 64.0
+
+# Page scroll ratio (default: 0.5)
+# Controls how much to scroll relative to the view height when using d/u keys.
+page_scroll_ratio = 0.5

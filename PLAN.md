@@ -14,7 +14,7 @@ This plan breaks development of **zview** into small, reviewable tasks.
 * [x] **Task 1:** Launch Viewer without specifying MAIN PDF via CLI
 * [x] **Task 2:** Multi-tab support for SUB PDFs
 * [x] **Task 3:** Improve focus indication
-* [ ] **Task 4:** Config file support
+* [x] **Task 4:** Config file support
 
 ---
 
@@ -153,7 +153,7 @@ A task is “done” when:
 
 #### `task/config-file`
 
-* [ ] Done
+* [x] Done
 
 **Goal:** Allow configuration (keymaps/defaults) without adding runtime deps.
 

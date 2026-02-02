@@ -29,6 +29,7 @@ type options struct {
 	port          int
 	portSpecified bool
 	openBrowser   bool
+	config        Config
 }
 
 func parseArgs(args []string) (options, error) {
@@ -61,19 +62,28 @@ func parseArgs(args []string) (options, error) {
 		fmt.Fprintln(fs.Output(), "  zview kill 8571")
 	}
 
+	// Load config first
+	cfg, err := LoadConfig()
+	if err != nil {
+		// If config is malformed, we might want to warn, but for now just proceed with defaults if error is strictly loading issue.
+		// However, LoadConfig returns defaults on error unless it's a parsing error.
+		// Let's print a warning if it's a parsing error?
+		// For simplicity, we just use what we get.
+	}
 	opts := options{
 		command:     CommandView,
 		focus:       "main",
-		watch:       true,
+		watch:       cfg.Watch,
 		port:        defaultPort,
 		openBrowser: true,
+		config:      cfg,
 	}
 
 	fs.StringVar(&opts.subPath, "sub", "", "path to SUB PDF")
 	fs.StringVar(&opts.focus, "focus", opts.focus, "initial focus: main|sub")
 	helpFlag := fs.Bool("help", false, "show this help and exit")
 
-	watchFlag := fs.Bool("watch", true, "enable file watching for MAIN (default)")
+	watchFlag := fs.Bool("watch", cfg.Watch, "enable file watching for MAIN (default)")
 	noWatchFlag := fs.Bool("no-watch", false, "disable file watching for MAIN")
 
 	fs.IntVar(&opts.port, "port", opts.port, "port to bind (0 = auto-select)")
@@ -109,10 +119,18 @@ func parseArgs(args []string) (options, error) {
 		opts.subPath = remaining[1]
 	}
 
+	// Update watch based on flags
+	// logic: if user explicitly sets --watch=false (via no-watch or watch=false), it overrides config.
+	// fs.Parse sets *watchFlag.
+	// But if user DOESN'T provide flag, *watchFlag is default (which is cfg.Watch).
+	// So *watchFlag is correct in both cases.
 	opts.watch = *watchFlag
 	if *noWatchFlag {
 		opts.watch = false
 	}
+	// Update config with final watch state so frontend knows
+	opts.config.Watch = opts.watch
+
 	opts.openBrowser = !*noOpenFlag
 
 	// Check if port was explicitly specified

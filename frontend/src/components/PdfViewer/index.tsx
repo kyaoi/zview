@@ -12,6 +12,7 @@ import {
 import {
 	DPR_CAP,
 	PAGE_GAP_PX,
+	PAGE_SCROLL_RATIO,
 	PDFJS_ASSET_BASE,
 	RENDER_BUFFER,
 	ZOOM_STEP,
@@ -512,7 +513,7 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 	const scrollHalfPage = useCallback((direction: 1 | -1) => {
 		const el = scrollRef.current;
 		if (!el) return;
-		const amount = Math.max(1, el.clientHeight / 2);
+		const amount = el.clientHeight * PAGE_SCROLL_RATIO;
 		el.scrollBy({ top: direction * amount, behavior: "smooth" });
 	}, []);
 
