@@ -8,7 +8,7 @@ import { ToastContainer, type ToastMessage } from "./components/Toast";
 import { useBootstrap } from "./hooks/useBootstrap";
 import { useFileWatcher } from "./hooks/useFileWatcher";
 import { useKeyboardNavigation, useSwapPanes } from "./hooks/useKeyboardNavigation";
-import type { ActionKey, ScrollSnapshot, ToastType, ViewerHandle } from "./lib/types";
+import type { ActionKey, ToastType, ViewerHandle } from "./lib/types";
 import { classNames } from "./lib/utils";
 
 export default function App() {
