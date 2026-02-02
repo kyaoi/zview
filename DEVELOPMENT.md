@@ -111,6 +111,10 @@ zview path/to/main.pdf --sub path/to/sub.pdf
 zview path/to/main.pdf --no-watch
 ```
 
+### Configuration File
+
+During development, `zview` will look for the configuration file at `~/.config/zview/config.toml`. You can copy `config.example.toml` to this location to test configuration changes.
+
 ---
 
 ## Build

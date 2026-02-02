@@ -1,199 +1,144 @@
 # zview
 
-A **fast, lightweight, read-only PDF viewer** that runs in your browser, inspired by Zathura’s minimal UX and Vim-like navigation.
-
-* **Linux-first**
-* **Web UI only** (the CLI starts a local server and opens your browser)
-* **PDF.js-powered** rendering
-
----
-
-## Goals
-
-* Fast startup and smooth scrolling for large PDFs
-* Vim-like keybindings (minimal, practical subset)
-* Optional auto-reload for the **MAIN** PDF
-* Side-by-side view (max 2 panes) with clear focus/role indicators
-
-## Non-goals
-
-* Editing, annotations, forms
-* In-document text search
-* URL loading (local files only)
-* Tabs/session management
-
----
+A **fast, lightweight, read-only PDF viewer** for Linux.
+Runs in your browser, powered by PDF.js, with Vim-like navigation.
 
 ## Features
 
-### Rendering & UX
+* **Fast & Lightweight**: Virtualized rendering for smooth scrolling even with large PDFs.
+* **Vim-like Keybindings**: Navigate with `j`, `k`, `d`, `u`, `gg`, `G`, etc.
+* **Dual Pane Support**: View two PDFs side-by-side (MAIN and SUB).
+    * **MAIN Pane**: Supports auto-reload on file change.
+    * **SUB Pane**: Static reference view; supports multiple tabs.
+* **Focus Management**: Clear visual indication of the active pane.
+* **Configuration**: Customizable key behaviors via `~/.config/zview/config.toml`.
+* **Session Management**: List and terminate running instances via CLI.
 
-* **Continuous scroll** with **16px** spacing between pages
-* **Zoom:** `+` / `-`
-* **Fit to width:** `=`
-* Bundled **Noto Sans JP** + PDF.js CMaps/standard fonts for offline-safe Japanese text rendering
+## Installation
 
-### Two panes (max 2)
-
-* Two roles: **MAIN** and **SUB**
-* **SUB is static** (no reload). To change it, re-open via the UI.
-* **Swap panes:** `s` (swaps left/right positions; roles remain MAIN/SUB)
-* **Focus toggle:** `Tab`
-
-### Reload behavior
-
-* **MAIN**:
-
-  * When watch is **ON**: automatically reloads on file change.
-  * If reload fails (e.g., file mid-write): **keeps the current display** and retries on the next change.
-  * Keeps the **same page and approximately the same vertical position** after reload.
-* When watch is **OFF**:
-
-  * **No change detection**.
-  * Use manual reload: `r` (reload MAIN).
-
----
-
-## Keybindings
-
-### Navigation
-
-* `j` / `k` — scroll down / up
-* `d` / `u` — half-page down / up
-* `gg` — jump to top
-* `G` — jump to bottom
-* `n` / `p` — next / previous page (best-effort based on current viewport)
-
-### Zoom
-
-* `+` / `-` — zoom in / out
-* `=` — fit to width
-
-### Panes
-
-* `Tab` — toggle focus (MAIN ↔ SUB)
-* `s` — swap left/right pane positions
-
-### Reload / Misc
-
-* `r` — reload **MAIN** (manual)
-* `R` — reload **MAIN** and re-render **SUB** (SUB does not re-read from disk)
-* `?` — show help overlay
-* `q` — quit
-
----
-
-## CLI Usage
-
-### Open a PDF as MAIN
+### Homebrew (Recommended)
 
 ```bash
-zview path/to/main.pdf
+brew install kyaoi/zview/zview
 ```
 
-### Two-pane view (MAIN + SUB)
+### Build from source
+
+Requirements: `go`, `pnpm`
 
 ```bash
-zview path/to/main.pdf path/to/other.pdf
-# or
-zview path/to/main.pdf --sub path/to/other.pdf
+# Clone the repository
+git clone https://github.com/kyaoi/zview.git
+cd zview
+
+# Build frontend and backend
+make build
+
+# Install (optional, or add to $PATH)
+sudo cp zview /usr/local/bin/
 ```
 
-### Start focused on SUB
+## Usage
+
+### Basic Usage
+
+Open a PDF in the MAIN pane:
 
 ```bash
-zview path/to/main.pdf --sub path/to/other.pdf --focus sub
+zview document.pdf
 ```
 
-### Disable watch (no detection)
-
-```bash
-zview path/to/main.pdf --no-watch
-```
-
-### No path: open empty UI
+Open without arguments (select file in UI):
 
 ```bash
 zview
 ```
 
-Then use the **Open** button in the Web UI.
+### Dual Pane View
 
-### Options (planned / typical)
-
-* `--sub <PATH>` — open a second PDF as SUB
-* `--focus main|sub` — initial focus
-* `--watch / --no-watch` — enable/disable filesystem watching for MAIN (default: watch)
-* `--port <N>` — bind to a specific port
-* `--no-open` — don’t auto-open a browser tab
-
-## Build (single binary)
+Open two PDFs side-by-side:
 
 ```bash
-cd frontend
-pnpm install        # first time only
-pnpm build          # emits assets to ../backend/dist for embedding
-
-cd ../backend
-go build -o ../zview
+zview main.pdf ref.pdf
+# or
+zview main.pdf --sub ref.pdf
 ```
 
-Result: `./zview` contains the embedded frontend; end users do **not** need Node/pnpm.
+* **MAIN Pane**: The primary document. Auto-reloads when the file changes (unless disabled).
+* **SUB Pane**: Secondary reference document(s). Configurable via tabs in the UI.
 
----
+### Session Management
 
-## Web UI
+List running `zview` instances:
 
-Minimal toolbar (suggested):
+```bash
+zview ps
+```
 
-* **Open** (MAIN)
-* **Open Sub** (SUB)
-* **Swap**
-* **Reload** (MAIN)
-* **Help**
+Terminate an instance:
 
-Each pane should show a persistent header badge like:
+```bash
+zview kill <port>
+# or interactive selection:
+zview kill
+```
 
-* `MAIN • watching` / `MAIN • manual`
-* `SUB • static`
+### CLI Options
 
-This prevents confusion when switching focus.
+* `--sub <PATH>`: Open a second PDF as SUB.
+* `--focus <main|sub>`: Set initial focus (default: main).
+* `--port <N>`: Bind to a specific port (default: auto).
+* `--no-watch`: Disable file watching for MAIN.
+* `--no-open`: Don't open the browser automatically.
 
----
+## Keybindings
 
-## Performance strategy (core design)
+| Key | Action |
+| :--- | :--- |
+| **Navigation** | |
+| `j` / `k` | Scroll down / up |
+| `d` / `u` | Scroll half-page down / up |
+| `h` / `l` | Scroll left / right |
+| `gg` | Jump to top |
+| `G` | Jump to bottom |
+| `n` / `p` | Next / Previous page |
+| **Zoom** | |
+| `+` / `-` | Zoom in / out |
+| `=` | Fit to width |
+| **Panes** | |
+| `Tab` | Toggle focus (MAIN ↔ SUB) |
+| `s` | Swap left/right pane positions |
+| **General** | |
+| `r` | Reload MAIN |
+| `?` | Show help overlay |
 
-This project prioritizes speed:
+## Configuration
 
-* **Virtualized rendering**: only render visible pages (+ a small buffer). Far pages are placeholders.
-* **Cancelable renders**: abort in-flight page renders when scrolling quickly.
-* **No text layer** by default (since search is out of scope).
-* **DPR cap** (avoid memory blowups on high-DPI screens).
-* For MAIN, the local server should support **HTTP Range requests** where possible.
+You can configure `zview` by creating a file at `~/.config/zview/config.toml`.
 
----
+**Example `config.toml`:**
 
-## Auto-reload details (MAIN)
+```toml
+# Enable file watching for MAIN PDF (default: true)
+watch = true
 
-* Watches the file (Linux-first). Updates often occur via atomic replace; the watcher must handle rename/replace.
-* Transport: **SSE** on `/events` (only when watch is ON and MAIN exists). With `--no-watch`, `/events` is not served and no change detection occurs.
-* Uses a short debounce before reloading.
-* On reload success: restore **page + vertical position** best-effort.
-* On reload failure: do nothing visually; show a brief status message.
+# Zoom step factor (default: 1.2)
+zoom_step = 1.2
 
----
+# Device Pixel Ratio cap (default: 2.0)
+# Lower this to 1.0 if you experience memory issues or lag on high-DPI screens.
+dpr_cap = 2.0
 
-## Security
+# Scroll step in pixels (default: 64.0)
+scroll_step_vertical = 64.0
+scroll_step_horizontal = 64.0
 
-* The server should bind to **127.0.0.1** only.
-* Prefer a per-launch random token in the URL to avoid accidental cross-tab access.
+# Page scroll ratio (default: 0.5)
+# How much to scroll (relative to screen height) for 'd' / 'u' commands.
+page_scroll_ratio = 0.5
+```
 
-## Language
+## Troubleshooting
 
-Project documentation and UI text are written in English by default unless a task specifies otherwise. Use pnpm for Node installs. Styling should use Tailwind CSS v4.x.
-
----
-
-## License
-
-TBD
+* **Performance**: `zview` prioritizes performance. It does not use a "Text Layer" for selection/search to keep rendering fast and lightweight.
+* **Reloading**: The SUB pane is static and does not watch for changes. Re-open the file in the UI to update it.
