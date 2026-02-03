@@ -138,7 +138,7 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for details.
 
 ### Keybindings (default)
 
-* Scroll: `j/k`, half-page: `d/u`, top: `gg`, bottom: `G`
+* Scroll: `j/k`, half-page: `d/u`, top: `g g`, bottom: `G`
 * Page step: `n/p` (best-effort)
 * Zoom: `+/-`, Fit width: `=`
 * Focus: `Tab`

@@ -28,24 +28,36 @@ page_scroll_ratio = 0.5
 
 # [keys]
 # Customize keybindings (defaults shown below).
-# Uncomment and modify to change key assignments.
+# You can specify a single string or an array of strings for multiple bindings.
 #
+# Example (single key):
 # scroll_down = "j"
-# scroll_up = "k"
-# scroll_left = "h"
-# scroll_right = "l"
-# half_page_down = "d"
-# half_page_up = "u"
-# jump_top = "gg"
-# jump_bottom = "G"
-# next_page = "n"
-# prev_page = "p"
-# zoom_in = "+"
-# zoom_out = "-"
-# fit_width = "="
-# toggle_focus = "Tab"
-# swap_panes = "s"
-# reload_main = "r"
-# reload_all = "R"
-# toggle_help = "?"
-# quit = "q"
+#
+# Example (multiple keys):
+# scroll_down = ["j", "ArrowDown"]
+# scroll_up = ["k", "ArrowUp"]
+#
+# Example (sequence keys):
+# jump_top = ["g g"]        # press g twice
+# next_tab = ["g t"]        # press g then t
+#
+# Available key bindings:
+# scroll_down = ["j"]
+# scroll_up = ["k"]
+# scroll_left = ["h"]
+# scroll_right = ["l"]
+# half_page_down = ["d"]
+# half_page_up = ["u"]
+# jump_top = ["g g"]      # compound key: press g twice
+# jump_bottom = ["G"]
+# next_page = ["n"]
+# prev_page = ["p"]
+# zoom_in = ["+"]
+# zoom_out = ["-"]
+# fit_width = ["="]
+# toggle_focus = ["Tab"]
+# swap_panes = ["s"]
+# reload_main = ["r"]
+# reload_all = ["R"]
+# toggle_help = ["?"]
+# quit = ["q"]

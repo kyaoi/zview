@@ -468,7 +468,7 @@ export default function App() {
 
 			<div className="flex flex-1 min-h-0 w-full flex-row gap-0">{paneSequence}</div>
 
-			{showHelp ? <HelpOverlay onClose={() => setShowHelp(false)} /> : null}
+			{showHelp ? <HelpOverlay onClose={() => setShowHelp(false)} visible={true} /> : null}
 
 			<input
 				type="file"

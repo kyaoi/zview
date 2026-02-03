@@ -5,7 +5,13 @@ import {
 	SCROLL_STEP_HORIZONTAL,
 	SCROLL_STEP_VERTICAL,
 } from "../lib/constants";
-import { getKeys } from "../lib/config";
+import {
+	getKeyBinding,
+	isKeySequence,
+	parseKeySequence,
+	validateKeyConflicts,
+} from "../lib/config";
+import { keyActionDefs } from "../lib/keyActions";
 import type { ScrollSnapshot, ToastType, ViewerHandle } from "../lib/types";
 
 interface UseKeyboardNavigationOptions {
@@ -23,27 +29,132 @@ interface UseKeyboardNavigationOptions {
 	onTabSwitch?: (direction: "prev" | "next") => void;
 }
 
-// Helper to check if a key matches a keybinding
-function matchesKey(event: KeyboardEvent, binding: string): boolean {
-	const key = event.key;
-	const keyLower = key?.toLowerCase?.() ?? "";
-	const codeLower = event.code?.toLowerCase?.() ?? "";
+// Check if a key event matches any of the keybindings
+// Check if a key event matches any of the keybindings
+// Check if a key event matches any of the bound keys
+// Now supports <Key>, <M-key>, etc.
+// Check if a key event matches any of the bound keys
+// Now supports <Key>, <M-key>, etc.
+function matchesAnyKey(event: KeyboardEvent, keys: string[]): boolean {
+	const eventKey = event.key;
+	const eventCode = event.code; // e.g., "KeyJ", "Space", "Enter"
 
-	// Handle special key names
-	if (binding === "Tab") {
-		return key === "Tab";
+	// Normalize modifiers from event
+	const modifiers: string[] = [];
+	if (event.ctrlKey) modifiers.push("C");
+	if (event.metaKey) modifiers.push("M");
+	if (event.altKey) modifiers.push("A");
+	if (event.shiftKey) modifiers.push("S");
+	// Sort modifiers to ensure consistent order
+	modifiers.sort();
+
+	for (const binding of keys) {
+		// Parse binding: <M-j> -> modifiers=["M"], key="j"
+		let bindingKey = binding;
+		let bindingModifiers: string[] = [];
+
+		// Check for <...> notation
+		if (binding.startsWith("<") && binding.endsWith(">")) {
+			// e.g. <C-M-j> or <Space>
+			const content = binding.slice(1, -1);
+			const parts = content.split("-");
+			if (parts.length > 1) {
+				// Has modifiers: <Mod-Key>
+				// Last part is the key, previous are modifiers
+				bindingKey = parts.pop() || "";
+				// Normalized modifiers
+				bindingModifiers = parts.map((m) => {
+					switch (m.toUpperCase()) {
+						case "C":
+						case "CTRL":
+							return "C";
+						case "M":
+						case "META":
+						case "CMD":
+						case "WIN":
+						case "SUPER":
+							return "M";
+						case "A":
+						case "ALT":
+							return "A";
+						case "S":
+						case "SHIFT":
+							return "S";
+						default:
+							return m;
+					}
+				});
+			} else {
+				// Just special key: <Space>, <Tab>
+				bindingKey = content;
+			}
+		}
+
+		// Check modifiers match strictly
+		const hasModifiersMismatch = () => {
+			const eventMods = new Set(modifiers);
+			const bindMods = new Set(bindingModifiers);
+			// If binding has explicit Shift (e.g. <S-Tab>), we check it.
+			// If binding is a single char (e.g. "G"), Shift is implicit in the key char, so we don't treat event.shiftKey as a mismatch modifier.
+			// But if binding is "g" and we press "Ctrl-g", that's a mismatch.
+
+			// For simple single chars (e.g. "A"), event will have Shift+a.
+			// matchesAnyKey is called with "A".
+			// parse logic: bindingKey="A", bindingModifiers=[]
+			// event logic: eventKey="A", modifiers=["S"] (maybe? depends on OS/browser)
+
+			// Let's rely on explicit modifiers required by binding.
+			// If binding specifies mod, event MUST have it.
+			for (const m of bindingModifiers) {
+				if (!eventMods.has(m)) return true; // Missing required modifier
+			}
+
+			// If event has extra modifiers NOT in binding?
+			// e.g. binding="j", event="Ctrl+j" -> Should fail.
+			// e.g. binding="G", event="Shift+g" -> Should succeed (Shift produces G).
+			// We filter out Shift if the key itself implies it?
+			// Actually, simpler:
+			// If binding has no modifiers, and event has modifiers, fail (UNLESS simple key match handles it?)
+
+			// Simplification strategy:
+			// 1. Check Key/Code match first.
+			// 2. Then check Modifiers.
+
+			// Filter out 'S' from eventMods if the key match implicitly handles it (case sensitive char).
+			// But we are normalizing.
+
+			// Strict check:
+			// bindingModifiers must equal eventModifiers (ignoring order)
+			if (eventMods.size !== bindMods.size) return true;
+			for (const m of eventMods) {
+				if (!bindMods.has(m)) return true;
+			}
+			return false;
+		};
+
+		// Key Matching Logic
+		let keyMatches = false;
+
+		// Case 1: Special name match (Space, Tab, Escape, etc.)
+		// We compare bindingKey (e.g. "Space") with event.code (e.g. "Space") OR event.key (e.g. " ")
+		if (bindingKey.length > 1) {
+			// It's a special key name (Enter, Space, Tab)
+			// Check Code
+			if (eventCode.toLowerCase() === bindingKey.toLowerCase()) keyMatches = true;
+			else if (eventCode.toLowerCase() === `key${bindingKey.toLowerCase()}`) keyMatches = true;
+			// Check Key (e.g. "Tab" === "Tab")
+			else if (eventKey.toLowerCase() === bindingKey.toLowerCase()) keyMatches = true;
+			else if (bindingKey.toLowerCase() === "space" && eventKey === " ") keyMatches = true;
+		} else {
+			// Single char (e.g. "j", "G", "?")
+			// Exact match on key
+			if (bindingKey === eventKey) keyMatches = true;
+		}
+
+		if (keyMatches) {
+			if (!hasModifiersMismatch()) return true;
+		}
 	}
-
-	// Handle compound keys like 'gg' - these are handled separately
-	if (binding.length > 1 && !binding.startsWith("Arrow")) {
-		return false;
-	}
-
-	// Check if binding matches key or code
-	if (binding === key) return true;
-	if (binding.toLowerCase() === keyLower) return true;
-	if (`key${binding.toLowerCase()}` === codeLower) return true;
-
 	return false;
 }
 
@@ -68,10 +179,10 @@ export function useKeyboardNavigation({
 	const showHelpRef = useRef(showHelp);
 	const keysEnabledRef = useRef(keysEnabled);
 	const onTabSwitchRef = useRef(onTabSwitch);
+
 	useEffect(() => {
 		onTabSwitchRef.current = onTabSwitch;
 	}, [onTabSwitch]);
-
 	useEffect(() => {
 		hasSubRef.current = hasSub;
 	}, [hasSub]);
@@ -84,9 +195,112 @@ export function useKeyboardNavigation({
 	useEffect(() => {
 		keysEnabledRef.current = keysEnabled;
 	}, [keysEnabled]);
+	useEffect(() => {
+		const warnings = validateKeyConflicts();
+		for (const warning of warnings) {
+			console.warn(warning);
+			addToast(warning.message, "warning");
+		}
+	}, [addToast]);
 
 	useEffect(() => {
-		const keys = getKeys();
+		// Build action handlers map
+		type ActionHandler = (
+			viewer: ViewerHandle | null,
+			event: KeyboardEvent,
+			context: {
+				hasSub: boolean;
+				focusedPane: "main" | "sub";
+				showHelp: boolean;
+				subViewerRef: React.RefObject<ViewerHandle | null>;
+			},
+		) => void;
+
+		const actionHandlers: Record<string, ActionHandler> = {
+			scroll_down: (v, e) => {
+				if (e.repeat) {
+					v?.startContinuousScroll(0, CONT_SCROLL_PER_FRAME);
+				} else {
+					v?.scrollLine(SCROLL_STEP_VERTICAL);
+				}
+			},
+			scroll_up: (v, e) => {
+				if (e.repeat) {
+					v?.startContinuousScroll(0, -CONT_SCROLL_PER_FRAME);
+				} else {
+					v?.scrollLine(-SCROLL_STEP_VERTICAL);
+				}
+			},
+			scroll_left: (v, e) => {
+				if (e.repeat) {
+					v?.startContinuousScroll(-CONT_SCROLL_PER_FRAME, 0);
+				} else {
+					v?.scrollHorizontal(-SCROLL_STEP_HORIZONTAL);
+				}
+			},
+			scroll_right: (v, e) => {
+				if (e.repeat) {
+					v?.startContinuousScroll(CONT_SCROLL_PER_FRAME, 0);
+				} else {
+					v?.scrollHorizontal(SCROLL_STEP_HORIZONTAL);
+				}
+			},
+			half_page_down: (v, e) => {
+				if (e.repeat) {
+					v?.startContinuousScroll(0, CONT_SCROLL_FAST);
+				} else {
+					v?.scrollHalfPage(1);
+				}
+			},
+			half_page_up: (v, e) => {
+				if (e.repeat) {
+					v?.startContinuousScroll(0, -CONT_SCROLL_FAST);
+				} else {
+					v?.scrollHalfPage(-1);
+				}
+			},
+			jump_top: (v) => v?.jumpToTop(),
+			jump_bottom: (v) => v?.jumpToBottom(),
+			next_page: (v) => v?.jumpByPages(1),
+			prev_page: (v) => v?.jumpByPages(-1),
+			zoom_in: (v) => v?.zoomIn(),
+			zoom_out: (v) => v?.zoomOut(),
+			fit_width: (v) => v?.fitToWidth(),
+			toggle_focus: (v, _e, ctx) => {
+				v?.stopContinuousScroll();
+				if (ctx.hasSub) {
+					setFocusedPane(ctx.focusedPane === "main" ? "sub" : "main");
+				} else {
+					setFocusedPane("main");
+				}
+			},
+			swap_panes: (v, e) => {
+				if (e.repeat) return;
+				v?.stopContinuousScroll();
+				swapPanes();
+			},
+			reload_main: () => {
+				setMainReloadKey((v) => v + 1);
+				setFocusedPane("main");
+				addToast("MAIN: reloading…", "info");
+			},
+			reload_all: (_v, _e, ctx) => {
+				setMainReloadKey((v) => v + 1);
+				if (ctx.hasSub) {
+					ctx.subViewerRef.current?.rerender();
+				}
+				setFocusedPane("main");
+				addToast(ctx.hasSub ? "MAIN: reload (re-render SUB)" : "MAIN: reloading…", "info");
+			},
+			toggle_help: () => setShowHelp((open) => !open),
+			quit: (_v, _e, ctx) => {
+				if (ctx.showHelp) {
+					setShowHelp(false);
+				} else {
+					addToast("Close the tab to quit", "info");
+				}
+			},
+		};
 
 		const clearSequence = () => {
 			if (keySeqTimeoutRef.current) {
@@ -123,175 +337,129 @@ export function useKeyboardNavigation({
 					? subViewerRef.current
 					: mainViewerRef.current;
 
-			// Handle compound key: gg (jump to top)
-			if (keys.jump_top === "gg") {
-				if (event.key === "g") {
-					if (lastKeyRef.current === "g") {
+			const context = {
+				hasSub: hasSubRef.current,
+				focusedPane: focusedPaneRef.current,
+				showHelp: showHelpRef.current,
+				subViewerRef,
+			};
+
+			// 1. Check if we are completing a sequence
+			if (lastKeyRef.current) {
+				const currentKey = event.key;
+				const candidateSeq = `${lastKeyRef.current} ${currentKey}`;
+
+				for (const actionDef of keyActionDefs) {
+					const bindings = getKeyBinding(actionDef.id);
+					if (bindings.includes(candidateSeq)) {
 						consume();
 						clearSequence();
-						targetViewer?.jumpToTop();
+
+						if (context.showHelp) {
+							if (actionDef.id === "quit" || actionDef.id === "toggle_help") {
+								// Run handler
+							} else if (actionDef.category === "navigation" || actionDef.id === "jump_top") {
+								const helpContent = document.getElementById("help-overlay-content");
+								if (helpContent) {
+									if (actionDef.id === "jump_top") {
+										helpContent.scrollTo({ top: 0, behavior: "smooth" });
+									} else if (actionDef.id === "jump_bottom") {
+										helpContent.scrollTo({ top: helpContent.scrollHeight, behavior: "smooth" });
+									}
+									return;
+								}
+							} else {
+								return;
+							}
+						}
+
+						actionHandlers[actionDef.id]?.(targetViewer, event, context);
 						return;
 					}
-					lastKeyRef.current = "g";
-					scheduleSequenceClear();
-					return;
+				}
+				clearSequence();
+			}
+
+			// 2. Check for Single Key Match OR Sequence Start
+			let singleMatchId: string | null = null;
+			let startsSequence = false;
+
+			for (const actionDef of keyActionDefs) {
+				const bindings = getKeyBinding(actionDef.id);
+
+				const singleKeys = bindings.filter((b) => !isKeySequence(b));
+				if (matchesAnyKey(event, singleKeys)) {
+					singleMatchId = actionDef.id;
+				}
+
+				for (const binding of bindings) {
+					if (isKeySequence(binding)) {
+						const [first] = parseKeySequence(binding);
+						if (matchesAnyKey(event, [first])) {
+							startsSequence = true;
+						}
+					}
 				}
 			}
-			clearSequence();
 
-			// Swap panes
-			if (matchesKey(event, keys.swap_panes)) {
+			if (singleMatchId) {
 				consume();
-				if (event.repeat) return;
-				targetViewer?.stopContinuousScroll();
-				swapPanes();
-				return;
-			}
 
-			// Scroll down
-			if (matchesKey(event, keys.scroll_down)) {
-				consume();
-				if (event.repeat) {
-					targetViewer?.startContinuousScroll(0, CONT_SCROLL_PER_FRAME);
-				} else {
-					targetViewer?.scrollLine(SCROLL_STEP_VERTICAL);
+				if (context.showHelp) {
+					const helpContent = document.getElementById("help-overlay-content");
+					if (helpContent) {
+						if (singleMatchId === "quit" || singleMatchId === "toggle_help") {
+							// execute
+						} else {
+							const def = keyActionDefs.find((d) => d.id === singleMatchId);
+							if (def?.category === "navigation") {
+								const scrollAmount = 60;
+								const pageAmount = helpContent.clientHeight * 0.8;
+								switch (singleMatchId) {
+									case "scroll_down":
+										helpContent.scrollBy({ top: scrollAmount, behavior: "smooth" });
+										return;
+									case "scroll_up":
+										helpContent.scrollBy({ top: -scrollAmount, behavior: "smooth" });
+										return;
+									case "half_page_down":
+									case "next_page":
+										helpContent.scrollBy({ top: pageAmount, behavior: "smooth" });
+										return;
+									case "half_page_up":
+									case "prev_page":
+										helpContent.scrollBy({ top: -pageAmount, behavior: "smooth" });
+										return;
+									case "jump_top":
+										helpContent.scrollTo({ top: 0, behavior: "smooth" });
+										return;
+									case "jump_bottom":
+										helpContent.scrollTo({ top: helpContent.scrollHeight, behavior: "smooth" });
+										return;
+								}
+							}
+							return;
+						}
+					}
 				}
+
+				actionHandlers[singleMatchId]?.(targetViewer, event, context);
 				return;
 			}
 
-			// Scroll up
-			if (matchesKey(event, keys.scroll_up)) {
+			if (startsSequence) {
 				consume();
-				if (event.repeat) {
-					targetViewer?.startContinuousScroll(0, -CONT_SCROLL_PER_FRAME);
-				} else {
-					targetViewer?.scrollLine(-SCROLL_STEP_VERTICAL);
-				}
+				lastKeyRef.current = event.key;
+				scheduleSequenceClear();
 				return;
 			}
 
-			// Scroll left
-			if (matchesKey(event, keys.scroll_left)) {
-				consume();
-				if (event.repeat) {
-					targetViewer?.startContinuousScroll(-CONT_SCROLL_PER_FRAME, 0);
-				} else {
-					targetViewer?.scrollHorizontal(-SCROLL_STEP_HORIZONTAL);
-				}
-				return;
-			}
-
-			// Scroll right
-			if (matchesKey(event, keys.scroll_right)) {
-				consume();
-				if (event.repeat) {
-					targetViewer?.startContinuousScroll(CONT_SCROLL_PER_FRAME, 0);
-				} else {
-					targetViewer?.scrollHorizontal(SCROLL_STEP_HORIZONTAL);
-				}
-				return;
-			}
-
-			// Half page down
-			if (matchesKey(event, keys.half_page_down)) {
-				consume();
-				if (event.repeat) {
-					targetViewer?.startContinuousScroll(0, CONT_SCROLL_FAST);
-				} else {
-					targetViewer?.scrollHalfPage(1);
-				}
-				return;
-			}
-
-			// Half page up
-			if (matchesKey(event, keys.half_page_up)) {
-				consume();
-				if (event.repeat) {
-					targetViewer?.startContinuousScroll(0, -CONT_SCROLL_FAST);
-				} else {
-					targetViewer?.scrollHalfPage(-1);
-				}
-				return;
-			}
-
-			// Jump to bottom
-			if (matchesKey(event, keys.jump_bottom)) {
-				consume();
-				targetViewer?.jumpToBottom();
-				return;
-			}
-
-			// Next page
-			if (matchesKey(event, keys.next_page)) {
-				consume();
-				targetViewer?.jumpByPages(1);
-				return;
-			}
-
-			// Previous page
-			if (matchesKey(event, keys.prev_page)) {
-				consume();
-				targetViewer?.jumpByPages(-1);
-				return;
-			}
-
-			// Zoom in
-			if (matchesKey(event, keys.zoom_in)) {
-				consume();
-				targetViewer?.zoomIn();
-				return;
-			}
-
-			// Zoom out
-			if (matchesKey(event, keys.zoom_out)) {
-				consume();
-				targetViewer?.zoomOut();
-				return;
-			}
-
-			// Fit to width
-			if (matchesKey(event, keys.fit_width)) {
-				consume();
-				targetViewer?.fitToWidth();
-				return;
-			}
-
-			// Toggle focus
-			if (matchesKey(event, keys.toggle_focus)) {
-				consume();
-				targetViewer?.stopContinuousScroll();
-				if (hasSubRef.current) {
-					setFocusedPane(focusedPaneRef.current === "main" ? "sub" : "main");
-				} else {
-					setFocusedPane("main");
-				}
-				return;
-			}
-
-			// Reload main
-			if (matchesKey(event, keys.reload_main)) {
-				consume();
-				setMainReloadKey((v) => v + 1);
-				setFocusedPane("main");
-				addToast("MAIN: reloading…", "info");
-				return;
-			}
-
-			// Reload all
-			if (matchesKey(event, keys.reload_all)) {
-				consume();
-				setMainReloadKey((v) => v + 1);
-				if (hasSubRef.current) {
-					subViewerRef.current?.rerender();
-				}
-				setFocusedPane("main");
-				addToast(hasSubRef.current ? "MAIN: reload (re-render SUB)" : "MAIN: reloading…", "info");
-				return;
-			}
-
-			// Tab switch (H/L for SUB pane tabs)
+			// Handle H/L for tab switching in SUB pane (special case)
 			if (event.key === "H") {
 				consume();
+				// Block if help is open
+				if (context.showHelp) return;
+
 				if (hasSubRef.current && focusedPaneRef.current === "sub") {
 					onTabSwitchRef.current?.("prev");
 				} else {
@@ -301,6 +469,9 @@ export function useKeyboardNavigation({
 			}
 			if (event.key === "L") {
 				consume();
+				// Block if help is open
+				if (context.showHelp) return;
+
 				if (hasSubRef.current && focusedPaneRef.current === "sub") {
 					onTabSwitchRef.current?.("next");
 				} else {
@@ -309,47 +480,94 @@ export function useKeyboardNavigation({
 				return;
 			}
 
-			// Toggle help
-			if (matchesKey(event, keys.toggle_help)) {
-				consume();
-				setShowHelp((open) => !open);
-				return;
-			}
+			// Iterate through all actions and check for matches
+			for (const actionDef of keyActionDefs) {
+				const keys = getKeyBinding(actionDef.id);
+				if (matchesAnyKey(event, keys)) {
+					consume();
 
-			// Quit
-			if (matchesKey(event, keys.quit)) {
-				consume();
-				if (showHelpRef.current) {
-					setShowHelp(false);
-				} else {
-					addToast("Close the tab to quit", "info");
+					// Special handling when Help Overlay is open:
+					// - Allow quit/toggle_help
+					// - Redirect navigation keys to scroll the help content
+					// - Block everything else (so PDF doesn't scroll/zoom in background)
+					if (context.showHelp) {
+						const helpContent = document.getElementById("help-overlay-content");
+						if (helpContent) {
+							if (actionDef.id === "quit" || actionDef.id === "toggle_help") {
+								// Fall through to normal handler
+							} else if (actionDef.category === "navigation") {
+								const scrollAmount = 60; // Approximate line height * 3
+								const pageAmount = helpContent.clientHeight * 0.8;
+
+								switch (actionDef.id) {
+									case "scroll_down":
+										helpContent.scrollBy({ top: scrollAmount, behavior: "smooth" });
+										return;
+									case "scroll_up":
+										helpContent.scrollBy({ top: -scrollAmount, behavior: "smooth" });
+										return;
+									case "half_page_down":
+									case "next_page":
+										helpContent.scrollBy({ top: pageAmount, behavior: "smooth" });
+										return;
+									case "half_page_up":
+									case "prev_page":
+										helpContent.scrollBy({ top: -pageAmount, behavior: "smooth" });
+										return;
+									case "jump_top":
+										helpContent.scrollTo({ top: 0, behavior: "smooth" });
+										return;
+									case "jump_bottom":
+										helpContent.scrollTo({ top: helpContent.scrollHeight, behavior: "smooth" });
+										return;
+									default:
+										return; // Ignore other nav keys (left/right etc)
+								}
+							} else {
+								// Block all other actions (zoom, panes, etc)
+								return;
+							}
+						}
+					}
+
+					const handler = actionHandlers[actionDef.id];
+					if (handler) {
+						handler(targetViewer, event, context);
+					}
+					return;
 				}
-				return;
 			}
 		};
 
 		window.addEventListener("keydown", handleKey, { capture: true });
 
-		// Get scroll-related keys for keyup handling
-		const scrollKeys = [
-			keys.scroll_down,
-			keys.scroll_up,
-			keys.scroll_left,
-			keys.scroll_right,
-			keys.half_page_down,
-			keys.half_page_up,
+		// Scroll-related action IDs for keyup handling
+		const scrollActionIds = [
+			"scroll_down",
+			"scroll_up",
+			"scroll_left",
+			"scroll_right",
+			"half_page_down",
+			"half_page_up",
 		];
 
 		const handleKeyUp = (event: KeyboardEvent) => {
 			if (!keysEnabledRef.current) return;
-			if (scrollKeys.includes(event.key)) {
-				const targetViewer =
-					focusedPaneRef.current === "sub" && hasSubRef.current
-						? subViewerRef.current
-						: mainViewerRef.current;
-				targetViewer?.stopContinuousScroll();
+
+			// Check if released key was a scroll key
+			for (const actionId of scrollActionIds) {
+				const keys = getKeyBinding(actionId);
+				if (matchesAnyKey(event, keys)) {
+					const targetViewer =
+						focusedPaneRef.current === "sub" && hasSubRef.current
+							? subViewerRef.current
+							: mainViewerRef.current;
+					targetViewer?.stopContinuousScroll();
+					return;
+				}
 			}
 		};
+
 		window.addEventListener("keyup", handleKeyUp);
 		return () => {
 			window.removeEventListener("keydown", handleKey);
@@ -364,7 +582,6 @@ export function useKeyboardNavigation({
 		setFocusedPane,
 		setMainReloadKey,
 		setShowHelp,
-		// onTabSwitch removed from deps, ref used
 	]);
 }
 
@@ -388,7 +605,6 @@ export function useSwapPanes(
 			addToast("Cannot swap without SUB", "error");
 			return false;
 		}
-		// Capture snapshots before state update triggers re-render/layout
 		const mainSnap = mainViewerRef.current?.getSnapshot() ?? null;
 		const subSnap = subViewerRef.current?.getSnapshot() ?? null;
 		swapSnapshotsRef.current = { main: mainSnap, sub: subSnap };

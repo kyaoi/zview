@@ -6,7 +6,7 @@ Runs in your browser, powered by PDF.js, with Vim-like navigation.
 ## Features
 
 * **Fast & Lightweight**: Virtualized rendering for smooth scrolling even with large PDFs.
-* **Vim-like Keybindings**: Navigate with `j`, `k`, `d`, `u`, `gg`, `G`, etc.
+* **Vim-like Keybindings**: Navigate with `j`, `k`, `d`, `u`, `g g`, `G`, etc.
 * **Dual Pane Support**: View two PDFs side-by-side (MAIN and SUB).
     * **MAIN Pane**: Supports auto-reload on file change.
     * **SUB Pane**: Static reference view; supports multiple tabs.
@@ -99,7 +99,7 @@ zview kill
 | `j` / `k` | Scroll down / up |
 | `d` / `u` | Scroll half-page down / up |
 | `h` / `l` | Scroll left / right |
-| `gg` | Jump to top |
+| `g g` | Jump to top |
 | `G` | Jump to bottom |
 | `n` / `p` | Next / Previous page |
 | **Zoom** | |
@@ -136,6 +136,12 @@ scroll_step_horizontal = 64.0
 # Page scroll ratio (default: 0.5)
 # How much to scroll (relative to screen height) for 'd' / 'u' commands.
 page_scroll_ratio = 0.5
+
+# [keys]
+# You can define custom keybindings.
+# Single key:   scroll_down = "j"
+# Multiple keys: scroll_down = ["j", "ArrowDown"]
+# Key sequence: jump_top = ["g g"]  (space-separated)
 ```
 
 ## Troubleshooting

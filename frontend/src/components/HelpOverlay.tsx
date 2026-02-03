@@ -1,106 +1,101 @@
-import { getKeys } from "../lib/config";
+import { useEffect, useState } from "react";
+import { getKeyBinding, validateKeyConflicts, type KeyConflict } from "../lib/config";
+import { type KeyCategory, categoryLabels, getActionsByCategory } from "../lib/keyActions";
+import "../styles/HelpOverlay.css";
 
 interface HelpOverlayProps {
 	onClose: () => void;
+	visible: boolean;
 }
 
-export function HelpOverlay({ onClose }: HelpOverlayProps) {
-	const keys = getKeys();
+// Render keyboard key display element
+const KeyDisplay = ({ keys }: { keys: string[] }) => {
+	return (
+		<span className="key-display">
+			{keys.map((k, i) => (
+				<span key={k}>
+					{i > 0 && <span className="key-separator"> / </span>}
+					<code>{k}</code>
+				</span>
+			))}
+		</span>
+	);
+};
 
-	// Helper to format key display
-	const fmt = (key: string) => `\`${key}\``;
+export const HelpOverlay: React.FC<HelpOverlayProps> = ({ onClose, visible }) => {
+	const [warnings, setWarnings] = useState<KeyConflict[]>([]);
+
+	// Run conflict validation on mount (or when visible changes)
+	// Theoretically config doesn't change at runtime, but good to check.
+	// We assume window.ZVIEW_CONFIG is populated.
+	useEffect(() => {
+		if (visible) {
+			setWarnings(validateKeyConflicts());
+		}
+	}, [visible]);
+
+	const actionsByCategory = getActionsByCategory();
+	const categoryOrder: KeyCategory[] = ["navigation", "zoom", "panes", "misc"];
+
+	if (!visible) return null;
 
 	return (
-		<div
-			className="fixed inset-0 z-30 grid place-items-center bg-slate-950/70 px-4"
-			role="dialog"
-			aria-modal="true"
-			onClick={(e) => {
-				if (e.target === e.currentTarget) onClose();
-			}}
-			onKeyDown={(e) => {
-				if (e.key === "Escape" || e.key === "Enter" || e.key === " ") onClose();
-			}}
-			tabIndex={-1}
-			aria-label="Help overlay"
-		>
+		// biome-ignore lint/a11y/useKeyWithClickEvents: backdrop close is supplementary to button
+		// biome-ignore lint/a11y/noStaticElementInteractions: backdrop acts as a large close button
+		<div className="help-overlay-backdrop" onClick={onClose}>
+			{/* biome-ignore lint/a11y/useKeyWithClickEvents: stop propagation is not interactive */}
 			<div
-				className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900/90 p-5 shadow-2xl"
+				className="help-overlay"
+				onClick={(e) => e.stopPropagation()}
 				role="dialog"
 				aria-modal="true"
-				onClick={(e) => e.stopPropagation()}
-				onKeyDown={(e) => {
-					e.stopPropagation();
-					if (e.key === "Escape" || e.key === "Enter" || e.key === " ") onClose();
-				}}
+				aria-labelledby="help-overlay-title"
 			>
-				<header className="mb-3">
-					<p className="text-xs uppercase tracking-[0.2em] text-slate-400">Guide</p>
-					<h3 className="text-lg font-semibold text-slate-50">Keybindings</h3>
+				<header>
+					<h2 id="help-overlay-title">Keyboard Shortcuts</h2>
+					<button type="button" className="close-button" onClick={onClose}>
+						×
+					</button>
 				</header>
-				<div className="mb-4 grid grid-cols-1 gap-3 text-sm text-slate-200">
-					<div>
-						<p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
-							Navigation
+				<div className="help-content" id="help-overlay-content">
+					{warnings.length > 0 && (
+						<div className="help-warnings">
+							{warnings.map((c, i) => (
+								// biome-ignore lint/suspicious/noArrayIndexKey: stable list
+								<div key={i} className="warning-item">
+									⚠️ {c.message}
+								</div>
+							))}
+						</div>
+					)}
+					{categoryOrder.map((category) => {
+						const actions = actionsByCategory[category];
+						if (!actions || actions.length === 0) return null;
+
+						return (
+							<section key={category} className="help-section">
+								<h3>{categoryLabels[category]}</h3>
+								<ul>
+									{actions.map((action) => {
+										const keys = getKeyBinding(action.id);
+										return (
+											<li key={action.id}>
+												<KeyDisplay keys={keys} />
+												<span className="description">— {action.description}</span>
+											</li>
+										);
+									})}
+								</ul>
+							</section>
+						);
+					})}
+					<section className="help-section help-footer">
+						<p>
+							Keybindings can be customized in <code>~/.config/zview/config.toml</code>
 						</p>
-						<ul className="list-disc space-y-1 pl-5">
-							<li>
-								{fmt(keys.scroll_down)} / {fmt(keys.scroll_up)} — scroll down / up
-							</li>
-							<li>
-								{fmt(keys.scroll_left)} / {fmt(keys.scroll_right)} — scroll left / right
-							</li>
-							<li>
-								{fmt(keys.half_page_down)} / {fmt(keys.half_page_up)} — half-page down / up
-							</li>
-							<li>
-								{fmt(keys.jump_top)} — top, {fmt(keys.jump_bottom)} — bottom
-							</li>
-							<li>
-								{fmt(keys.next_page)} / {fmt(keys.prev_page)} — next / previous page
-							</li>
-						</ul>
-					</div>
-					<div>
-						<p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
-							Zoom
-						</p>
-						<ul className="list-disc space-y-1 pl-5">
-							<li>
-								{fmt(keys.zoom_in)} / {fmt(keys.zoom_out)} — zoom in / out
-							</li>
-							<li>{fmt(keys.fit_width)} — fit to width</li>
-						</ul>
-					</div>
-					<div>
-						<p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
-							Panes
-						</p>
-						<ul className="list-disc space-y-1 pl-5">
-							<li>{fmt(keys.toggle_focus)} — toggle focus (MAIN ↔ SUB)</li>
-							<li>{fmt(keys.swap_panes)} — swap pane positions</li>
-						</ul>
-					</div>
-					<div>
-						<p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">
-							Reload / misc
-						</p>
-						<ul className="list-disc space-y-1 pl-5">
-							<li>{fmt(keys.reload_main)} — reload MAIN</li>
-							<li>{fmt(keys.reload_all)} — reload MAIN (re-render SUB)</li>
-							<li>{fmt(keys.toggle_help)} — toggle this overlay</li>
-							<li>{fmt(keys.quit)} — quit (close tab)</li>
-						</ul>
-					</div>
+					</section>
 				</div>
-				<button
-					type="button"
-					className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-2 text-sm font-semibold text-slate-100 hover:border-brand/60 hover:bg-slate-800/80"
-					onClick={onClose}
-				>
-					Close
-				</button>
 			</div>
 		</div>
 	);
-}
+};

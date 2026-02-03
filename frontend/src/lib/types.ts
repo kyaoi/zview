@@ -56,4 +56,4 @@ export type ViewerHandle = {
 	restoreSnapshot: (snapshot: ScrollSnapshot) => void;
 };
 
-export type ToastType = "info" | "success" | "error";
+export type ToastType = "info" | "success" | "error" | "warning";
