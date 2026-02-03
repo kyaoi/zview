@@ -142,7 +142,7 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for details.
 * Page step: `n/p` (best-effort)
 * Zoom: `+/-`, Fit width: `=`
 * Focus: `Tab`
-* Swap panes: `x`
+* Swap panes: `s`
 * Reload: `r` (MAIN), `R` (MAIN + re-render SUB)
 * Help: `?`, Quit: `q`
 
@@ -233,6 +233,5 @@ Restore after the new layout is measured:
 
 ## Future (explicitly optional)
 
-* Config file for keymaps and defaults
 * Persistent UI preferences (zoom mode, last used options)
 * Optional File System Access API enhancements (not required)

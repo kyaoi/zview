@@ -13,7 +13,7 @@ This plan breaks development of **zview** into small, reviewable tasks.
 * [x] **Task 1:** Fix PDF darkening on swap
 * [x] **Task 2:** Configurable Keybindings
 * [x] **Task 3:** Enhance CI and Pre-commit/Pre-push hooks
-* [ ] **Task 4:** Documentation Maintenance
+* [x] **Task 4:** Documentation Maintenance
 * [x] **Task 5:** Refactoring and Architecture cleanup
 
 ---
@@ -104,7 +104,7 @@ A task is “done” when:
 
 #### `task/docs-maintenance`
 
-* [ ] Not Started
+* [x] Done
 
 **Goal:** Clean up and standardize documentation.
 
