@@ -108,6 +108,8 @@ zview kill
 | **Panes** | |
 | `Tab` / `<Tab>` | Toggle focus (MAIN ↔ SUB) |
 | `s` | Swap left/right pane positions |
+| `H` | Prev tab (SUB) / Fast scroll left |
+| `L` | Next tab (SUB) / Fast scroll right |
 | **General** | |
 | `r` | Reload MAIN |
 | `?` | Show help overlay |

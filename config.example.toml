@@ -78,6 +78,8 @@ page_scroll_ratio = 0.5
 # fit_width = ["="]
 # toggle_focus = ["Tab"]
 # swap_panes = ["s"]
+# prev_tab = ["H"]
+# next_tab = ["L"]
 # reload_main = ["r"]
 # reload_all = ["R"]
 # toggle_help = ["?"]

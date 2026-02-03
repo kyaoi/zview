@@ -40,6 +40,18 @@ export const keyActionDefs: KeyActionDef[] = [
 		category: "panes",
 	},
 	{ id: "swap_panes", defaultKeys: ["s"], description: "swap pane positions", category: "panes" },
+	{
+		id: "prev_tab",
+		defaultKeys: ["H"],
+		description: "previous tab (SUB) / fast left",
+		category: "panes",
+	},
+	{
+		id: "next_tab",
+		defaultKeys: ["L"],
+		description: "next tab (SUB) / fast right",
+		category: "panes",
+	},
 
 	// Misc
 	{ id: "reload_main", defaultKeys: ["r"], description: "reload MAIN", category: "misc" },

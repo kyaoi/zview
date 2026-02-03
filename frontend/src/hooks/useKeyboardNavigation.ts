@@ -278,6 +278,22 @@ export function useKeyboardNavigation({
 					addToast("Close the tab to quit", "info");
 				}
 			},
+			prev_tab: (v, _e, ctx) => {
+				// Special behavior: Switch tab if in SUB, otherwise fast scroll left
+				if (ctx.hasSub && ctx.focusedPane === "sub") {
+					onTabSwitchRef.current?.("prev");
+				} else {
+					v?.scrollHorizontal(-SCROLL_STEP_HORIZONTAL * 5);
+				}
+			},
+			next_tab: (v, _e, ctx) => {
+				// Special behavior: Switch tab if in SUB, otherwise fast scroll right
+				if (ctx.hasSub && ctx.focusedPane === "sub") {
+					onTabSwitchRef.current?.("next");
+				} else {
+					v?.scrollHorizontal(SCROLL_STEP_HORIZONTAL * 5);
+				}
+			},
 		};
 
 		const clearSequence = () => {
@@ -435,32 +451,6 @@ export function useKeyboardNavigation({
 				consume();
 				lastKeyRef.current = event.key;
 				scheduleSequenceClear();
-				return;
-			}
-
-			// Handle H/L for tab switching in SUB pane (special case)
-			if (event.key === "H") {
-				consume();
-				// Block if help is open
-				if (context.showHelp) return;
-
-				if (hasSubRef.current && focusedPaneRef.current === "sub") {
-					onTabSwitchRef.current?.("prev");
-				} else {
-					targetViewer?.scrollHorizontal(-SCROLL_STEP_HORIZONTAL * 5);
-				}
-				return;
-			}
-			if (event.key === "L") {
-				consume();
-				// Block if help is open
-				if (context.showHelp) return;
-
-				if (hasSubRef.current && focusedPaneRef.current === "sub") {
-					onTabSwitchRef.current?.("next");
-				} else {
-					targetViewer?.scrollHorizontal(SCROLL_STEP_HORIZONTAL * 5);
-				}
 				return;
 			}
 
