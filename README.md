@@ -162,6 +162,10 @@ page_scroll_ratio = 0.5
     * `M`: Meta (Command on Mac, Win on Windows)
     * `A`: Alt
     * `S`: Shift
+* **Note on Shift**: For printable characters, use the character itself.
+    * Use `"G"` instead of `"<S-g>"`.
+    * Use `"<"` instead of `"<S-,>"`.
+    * Use `"<C-G>"` for Ctrl+Shift+g.
 * **Sequences**: Space-separated (e.g., `"g g"`, `"<Space> j"`)
 ```
 
