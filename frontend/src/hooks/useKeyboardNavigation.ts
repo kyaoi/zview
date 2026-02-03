@@ -252,10 +252,12 @@ export function useKeyboardNavigation({
 					setFocusedPane("main");
 				}
 			},
-			swap_panes: (v, e) => {
+			swap_panes: (v, e, ctx) => {
 				if (e.repeat) return;
 				v?.stopContinuousScroll();
-				swapPanes();
+				if (swapPanes()) {
+					setFocusedPane(ctx.focusedPane === "main" ? "sub" : "main");
+				}
 			},
 			reload_main: () => {
 				setMainReloadKey((v) => v + 1);

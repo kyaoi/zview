@@ -224,7 +224,9 @@ export default function App() {
 				}
 				break;
 			case "swap":
-				swapPanes();
+				if (swapPanes()) {
+					setFocusedPane((prev) => (prev === "main" ? "sub" : "main"));
+				}
 				break;
 			case "reloadMain":
 				setMainReloadKey((v) => v + 1);
