@@ -59,9 +59,9 @@ zview
 Open two PDFs side-by-side:
 
 ```bash
-zview main.pdf ref.pdf
+zview main.pdf sub.pdf
 # or
-zview main.pdf --sub ref.pdf
+zview main.pdf --sub sub.pdf
 ```
 
 * **MAIN Pane**: The primary document. Auto-reloads when the file changes (unless disabled).

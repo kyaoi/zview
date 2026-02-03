@@ -10,11 +10,11 @@ This plan breaks development of **zview** into small, reviewable tasks.
 
 ## Progress tracking
 
-* [x] **Task 0:** Dynamic Port Selection
-* [x] **Task 1:** Launch Viewer without specifying MAIN PDF via CLI
-* [x] **Task 2:** Multi-tab support for SUB PDFs
-* [x] **Task 3:** Improve focus indication
-* [x] **Task 4:** Config file support
+* [ ] **Task 1:** Fix PDF darkening on swap
+* [ ] **Task 2:** Configurable Keybindings
+* [ ] **Task 3:** Enhance CI and Pre-commit/Pre-push hooks
+* [ ] **Task 4:** Documentation Maintenance
+* [ ] **Task 5:** Refactoring and Architecture cleanup
 
 ---
 
@@ -39,132 +39,101 @@ A task is “done” when:
 
 ## Task list
 
-### 0) Dynamic Port Selection
+### 1) Fix PDF darkening on swap
 
-#### `task/dynamic-port-selection`
+#### `task/fix-swap-darkening`
 
-* [x] Done
+* [ ] Not Started
 
-**Goal:** Automatically find and use an available port, and provide robust CLI commands to list and manage running `zview` instances.
-
-**Work:**
-
-* Backend:
-  * **State Management:**
-    * On startup, register the new `zview` instance (PID, port, MAIN PDF, SUB PDF, start time) in a state file located at `~/.config/zview/sessions.json`.
-    * On graceful shutdown, the instance should remove itself from this file.
-  * **Dynamic Port Selection:**
-    * If `--port` is not specified, scan for an open port and use it.
-  * **Process Listing:**
-    * Implement `zview ps` (or `zview --list`) to read the state file and display a formatted table of running instances with:
-      * Port Number
-      * MAIN PDF path
-      * SUB PDF path
-      * Start Time (e.g., "YYYY-MM-DD HH:MM:SS")
-  * **Process Termination:**
-    * Implement `zview kill` (or `zview --kill`):
-      * With a port number (`zview kill 8080`), it should terminate the specified process.
-      * Without arguments, it should enter an interactive mode: display the list of running processes and prompt the user to select one or more to terminate.
-
-**Acceptance:**
-
-* Running `zview` without a `--port` flag starts successfully on a free port.
-* The `~/.config/zview/sessions.json` file is created and correctly updated on startup and shutdown.
-* `zview ps` displays a clear, accurate list of all running `zview` instances, including their port, PDF paths, and start time.
-* `zview kill <port>` terminates the correct process.
-* `zview kill` in interactive mode allows the user to select and successfully terminate one or more processes.
-
----
-
-### 1) Launch Viewer without specifying MAIN PDF via CLI
-
-#### `task/dynamic-main-selection`
-
-* [x] Done
-
-**Goal:** Allow opening the viewer without any CLI arguments and selecting the MAIN PDF from the web interface.
+**Goal:** Fix the issue where the PDF becomes dark (dimmed) incorrectly when swapping panes.
 
 **Work:**
-
-* Backend:
-  * Allow starting without a default MAIN PDF path.
-  * Serve a "No PDF Loaded" state or placeholder for MAIN.
-  * Reuse/adapt the file upload endpoint (currently used for SUB) to support MAIN.
-* Frontend:
-  * Show a "Open Main PDF" button/UI when no MAIN PDF is loaded.
-  * Ensure file selection triggers the normal loading/rendering flow.
+* Investigate the `s` (swap) command logic.
+* Ensure that the "active" and "inactive" states are correctly applied after the swap.
+* The new active pane should be fully opaque, and the new inactive pane should handle dimming (if applicable) correctly without getting stuck in a darkened state.
+* Verify focus indication logic works as intended after swap.
 
 **Acceptance:**
-
-* Running `zview` (no args) opens the viewer.
-* User can select a local file to populate the MAIN pane.
-* Watch/reload functionality should ideally work for the selected file if possible (or gracefully degrade to manual reload).
+* Swapping panes results in the new MAIN/SUB positions having correct visual brightness/opacity.
+* No "stuck" darkened state.
 
 ---
 
-### 2) Multi-tab support for SUB PDFs
+### 2) Configurable Keybindings
 
-#### `task/multi-tab-sub-pane`
+#### `task/config-keybindings`
 
-* [x] Done
+* [ ] Not Started
 
-**Goal:** Support loading multiple reference PDFs (SUB) and switching between them via tabs, while displaying at most one MAIN and one SUB pane at a time.
+**Goal:** Allow users to customize keybindings via the config file.
 
 **Work:**
-
-* Frontend:
-  * Manage a list of loaded SUB PDFs (name, data/url).
-  * Add a tab bar (or similar selector) in the SUB pane header area.
-  * Switching tabs changes the active SUB PDF without reloading from disk if possible (cached).
-  * "Open (Sub)" button adds a new tab instead of replacing the current one.
-  * Add ability to close tabs.
+* Extend `~/.config/zview/config.toml` to support a `[keys]` section (or similar).
+* Update `frontend` to read these key mappings.
+* **Crucial:** Update the **Help Overlay** (triggered by `?`) to display the *actual* configured keys, not just hardcoded defaults.
 
 **Acceptance:**
-
-* User can load multiple files into the SUB pane.
-* Tabs allow quick switching between loaded references.
-* Zoom/scroll state is preserved per tab (ideally).
+* Users can remap keys (e.g., `j/k` to `ArrowUp/ArrowDown` etc.).
+* The Help menu reflects user changes.
+* Defaults are strictly preserved if no config is present.
 
 ---
 
-### 3) Improve focus indication
+### 3) Enhance CI and Pre-commit/Pre-push hooks
 
-#### `task/improve-focus-visibility`
+#### `task/enhance-ci`
 
-* [x] Done
+* [ ] Not Started
 
-**Goal:** Make the active pane (MAIN vs SUB) more visually distinct than just dimming the inactive one.
+**Goal:** strengthen the development workflow and ensure quality gates are automated locally and in CI.
 
 **Work:**
-
-* Frontend:
-  * Design a clearer active state (e.g., prominent colored border, header highlight, or shadow elevation).
-  * Ensure it remains accessible and visible in different lighting conditions.
-  * Consider removing or reducing the dimming effect if the new indicator is strong enough, to improve readability of the reference pane.
+* **Local:** Implement `Lefthook` (or similar) for pre-commit/pre-push checks (lint, fmt, build).
+  * Manage tools via `mise.toml` if possible.
+* **CI:** Review and strengthen GitHub Actions (or current CI system).
+  * Ensure lint/test/build passes on every PR.
+  * Check if existing workflows are sufficient or need expansion.
 
 **Acceptance:**
-
-* Current active pane is instantly recognizable.
-* Users don't struggle to read the inactive pane (due to excessive dimming).
-
----
-
-### 4) Config file support
-
-#### `task/config-file`
-
-* [x] Done
-
-**Goal:** Allow configuration (keymaps/defaults) without adding runtime deps.
-
-**Scope idea:**
-
-* Read `~/.config/zview/config.toml` (optional)
-* Only safe toggles first (watch default, zoom step, DPR cap)
+* `git commit` / `git push` automatically runs checks locally (Lefthook).
+* CI pipeline is robust and catches errors early.
 
 ---
 
-## Notes
+### 4) Documentation Maintenance
 
-* Keep PDF.js pinned to a known-good version to avoid worker mismatch surprises.
-* Performance tasks are first-class: avoid implementing features that require a TextLayer.
+#### `task/docs-maintenance`
+
+* [ ] Not Started
+
+**Goal:** Clean up and standardize documentation.
+
+**Work:**
+* Review `README.md`, `AGENTS.md`, `DEVELOPMENT.md` etc.
+* Remove outdated information.
+* **AGENTS.md check:** Review if `AGENTS.md` contains sensitive or unnecessary "internal" instructions that shouldn't be in a public repo. Move sensitive parts to a private doc or delete if obsolete.
+* Ensure all docs match the current v0.2.0+ reality.
+
+**Acceptance:**
+* Documentation is accurate and clean.
+* No confusion about how to use or develop zview.
+
+---
+
+### 5) Refactoring and Architecture cleanup
+
+#### `task/refactor-architecture`
+
+* [ ] Not Started
+
+**Goal:** Improve code quality and remove technical debt.
+
+**Work:**
+* Identify dead code or unused files.
+* Review architectural decisions (e.g., state management, backend-frontend communication).
+* Refactor for readability and maintainability.
+* "Cleaner way of writing code" — apply consistent patterns (e.g., in React components or Go handlers).
+
+**Acceptance:**
+* Codebase is cleaner and smaller (if dead code removed).
+* No regression in functionality.
