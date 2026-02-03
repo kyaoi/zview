@@ -1,8 +1,15 @@
+import { getKeys } from "../lib/config";
+
 interface HelpOverlayProps {
 	onClose: () => void;
 }
 
 export function HelpOverlay({ onClose }: HelpOverlayProps) {
+	const keys = getKeys();
+
+	// Helper to format key display
+	const fmt = (key: string) => `\`${key}\``;
+
 	return (
 		<div
 			className="fixed inset-0 z-30 grid place-items-center bg-slate-950/70 px-4"
@@ -37,11 +44,21 @@ export function HelpOverlay({ onClose }: HelpOverlayProps) {
 							Navigation
 						</p>
 						<ul className="list-disc space-y-1 pl-5">
-							<li>`j` / `k` — scroll down / up</li>
-							<li>`h` / `l` — scroll left / right</li>
-							<li>`d` / `u` — half-page down / up</li>
-							<li>`gg` — top, `G` — bottom</li>
-							<li>`n` / `p` — next / previous page</li>
+							<li>
+								{fmt(keys.scroll_down)} / {fmt(keys.scroll_up)} — scroll down / up
+							</li>
+							<li>
+								{fmt(keys.scroll_left)} / {fmt(keys.scroll_right)} — scroll left / right
+							</li>
+							<li>
+								{fmt(keys.half_page_down)} / {fmt(keys.half_page_up)} — half-page down / up
+							</li>
+							<li>
+								{fmt(keys.jump_top)} — top, {fmt(keys.jump_bottom)} — bottom
+							</li>
+							<li>
+								{fmt(keys.next_page)} / {fmt(keys.prev_page)} — next / previous page
+							</li>
 						</ul>
 					</div>
 					<div>
@@ -49,8 +66,10 @@ export function HelpOverlay({ onClose }: HelpOverlayProps) {
 							Zoom
 						</p>
 						<ul className="list-disc space-y-1 pl-5">
-							<li>`+` / `-` — zoom in / out</li>
-							<li>`=` — fit to width</li>
+							<li>
+								{fmt(keys.zoom_in)} / {fmt(keys.zoom_out)} — zoom in / out
+							</li>
+							<li>{fmt(keys.fit_width)} — fit to width</li>
 						</ul>
 					</div>
 					<div>
@@ -58,8 +77,8 @@ export function HelpOverlay({ onClose }: HelpOverlayProps) {
 							Panes
 						</p>
 						<ul className="list-disc space-y-1 pl-5">
-							<li>`Tab` — toggle focus (MAIN ↔ SUB)</li>
-							<li>`s` — swap pane positions</li>
+							<li>{fmt(keys.toggle_focus)} — toggle focus (MAIN ↔ SUB)</li>
+							<li>{fmt(keys.swap_panes)} — swap pane positions</li>
 						</ul>
 					</div>
 					<div>
@@ -67,10 +86,10 @@ export function HelpOverlay({ onClose }: HelpOverlayProps) {
 							Reload / misc
 						</p>
 						<ul className="list-disc space-y-1 pl-5">
-							<li>`r` — reload MAIN</li>
-							<li>`R` — reload MAIN (re-render SUB)</li>
-							<li>`?` — toggle this overlay</li>
-							<li>`q` — quit (close tab)</li>
+							<li>{fmt(keys.reload_main)} — reload MAIN</li>
+							<li>{fmt(keys.reload_all)} — reload MAIN (re-render SUB)</li>
+							<li>{fmt(keys.toggle_help)} — toggle this overlay</li>
+							<li>{fmt(keys.quit)} — quit (close tab)</li>
 						</ul>
 					</div>
 				</div>

@@ -25,3 +25,27 @@ scroll_step_horizontal = 64.0
 # Page scroll ratio (default: 0.5)
 # Controls how much to scroll relative to the view height when using d/u keys.
 page_scroll_ratio = 0.5
+
+# [keys]
+# Customize keybindings (defaults shown below).
+# Uncomment and modify to change key assignments.
+#
+# scroll_down = "j"
+# scroll_up = "k"
+# scroll_left = "h"
+# scroll_right = "l"
+# half_page_down = "d"
+# half_page_up = "u"
+# jump_top = "gg"
+# jump_bottom = "G"
+# next_page = "n"
+# prev_page = "p"
+# zoom_in = "+"
+# zoom_out = "-"
+# fit_width = "="
+# toggle_focus = "Tab"
+# swap_panes = "s"
+# reload_main = "r"
+# reload_all = "R"
+# toggle_help = "?"
+# quit = "q"

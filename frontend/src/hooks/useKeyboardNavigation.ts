@@ -5,6 +5,7 @@ import {
 	SCROLL_STEP_HORIZONTAL,
 	SCROLL_STEP_VERTICAL,
 } from "../lib/constants";
+import { getKeys } from "../lib/config";
 import type { ScrollSnapshot, ToastType, ViewerHandle } from "../lib/types";
 
 interface UseKeyboardNavigationOptions {
@@ -20,6 +21,30 @@ interface UseKeyboardNavigationOptions {
 	swapPanes: () => boolean;
 	addToast: (message: string, type: ToastType) => void;
 	onTabSwitch?: (direction: "prev" | "next") => void;
+}
+
+// Helper to check if a key matches a keybinding
+function matchesKey(event: KeyboardEvent, binding: string): boolean {
+	const key = event.key;
+	const keyLower = key?.toLowerCase?.() ?? "";
+	const codeLower = event.code?.toLowerCase?.() ?? "";
+
+	// Handle special key names
+	if (binding === "Tab") {
+		return key === "Tab";
+	}
+
+	// Handle compound keys like 'gg' - these are handled separately
+	if (binding.length > 1 && !binding.startsWith("Arrow")) {
+		return false;
+	}
+
+	// Check if binding matches key or code
+	if (binding === key) return true;
+	if (binding.toLowerCase() === keyLower) return true;
+	if (`key${binding.toLowerCase()}` === codeLower) return true;
+
+	return false;
 }
 
 export function useKeyboardNavigation({
@@ -61,6 +86,8 @@ export function useKeyboardNavigation({
 	}, [keysEnabled]);
 
 	useEffect(() => {
+		const keys = getKeys();
+
 		const clearSequence = () => {
 			if (keySeqTimeoutRef.current) {
 				window.clearTimeout(keySeqTimeoutRef.current);
@@ -85,9 +112,6 @@ export function useKeyboardNavigation({
 			if (tag === "input" || tag === "textarea" || tag === "select" || target?.isContentEditable)
 				return;
 
-			const keyLower = event.key?.toLowerCase?.() ?? "";
-			const codeLower = event.code?.toLowerCase?.() ?? "";
-
 			const consume = () => {
 				event.preventDefault();
 				event.stopPropagation();
@@ -99,162 +123,226 @@ export function useKeyboardNavigation({
 					? subViewerRef.current
 					: mainViewerRef.current;
 
-			// multi-key: gg
-			if (event.key === "g") {
-				if (lastKeyRef.current === "g") {
-					consume();
-					clearSequence();
-					targetViewer?.jumpToTop();
+			// Handle compound key: gg (jump to top)
+			if (keys.jump_top === "gg") {
+				if (event.key === "g") {
+					if (lastKeyRef.current === "g") {
+						consume();
+						clearSequence();
+						targetViewer?.jumpToTop();
+						return;
+					}
+					lastKeyRef.current = "g";
+					scheduleSequenceClear();
 					return;
 				}
-				lastKeyRef.current = "g";
-				scheduleSequenceClear();
-				return;
 			}
 			clearSequence();
 
-			if (codeLower === "keys" || keyLower === "s") {
+			// Swap panes
+			if (matchesKey(event, keys.swap_panes)) {
 				consume();
 				if (event.repeat) return;
 				targetViewer?.stopContinuousScroll();
 				swapPanes();
 				return;
 			}
-			switch (event.key) {
-				case "j":
-					consume();
-					if (event.repeat) {
-						targetViewer?.startContinuousScroll(0, CONT_SCROLL_PER_FRAME);
-					} else {
-						targetViewer?.scrollLine(SCROLL_STEP_VERTICAL);
-					}
-					return;
-				case "k":
-					consume();
-					if (event.repeat) {
-						targetViewer?.startContinuousScroll(0, -CONT_SCROLL_PER_FRAME);
-					} else {
-						targetViewer?.scrollLine(-SCROLL_STEP_VERTICAL);
-					}
-					return;
-				case "h":
-					consume();
-					if (event.repeat) {
-						targetViewer?.startContinuousScroll(-CONT_SCROLL_PER_FRAME, 0);
-					} else {
-						targetViewer?.scrollHorizontal(-SCROLL_STEP_HORIZONTAL);
-					}
-					return;
-				case "l":
-					consume();
-					if (event.repeat) {
-						targetViewer?.startContinuousScroll(CONT_SCROLL_PER_FRAME, 0);
-					} else {
-						targetViewer?.scrollHorizontal(SCROLL_STEP_HORIZONTAL);
-					}
-					return;
-				case "d":
-					consume();
-					if (event.repeat) {
-						targetViewer?.startContinuousScroll(0, CONT_SCROLL_FAST);
-					} else {
-						targetViewer?.scrollHalfPage(1);
-					}
-					return;
-				case "u":
-					consume();
-					if (event.repeat) {
-						targetViewer?.startContinuousScroll(0, -CONT_SCROLL_FAST);
-					} else {
-						targetViewer?.scrollHalfPage(-1);
-					}
-					return;
-				case "G":
-					consume();
-					targetViewer?.jumpToBottom();
-					return;
-				case "n":
-					consume();
-					targetViewer?.jumpByPages(1);
-					return;
-				case "p":
-					consume();
-					targetViewer?.jumpByPages(-1);
-					return;
-				case "+":
-					consume();
-					targetViewer?.zoomIn();
-					return;
-				case "-":
-					consume();
-					targetViewer?.zoomOut();
-					return;
-				case "=":
-					consume();
-					targetViewer?.fitToWidth();
-					return;
-				case "Tab":
-					consume();
-					targetViewer?.stopContinuousScroll();
-					if (hasSubRef.current) {
-						setFocusedPane(focusedPaneRef.current === "main" ? "sub" : "main");
-					} else {
-						setFocusedPane("main");
-					}
-					return;
-				case "r":
-					consume();
-					setMainReloadKey((v) => v + 1);
+
+			// Scroll down
+			if (matchesKey(event, keys.scroll_down)) {
+				consume();
+				if (event.repeat) {
+					targetViewer?.startContinuousScroll(0, CONT_SCROLL_PER_FRAME);
+				} else {
+					targetViewer?.scrollLine(SCROLL_STEP_VERTICAL);
+				}
+				return;
+			}
+
+			// Scroll up
+			if (matchesKey(event, keys.scroll_up)) {
+				consume();
+				if (event.repeat) {
+					targetViewer?.startContinuousScroll(0, -CONT_SCROLL_PER_FRAME);
+				} else {
+					targetViewer?.scrollLine(-SCROLL_STEP_VERTICAL);
+				}
+				return;
+			}
+
+			// Scroll left
+			if (matchesKey(event, keys.scroll_left)) {
+				consume();
+				if (event.repeat) {
+					targetViewer?.startContinuousScroll(-CONT_SCROLL_PER_FRAME, 0);
+				} else {
+					targetViewer?.scrollHorizontal(-SCROLL_STEP_HORIZONTAL);
+				}
+				return;
+			}
+
+			// Scroll right
+			if (matchesKey(event, keys.scroll_right)) {
+				consume();
+				if (event.repeat) {
+					targetViewer?.startContinuousScroll(CONT_SCROLL_PER_FRAME, 0);
+				} else {
+					targetViewer?.scrollHorizontal(SCROLL_STEP_HORIZONTAL);
+				}
+				return;
+			}
+
+			// Half page down
+			if (matchesKey(event, keys.half_page_down)) {
+				consume();
+				if (event.repeat) {
+					targetViewer?.startContinuousScroll(0, CONT_SCROLL_FAST);
+				} else {
+					targetViewer?.scrollHalfPage(1);
+				}
+				return;
+			}
+
+			// Half page up
+			if (matchesKey(event, keys.half_page_up)) {
+				consume();
+				if (event.repeat) {
+					targetViewer?.startContinuousScroll(0, -CONT_SCROLL_FAST);
+				} else {
+					targetViewer?.scrollHalfPage(-1);
+				}
+				return;
+			}
+
+			// Jump to bottom
+			if (matchesKey(event, keys.jump_bottom)) {
+				consume();
+				targetViewer?.jumpToBottom();
+				return;
+			}
+
+			// Next page
+			if (matchesKey(event, keys.next_page)) {
+				consume();
+				targetViewer?.jumpByPages(1);
+				return;
+			}
+
+			// Previous page
+			if (matchesKey(event, keys.prev_page)) {
+				consume();
+				targetViewer?.jumpByPages(-1);
+				return;
+			}
+
+			// Zoom in
+			if (matchesKey(event, keys.zoom_in)) {
+				consume();
+				targetViewer?.zoomIn();
+				return;
+			}
+
+			// Zoom out
+			if (matchesKey(event, keys.zoom_out)) {
+				consume();
+				targetViewer?.zoomOut();
+				return;
+			}
+
+			// Fit to width
+			if (matchesKey(event, keys.fit_width)) {
+				consume();
+				targetViewer?.fitToWidth();
+				return;
+			}
+
+			// Toggle focus
+			if (matchesKey(event, keys.toggle_focus)) {
+				consume();
+				targetViewer?.stopContinuousScroll();
+				if (hasSubRef.current) {
+					setFocusedPane(focusedPaneRef.current === "main" ? "sub" : "main");
+				} else {
 					setFocusedPane("main");
-					addToast("MAIN: reloading…", "info");
-					return;
-				case "R":
-					consume();
-					setMainReloadKey((v) => v + 1);
-					if (hasSubRef.current) {
-						subViewerRef.current?.rerender();
-					}
-					setFocusedPane("main");
-					addToast(hasSubRef.current ? "MAIN: reload (re-render SUB)" : "MAIN: reloading…", "info");
-					return;
-				case "H":
-					consume();
-					if (hasSubRef.current && focusedPaneRef.current === "sub") {
-						onTabSwitchRef.current?.("prev");
-					} else {
-						// Fallback or do nothing
-						targetViewer?.scrollHorizontal(-SCROLL_STEP_HORIZONTAL * 5); // Faster scroll? Or just ignore
-					}
-					return;
-				case "L":
-					consume();
-					if (hasSubRef.current && focusedPaneRef.current === "sub") {
-						onTabSwitchRef.current?.("next");
-					} else {
-						targetViewer?.scrollHorizontal(SCROLL_STEP_HORIZONTAL * 5);
-					}
-					return;
-				case "?":
-					consume();
-					setShowHelp((open) => !open);
-					return;
-				case "q":
-					consume();
-					if (showHelpRef.current) {
-						setShowHelp(false);
-					} else {
-						addToast("Close the tab to quit", "info");
-					}
-					return;
-				default:
-					return;
+				}
+				return;
+			}
+
+			// Reload main
+			if (matchesKey(event, keys.reload_main)) {
+				consume();
+				setMainReloadKey((v) => v + 1);
+				setFocusedPane("main");
+				addToast("MAIN: reloading…", "info");
+				return;
+			}
+
+			// Reload all
+			if (matchesKey(event, keys.reload_all)) {
+				consume();
+				setMainReloadKey((v) => v + 1);
+				if (hasSubRef.current) {
+					subViewerRef.current?.rerender();
+				}
+				setFocusedPane("main");
+				addToast(hasSubRef.current ? "MAIN: reload (re-render SUB)" : "MAIN: reloading…", "info");
+				return;
+			}
+
+			// Tab switch (H/L for SUB pane tabs)
+			if (event.key === "H") {
+				consume();
+				if (hasSubRef.current && focusedPaneRef.current === "sub") {
+					onTabSwitchRef.current?.("prev");
+				} else {
+					targetViewer?.scrollHorizontal(-SCROLL_STEP_HORIZONTAL * 5);
+				}
+				return;
+			}
+			if (event.key === "L") {
+				consume();
+				if (hasSubRef.current && focusedPaneRef.current === "sub") {
+					onTabSwitchRef.current?.("next");
+				} else {
+					targetViewer?.scrollHorizontal(SCROLL_STEP_HORIZONTAL * 5);
+				}
+				return;
+			}
+
+			// Toggle help
+			if (matchesKey(event, keys.toggle_help)) {
+				consume();
+				setShowHelp((open) => !open);
+				return;
+			}
+
+			// Quit
+			if (matchesKey(event, keys.quit)) {
+				consume();
+				if (showHelpRef.current) {
+					setShowHelp(false);
+				} else {
+					addToast("Close the tab to quit", "info");
+				}
+				return;
 			}
 		};
 
 		window.addEventListener("keydown", handleKey, { capture: true });
+
+		// Get scroll-related keys for keyup handling
+		const scrollKeys = [
+			keys.scroll_down,
+			keys.scroll_up,
+			keys.scroll_left,
+			keys.scroll_right,
+			keys.half_page_down,
+			keys.half_page_up,
+		];
+
 		const handleKeyUp = (event: KeyboardEvent) => {
 			if (!keysEnabledRef.current) return;
-			if (["j", "k", "h", "l", "d", "u"].includes(event.key)) {
+			if (scrollKeys.includes(event.key)) {
 				const targetViewer =
 					focusedPaneRef.current === "sub" && hasSubRef.current
 						? subViewerRef.current

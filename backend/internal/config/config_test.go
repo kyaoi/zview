@@ -27,6 +27,20 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.PageScrollRatio != 0.5 {
 		t.Errorf("Default PageScrollRatio should be 0.5, got %f", cfg.PageScrollRatio)
 	}
+
+	// Test default keys
+	if cfg.Keys.ScrollDown != "j" {
+		t.Errorf("Default ScrollDown should be 'j', got %s", cfg.Keys.ScrollDown)
+	}
+	if cfg.Keys.ScrollUp != "k" {
+		t.Errorf("Default ScrollUp should be 'k', got %s", cfg.Keys.ScrollUp)
+	}
+	if cfg.Keys.JumpTop != "gg" {
+		t.Errorf("Default JumpTop should be 'gg', got %s", cfg.Keys.JumpTop)
+	}
+	if cfg.Keys.ToggleFocus != "Tab" {
+		t.Errorf("Default ToggleFocus should be 'Tab', got %s", cfg.Keys.ToggleFocus)
+	}
 }
 
 func TestLoadNoConfig(t *testing.T) {

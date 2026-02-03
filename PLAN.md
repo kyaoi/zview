@@ -12,9 +12,9 @@ This plan breaks development of **zview** into small, reviewable tasks.
 
 * [ ] **Task 1:** Fix PDF darkening on swap
 * [ ] **Task 2:** Configurable Keybindings
-* [ ] **Task 3:** Enhance CI and Pre-commit/Pre-push hooks
+* [x] **Task 3:** Enhance CI and Pre-commit/Pre-push hooks
 * [ ] **Task 4:** Documentation Maintenance
-* [ ] **Task 5:** Refactoring and Architecture cleanup
+* [x] **Task 5:** Refactoring and Architecture cleanup
 
 ---
 
@@ -63,7 +63,7 @@ A task is “done” when:
 
 #### `task/config-keybindings`
 
-* [ ] Not Started
+* [/] In Progress
 
 **Goal:** Allow users to customize keybindings via the config file.
 
@@ -124,7 +124,7 @@ A task is “done” when:
 
 #### `task/refactor-architecture`
 
-* [ ] Not Started
+* [x] Not Started
 
 **Goal:** Improve code quality and remove technical debt.
 
