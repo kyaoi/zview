@@ -1,4 +1,5 @@
-package main
+// Package session provides session management for zview instances.
+package session
 
 import (
 	"encoding/json"
@@ -9,7 +10,7 @@ import (
 	"time"
 )
 
-// Session represents a running zview instance
+// Session represents a running zview instance.
 type Session struct {
 	PID       int       `json:"pid"`
 	Port      int       `json:"port"`
@@ -23,8 +24,8 @@ type SessionFile struct {
 	Sessions []Session `json:"sessions"`
 }
 
-// getSessionFilePath returns the path to the sessions file
-func getSessionFilePath() (string, error) {
+// getFilePath returns the path to the sessions file.
+func getFilePath() (string, error) {
 	homeDir, err := os.UserHomeDir()
 	if err != nil {
 		return "", fmt.Errorf("failed to get home directory: %w", err)
@@ -32,9 +33,9 @@ func getSessionFilePath() (string, error) {
 	return filepath.Join(homeDir, ".config", "zview", "sessions.json"), nil
 }
 
-// ensureSessionDir creates the config directory if it doesn't exist
-func ensureSessionDir() error {
-	path, err := getSessionFilePath()
+// ensureDir creates the config directory if it doesn't exist.
+func ensureDir() error {
+	path, err := getFilePath()
 	if err != nil {
 		return err
 	}
@@ -42,9 +43,9 @@ func ensureSessionDir() error {
 	return os.MkdirAll(dir, 0755)
 }
 
-// loadSessions reads the sessions file
-func loadSessions() (SessionFile, error) {
-	path, err := getSessionFilePath()
+// load reads the sessions file.
+func load() (SessionFile, error) {
+	path, err := getFilePath()
 	if err != nil {
 		return SessionFile{}, err
 	}
@@ -65,13 +66,13 @@ func loadSessions() (SessionFile, error) {
 	return sf, nil
 }
 
-// saveSessions writes the sessions file
-func saveSessions(sf SessionFile) error {
-	if err := ensureSessionDir(); err != nil {
+// save writes the sessions file.
+func save(sf SessionFile) error {
+	if err := ensureDir(); err != nil {
 		return err
 	}
 
-	path, err := getSessionFilePath()
+	path, err := getFilePath()
 	if err != nil {
 		return err
 	}
@@ -84,8 +85,8 @@ func saveSessions(sf SessionFile) error {
 	return os.WriteFile(path, data, 0644)
 }
 
-// isProcessRunning checks if a process with the given PID is running
-func isProcessRunning(pid int) bool {
+// IsProcessRunning checks if a process with the given PID is running.
+func IsProcessRunning(pid int) bool {
 	process, err := os.FindProcess(pid)
 	if err != nil {
 		return false
@@ -95,9 +96,9 @@ func isProcessRunning(pid int) bool {
 	return err == nil
 }
 
-// registerSession adds the current process to the sessions file
-func registerSession(port int, mainPath, subPath string) error {
-	sf, err := loadSessions()
+// Register adds the current process to the sessions file.
+func Register(port int, mainPath, subPath string) error {
+	sf, err := load()
 	if err != nil {
 		return err
 	}
@@ -111,17 +112,17 @@ func registerSession(port int, mainPath, subPath string) error {
 	}
 
 	sf.Sessions = append(sf.Sessions, session)
-	return saveSessions(sf)
+	return save(sf)
 }
 
-// unregisterSession removes the current process from the sessions file
-func unregisterSession() error {
-	return unregisterSessionByPID(os.Getpid())
+// Unregister removes the current process from the sessions file.
+func Unregister() error {
+	return UnregisterByPID(os.Getpid())
 }
 
-// unregisterSessionByPID removes a specific PID from the sessions file
-func unregisterSessionByPID(pid int) error {
-	sf, err := loadSessions()
+// UnregisterByPID removes a specific PID from the sessions file.
+func UnregisterByPID(pid int) error {
+	sf, err := load()
 	if err != nil {
 		return err
 	}
@@ -134,12 +135,12 @@ func unregisterSessionByPID(pid int) error {
 	}
 
 	sf.Sessions = remaining
-	return saveSessions(sf)
+	return save(sf)
 }
 
-// listSessions returns all valid (running) sessions, cleaning up stale ones
-func listSessions() ([]Session, error) {
-	sf, err := loadSessions()
+// List returns all valid (running) sessions, cleaning up stale ones.
+func List() ([]Session, error) {
+	sf, err := load()
 	if err != nil {
 		return nil, err
 	}
@@ -148,7 +149,7 @@ func listSessions() ([]Session, error) {
 	var changed bool
 
 	for _, s := range sf.Sessions {
-		if isProcessRunning(s.PID) {
+		if IsProcessRunning(s.PID) {
 			valid = append(valid, s)
 		} else {
 			changed = true
@@ -158,15 +159,15 @@ func listSessions() ([]Session, error) {
 	// Clean up stale sessions
 	if changed {
 		sf.Sessions = valid
-		_ = saveSessions(sf)
+		_ = save(sf)
 	}
 
 	return valid, nil
 }
 
-// findSessionByPort returns the session running on the given port
-func findSessionByPort(port int) (*Session, error) {
-	sessions, err := listSessions()
+// FindByPort returns the session running on the given port.
+func FindByPort(port int) (*Session, error) {
+	sessions, err := List()
 	if err != nil {
 		return nil, err
 	}

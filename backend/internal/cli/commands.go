@@ -1,4 +1,5 @@
-package main
+// Package cli provides command-line interface and subcommand implementations for zview.
+package cli
 
 import (
 	"bufio"
@@ -8,11 +9,13 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/kyaoi/zview/backend/internal/session"
 )
 
-// runPsCommand lists all running zview sessions
-func runPsCommand() error {
-	sessions, err := listSessions()
+// RunPS lists all running zview sessions.
+func RunPS() error {
+	sessions, err := session.List()
 	if err != nil {
 		return fmt.Errorf("failed to list sessions: %w", err)
 	}
@@ -36,8 +39,8 @@ func runPsCommand() error {
 	return nil
 }
 
-// runKillCommand terminates zview instances
-func runKillCommand(args []string) error {
+// RunKill terminates zview instances.
+func RunKill(args []string) error {
 	if len(args) > 0 {
 		// Kill by port
 		port, err := strconv.Atoi(args[0])
@@ -51,31 +54,29 @@ func runKillCommand(args []string) error {
 	return killInteractive()
 }
 
-// killByPort terminates the session running on the given port
 func killByPort(port int) error {
-	session, err := findSessionByPort(port)
+	sess, err := session.FindByPort(port)
 	if err != nil {
 		return err
 	}
-	if session == nil {
+	if sess == nil {
 		return fmt.Errorf("no zview instance found on port %d", port)
 	}
 
-	if err := terminateProcess(session.PID); err != nil {
-		return fmt.Errorf("failed to terminate process %d: %w", session.PID, err)
+	if err := terminateProcess(sess.PID); err != nil {
+		return fmt.Errorf("failed to terminate process %d: %w", sess.PID, err)
 	}
 
-	if err := unregisterSessionByPID(session.PID); err != nil {
+	if err := session.UnregisterByPID(sess.PID); err != nil {
 		return fmt.Errorf("failed to unregister session: %w", err)
 	}
 
-	fmt.Printf("Terminated zview on port %d (PID: %d)\n", port, session.PID)
+	fmt.Printf("Terminated zview on port %d (PID: %d)\n", port, sess.PID)
 	return nil
 }
 
-// killInteractive shows a list of sessions and prompts for selection
 func killInteractive() error {
-	sessions, err := listSessions()
+	sessions, err := session.List()
 	if err != nil {
 		return fmt.Errorf("failed to list sessions: %w", err)
 	}
@@ -141,7 +142,7 @@ func killInteractive() error {
 			fmt.Printf("Failed to terminate PID %d: %v\n", s.PID, err)
 			continue
 		}
-		if err := unregisterSessionByPID(s.PID); err != nil {
+		if err := session.UnregisterByPID(s.PID); err != nil {
 			fmt.Printf("Failed to unregister PID %d: %v\n", s.PID, err)
 		}
 		fmt.Printf("Terminated zview on port %d (PID: %d)\n", s.Port, s.PID)
@@ -152,7 +153,6 @@ func killInteractive() error {
 	return nil
 }
 
-// terminateProcess sends SIGTERM to the given PID
 func terminateProcess(pid int) error {
 	process, err := os.FindProcess(pid)
 	if err != nil {
@@ -168,7 +168,7 @@ func terminateProcess(pid int) error {
 	done := make(chan struct{})
 	go func() {
 		for i := 0; i < 10; i++ {
-			if !isProcessRunning(pid) {
+			if !session.IsProcessRunning(pid) {
 				close(done)
 				return
 			}
@@ -181,7 +181,6 @@ func terminateProcess(pid int) error {
 	return nil
 }
 
-// truncatePath shortens a path for display
 func truncatePath(path string, maxLen int) string {
 	if path == "" {
 		return "(none)"

@@ -1,4 +1,5 @@
-package main
+// Package state provides application state management for zview.
+package state
 
 import (
 	"os"
@@ -7,7 +8,7 @@ import (
 	"github.com/google/uuid"
 )
 
-// SubTab represents a loaded SUB PDF tab
+// SubTab represents a loaded SUB PDF tab.
 type SubTab struct {
 	ID     string `json:"id"`
 	Name   string `json:"name"`
@@ -15,7 +16,7 @@ type SubTab struct {
 	IsTemp bool   `json:"-"` // whether this is a temporary file
 }
 
-// AppState holds the runtime configuration of PDFs
+// AppState holds the runtime state of the application.
 type AppState struct {
 	mu            sync.RWMutex
 	mainPath      string
@@ -24,19 +25,22 @@ type AppState struct {
 	tempMainFiles []string // track temp files for MAIN to clean up
 }
 
-func NewAppState(mainPath string) *AppState {
+// New creates a new AppState with the given main PDF path.
+func New(mainPath string) *AppState {
 	return &AppState{
 		mainPath: mainPath,
 		subTabs:  make(map[string]*SubTab),
 	}
 }
 
+// GetMainPath returns the current main PDF path.
 func (s *AppState) GetMainPath() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.mainPath
 }
 
+// SetMainPath sets the main PDF path.
 func (s *AppState) SetMainPath(path string, isTemp bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -46,7 +50,7 @@ func (s *AppState) SetMainPath(path string, isTemp bool) {
 	}
 }
 
-// GetSubTabs returns a copy of the sub tabs map
+// GetSubTabs returns a copy of all sub tabs.
 func (s *AppState) GetSubTabs() []SubTab {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -57,7 +61,7 @@ func (s *AppState) GetSubTabs() []SubTab {
 	return tabs
 }
 
-// GetSubTab returns a single sub tab by ID
+// GetSubTab returns a single sub tab by ID.
 func (s *AppState) GetSubTab(id string) *SubTab {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -67,7 +71,7 @@ func (s *AppState) GetSubTab(id string) *SubTab {
 	return nil
 }
 
-// AddSubTab adds a new SUB tab and returns its ID
+// AddSubTab adds a new SUB tab and returns its ID.
 func (s *AppState) AddSubTab(name, path string, isTemp bool) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -82,7 +86,7 @@ func (s *AppState) AddSubTab(name, path string, isTemp bool) string {
 	return id
 }
 
-// RemoveSubTab removes a SUB tab by ID and cleans up temp files
+// RemoveSubTab removes a SUB tab by ID and cleans up temp files.
 func (s *AppState) RemoveSubTab(id string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -94,7 +98,7 @@ func (s *AppState) RemoveSubTab(id string) bool {
 		_ = os.Remove(tab.Path)
 	}
 	delete(s.subTabs, id)
-	// If we removed the active tab, clear activeSubId or set to another tab
+	// If we removed the active tab, select another one
 	if s.activeSubId == id {
 		s.activeSubId = ""
 		for newId := range s.subTabs {
@@ -105,21 +109,21 @@ func (s *AppState) RemoveSubTab(id string) bool {
 	return true
 }
 
-// HasSub returns true if there are any sub tabs
+// HasSub returns true if there are any sub tabs.
 func (s *AppState) HasSub() bool {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return len(s.subTabs) > 0
 }
 
-// GetActiveSubId returns the active sub tab ID
+// GetActiveSubId returns the active sub tab ID.
 func (s *AppState) GetActiveSubId() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return s.activeSubId
 }
 
-// SetActiveSubId sets the active sub tab ID
+// SetActiveSubId sets the active sub tab ID.
 func (s *AppState) SetActiveSubId(id string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -128,7 +132,7 @@ func (s *AppState) SetActiveSubId(id string) {
 	}
 }
 
-// Cleanup removes all temporary files
+// Cleanup removes all temporary files and resets state.
 func (s *AppState) Cleanup() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -144,7 +148,7 @@ func (s *AppState) Cleanup() {
 	s.subTabs = make(map[string]*SubTab)
 }
 
-// Legacy compatibility: GetSubPath returns the path of the active sub tab
+// GetSubPath returns the path of the active sub tab (legacy compatibility).
 func (s *AppState) GetSubPath() string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

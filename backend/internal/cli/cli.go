@@ -1,4 +1,5 @@
-package main
+// Package cli provides command-line interface parsing for zview.
+package cli
 
 import (
 	"errors"
@@ -6,40 +7,56 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/kyaoi/zview/backend/internal/config"
 )
 
-var errShowHelp = errors.New("show help")
+// ErrShowHelp indicates that help was displayed and the program should exit.
+var ErrShowHelp = errors.New("show help")
 
-// CommandType represents the type of command to run
+const DefaultPort = 8571
+
+// CommandType represents the type of command to run.
 type CommandType int
 
 const (
+	// CommandView is the default command to view PDFs.
 	CommandView CommandType = iota
-	CommandPs
+	// CommandPS lists running zview instances.
+	CommandPS
+	// CommandKill terminates zview instances.
 	CommandKill
 )
 
-type options struct {
-	command       CommandType
-	killArgs      []string // args for kill command
-	mainPath      string
-	subPath       string
-	focus         string
-	watch         bool
-	port          int
-	portSpecified bool
-	openBrowser   bool
-	config        Config
+// Options holds the parsed command-line options.
+type Options struct {
+	Command       CommandType
+	KillArgs      []string // args for kill command
+	MainPath      string
+	SubPath       string
+	Focus         string
+	Watch         bool
+	Port          int
+	PortSpecified bool
+	OpenBrowser   bool
+	Config        config.Config
 }
 
-func parseArgs(args []string) (options, error) {
+var (
+	Version = "dev"
+	Commit  = "none"
+	Date    = "unknown"
+)
+
+// Parse parses command-line arguments and returns Options.
+func Parse(args []string) (Options, error) {
 	// Check for subcommands first
 	if len(args) > 0 {
 		switch args[0] {
 		case "ps":
-			return options{command: CommandPs}, nil
+			return Options{Command: CommandPS}, nil
 		case "kill":
-			return options{command: CommandKill, killArgs: args[1:]}, nil
+			return Options{Command: CommandKill, KillArgs: args[1:]}, nil
 		}
 	}
 
@@ -63,30 +80,24 @@ func parseArgs(args []string) (options, error) {
 	}
 
 	// Load config first
-	cfg, err := LoadConfig()
-	if err != nil {
-		// If config is malformed, we might want to warn, but for now just proceed with defaults if error is strictly loading issue.
-		// However, LoadConfig returns defaults on error unless it's a parsing error.
-		// Let's print a warning if it's a parsing error?
-		// For simplicity, we just use what we get.
-	}
-	opts := options{
-		command:     CommandView,
-		focus:       "main",
-		watch:       cfg.Watch,
-		port:        defaultPort,
-		openBrowser: true,
-		config:      cfg,
+	cfg, _ := config.Load()
+	opts := Options{
+		Command:     CommandView,
+		Focus:       "main",
+		Watch:       cfg.Watch,
+		Port:        DefaultPort,
+		OpenBrowser: true,
+		Config:      cfg,
 	}
 
-	fs.StringVar(&opts.subPath, "sub", "", "path to SUB PDF")
-	fs.StringVar(&opts.focus, "focus", opts.focus, "initial focus: main|sub")
+	fs.StringVar(&opts.SubPath, "sub", "", "path to SUB PDF")
+	fs.StringVar(&opts.Focus, "focus", opts.Focus, "initial focus: main|sub")
 	helpFlag := fs.Bool("help", false, "show this help and exit")
 
 	watchFlag := fs.Bool("watch", cfg.Watch, "enable file watching for MAIN (default)")
 	noWatchFlag := fs.Bool("no-watch", false, "disable file watching for MAIN")
 
-	fs.IntVar(&opts.port, "port", opts.port, "port to bind (0 = auto-select)")
+	fs.IntVar(&opts.Port, "port", opts.Port, "port to bind (0 = auto-select)")
 
 	noOpenFlag := fs.Bool("no-open", false, "do not auto-open browser tab")
 	versionFlag := fs.Bool("version", false, "print version and exit")
@@ -95,54 +106,50 @@ func parseArgs(args []string) (options, error) {
 	if err := fs.Parse(reordered); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
 			// Usage() is already called by flag package
-			return options{}, errShowHelp
+			return Options{}, ErrShowHelp
 		}
-		return options{}, err
+		return Options{}, err
 	}
 	if *helpFlag {
 		fs.Usage()
-		return options{}, errShowHelp
+		return Options{}, ErrShowHelp
 	}
 	if *versionFlag {
-		fmt.Printf("zview %s (%s) built at %s\n", version, commit, date)
+		fmt.Printf("zview %s (%s) built at %s\n", Version, Commit, Date)
 		os.Exit(0)
 	}
 
 	remaining := fs.Args()
 	if len(remaining) > 2 {
-		return options{}, fmt.Errorf("expected at most MAIN and SUB paths, got %d", len(remaining))
+		return Options{}, fmt.Errorf("expected at most MAIN and SUB paths, got %d", len(remaining))
 	}
 	if len(remaining) >= 1 {
-		opts.mainPath = remaining[0]
+		opts.MainPath = remaining[0]
 	}
-	if len(remaining) == 2 && opts.subPath == "" {
-		opts.subPath = remaining[1]
+	if len(remaining) == 2 && opts.SubPath == "" {
+		opts.SubPath = remaining[1]
 	}
 
 	// Update watch based on flags
-	// logic: if user explicitly sets --watch=false (via no-watch or watch=false), it overrides config.
-	// fs.Parse sets *watchFlag.
-	// But if user DOESN'T provide flag, *watchFlag is default (which is cfg.Watch).
-	// So *watchFlag is correct in both cases.
-	opts.watch = *watchFlag
+	opts.Watch = *watchFlag
 	if *noWatchFlag {
-		opts.watch = false
+		opts.Watch = false
 	}
 	// Update config with final watch state so frontend knows
-	opts.config.Watch = opts.watch
+	opts.Config.Watch = opts.Watch
 
-	opts.openBrowser = !*noOpenFlag
+	opts.OpenBrowser = !*noOpenFlag
 
 	// Check if port was explicitly specified
 	fs.Visit(func(f *flag.Flag) {
 		if f.Name == "port" {
-			opts.portSpecified = true
+			opts.PortSpecified = true
 		}
 	})
 
-	opts.focus = strings.ToLower(opts.focus)
-	if opts.focus != "main" && opts.focus != "sub" {
-		return options{}, fmt.Errorf("invalid --focus value %q (use main or sub)", opts.focus)
+	opts.Focus = strings.ToLower(opts.Focus)
+	if opts.Focus != "main" && opts.Focus != "sub" {
+		return Options{}, fmt.Errorf("invalid --focus value %q (use main or sub)", opts.Focus)
 	}
 
 	return opts, nil
