@@ -1,6 +1,6 @@
 # Frontend (Vite + React + Tailwind CSS)
 
-Web UI shell built with Vite + TypeScript. PDF rendering will arrive in the next task.
+Web UI shell built with Vite + TypeScript, powered by PDF.js.
 
 ## Requirements
 
@@ -34,7 +34,7 @@ pnpm test      # Placeholder
 
 ## Current UI
 
-- Top toolbar with required buttons: `Open(Main)`, `Open(Sub)`, `Swap`, `Reload(Main)`, `Help`.
-- Starts with MAIN only; clicking **Open(Sub)** reveals the SUB pane.
-- Persistent badges in pane headers (`MAIN` / `SUB`) and a focus indicator placeholder.
-- Lightweight help overlay (copy will expand when features are wired).
+- Top toolbar with actions: `Open(Main)`, `Open(Sub)`, `Swap`, `Reload`, `Help`.
+- **MAIN Pane**: Displays the primary PDF, supports auto-reload.
+- **SUB Pane**: Secondary view, supports multiple tabs.
+- **Keybindings**: Vim-like navigation (j/k/d/u), distinct from browser defaults.
