@@ -1,4 +1,5 @@
-package main
+// Package config provides configuration loading and management for zview.
+package config
 
 import (
 	"errors"
@@ -8,6 +9,7 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
+// Config holds the application configuration.
 type Config struct {
 	Watch                bool    `toml:"watch" json:"watch"`
 	ZoomStep             float64 `toml:"zoom_step" json:"zoom_step"`
@@ -17,7 +19,8 @@ type Config struct {
 	PageScrollRatio      float64 `toml:"page_scroll_ratio" json:"page_scroll_ratio"`
 }
 
-func DefaultConfig() Config {
+// Default returns the default configuration values.
+func Default() Config {
 	return Config{
 		Watch:                true,
 		ZoomStep:             1.2,
@@ -28,8 +31,10 @@ func DefaultConfig() Config {
 	}
 }
 
-func LoadConfig() (Config, error) {
-	cfg := DefaultConfig()
+// Load reads configuration from the user's config file.
+// If no config file exists, default values are returned.
+func Load() (Config, error) {
+	cfg := Default()
 
 	homeDir, err := os.UserHomeDir()
 	if err != nil {

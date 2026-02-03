@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"embed"
 	"errors"
 	"fmt"
 	"log"
@@ -13,21 +14,23 @@ import (
 	"path/filepath"
 	"runtime"
 	"syscall"
+
+	"github.com/kyaoi/zview/backend/internal/cli"
+	"github.com/kyaoi/zview/backend/internal/server"
+	"github.com/kyaoi/zview/backend/internal/session"
+	"github.com/kyaoi/zview/backend/internal/state"
+	"github.com/kyaoi/zview/backend/internal/watcher"
 )
 
-const defaultPort = 8571
-const maxUploadSize = 300 * 1024 * 1024 // 300MB
-
-var (
-	version = "dev"
-	commit  = "none"
-	date    = "unknown"
-)
+// Embedded frontend (built via `pnpm build` → backend/dist).
+//
+//go:embed dist/* dist/**/*
+var embeddedDist embed.FS
 
 func main() {
-	opts, err := parseArgs(os.Args[1:])
+	opts, err := cli.Parse(os.Args[1:])
 	if err != nil {
-		if errors.Is(err, errShowHelp) {
+		if errors.Is(err, cli.ErrShowHelp) {
 			os.Exit(0)
 		}
 		fmt.Fprintln(os.Stderr, "Error:", err)
@@ -35,15 +38,15 @@ func main() {
 	}
 
 	// Handle subcommands
-	switch opts.command {
-	case CommandPs:
-		if err := runPsCommand(); err != nil {
+	switch opts.Command {
+	case cli.CommandPS:
+		if err := cli.RunPS(); err != nil {
 			fmt.Fprintln(os.Stderr, "Error:", err)
 			os.Exit(1)
 		}
 		return
-	case CommandKill:
-		if err := runKillCommand(opts.killArgs); err != nil {
+	case cli.CommandKill:
+		if err := cli.RunKill(opts.KillArgs); err != nil {
 			fmt.Fprintln(os.Stderr, "Error:", err)
 			os.Exit(1)
 		}
@@ -53,67 +56,68 @@ func main() {
 	// CommandView: run the viewer server
 
 	// Validate MAIN path if provided
-	if opts.mainPath != "" {
-		info, err := os.Stat(opts.mainPath)
+	if opts.MainPath != "" {
+		info, err := os.Stat(opts.MainPath)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: MAIN file %q does not exist\n", opts.mainPath)
+			fmt.Fprintf(os.Stderr, "Error: MAIN file %q does not exist\n", opts.MainPath)
 			os.Exit(1)
 		}
 		if info.IsDir() {
-			fmt.Fprintf(os.Stderr, "Error: MAIN path %q is a directory, expected file\n", opts.mainPath)
+			fmt.Fprintf(os.Stderr, "Error: MAIN path %q is a directory, expected file\n", opts.MainPath)
 			os.Exit(1)
 		}
 	}
 
 	// Validate SUB path if provided
-	if opts.subPath != "" {
-		info, err := os.Stat(opts.subPath)
+	if opts.SubPath != "" {
+		info, err := os.Stat(opts.SubPath)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: SUB file %q does not exist\n", opts.subPath)
+			fmt.Fprintf(os.Stderr, "Error: SUB file %q does not exist\n", opts.SubPath)
 			os.Exit(1)
 		}
 		if info.IsDir() {
-			fmt.Fprintf(os.Stderr, "Error: SUB path %q is a directory, expected file\n", opts.subPath)
+			fmt.Fprintf(os.Stderr, "Error: SUB path %q is a directory, expected file\n", opts.SubPath)
 			os.Exit(1)
 		}
 	}
 
 	// Initialize state
-	state := NewAppState(opts.mainPath)
-	if opts.subPath != "" {
+	appState := state.New(opts.MainPath)
+	if opts.SubPath != "" {
 		// Use filename as tab name
-		name := filepath.Base(opts.subPath)
-		state.AddSubTab(name, opts.subPath, false)
+		name := filepath.Base(opts.SubPath)
+		appState.AddSubTab(name, opts.SubPath, false)
 	}
-	defer state.Cleanup()
+	defer appState.Cleanup()
 
 	// Load embedded frontend
-	dist, err := loadEmbeddedDist()
+	dist, err := server.LoadEmbeddedDist(embeddedDist)
 	if err != nil {
 		log.Fatalf("failed to load embedded dist: %v", err)
 	}
 
 	// Set up broadcaster for SSE
-	broadcaster := NewBroadcaster()
+	broadcaster := server.New()
 
 	// Start file watcher if enabled
-	var stopWatcher func()
-	if opts.watch && opts.mainPath != "" {
-		stopWatcher = startWatcher(opts.mainPath, broadcaster)
+	if opts.Watch && opts.MainPath != "" {
+		stopWatcher := watcher.Start(opts.MainPath, func() {
+			broadcaster.Broadcast("main-change", "")
+		})
 		defer stopWatcher()
 	}
 
 	// Set up HTTP routes
 	mux := http.NewServeMux()
-	mux.Handle("/", spaHandler(dist, opts.config))
-	mux.HandleFunc("/api/main.pdf", handleMainPDF(state))
-	mux.HandleFunc("/api/sub.pdf", handleSubPDF(state))
-	mux.HandleFunc("/api/bootstrap", handleBootstrap(state, opts))
-	mux.HandleFunc("/api/sub/upload", handleSubUpload(state))
-	mux.HandleFunc("/api/main/upload", handleMainUpload(state, broadcaster))
+	mux.Handle("/", server.SPAHandler(http.FS(dist), opts.Config))
+	mux.HandleFunc("/api/main.pdf", server.HandleMainPDF(appState))
+	mux.HandleFunc("/api/sub.pdf", server.HandleSubPDF(appState))
+	mux.HandleFunc("/api/bootstrap", server.HandleBootstrap(appState, opts.Focus, opts.Watch))
+	mux.HandleFunc("/api/sub/upload", server.HandleSubUpload(appState))
+	mux.HandleFunc("/api/main/upload", server.HandleMainUpload(appState, broadcaster))
 	mux.HandleFunc("/api/sub", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodDelete {
-			handleSubDelete(state)(w, r)
+			server.HandleSubDelete(appState)(w, r)
 			return
 		}
 		http.NotFound(w, r)
@@ -123,20 +127,20 @@ func main() {
 	// Start server with dynamic port selection
 	var listener net.Listener
 
-	if opts.portSpecified {
+	if opts.PortSpecified {
 		// User requested specific port (or 0 for random). Fail if unavailable.
-		addr := fmt.Sprintf("127.0.0.1:%d", opts.port)
+		addr := fmt.Sprintf("127.0.0.1:%d", opts.Port)
 		listener, err = net.Listen("tcp", addr)
 		if err != nil {
 			log.Fatalf("failed to listen on %s: %v", addr, err)
 		}
 	} else {
 		// Default behavior: try default port, fallback to random
-		addr := fmt.Sprintf("127.0.0.1:%d", opts.port)
+		addr := fmt.Sprintf("127.0.0.1:%d", opts.Port)
 		listener, err = net.Listen("tcp", addr)
 		if err != nil {
 			// If default port failed, try random
-			log.Printf("Port %d is busy, trying a random port...", opts.port)
+			log.Printf("Port %d is busy, trying a random port...", opts.Port)
 			listener, err = net.Listen("tcp", "127.0.0.1:0")
 			if err != nil {
 				log.Fatalf("failed to listen on random port: %v", err)
@@ -152,8 +156,8 @@ func main() {
 
 	// Register session
 	// For session registration, we just pass the active/first sub path or empty
-	initialSubPath := state.GetSubPath()
-	if err := registerSession(actualPort, opts.mainPath, initialSubPath); err != nil {
+	initialSubPath := appState.GetSubPath()
+	if err := session.Register(actualPort, opts.MainPath, initialSubPath); err != nil {
 		log.Printf("Warning: failed to register session: %v", err)
 	}
 
@@ -161,29 +165,29 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	server := &http.Server{Handler: mux}
+	srv := &http.Server{Handler: mux}
 
 	go func() {
 		<-sigChan
 		log.Println("Shutting down...")
 
 		// Unregister session
-		if err := unregisterSession(); err != nil {
+		if err := session.Unregister(); err != nil {
 			log.Printf("Warning: failed to unregister session: %v", err)
 		}
 
 		// Gracefully shutdown the server
-		if err := server.Shutdown(context.Background()); err != nil {
+		if err := srv.Shutdown(context.Background()); err != nil {
 			log.Printf("Error during shutdown: %v", err)
 		}
 	}()
 
 	// Open browser if requested
-	if opts.openBrowser {
+	if opts.OpenBrowser {
 		openBrowser(url)
 	}
 
-	if err := server.Serve(listener); err != nil && err != http.ErrServerClosed {
+	if err := srv.Serve(listener); err != nil && err != http.ErrServerClosed {
 		log.Fatal(err)
 	}
 }

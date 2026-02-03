@@ -176,7 +176,9 @@ When changing viewer behavior, manually verify:
 Whenever behavior changes, update:
 
 * `README.md` (user-facing usage/keys)
-* `TECH_STACK.md` (stack/architecture decisions)
+* `docs/TECH_STACK.md` (stack/architecture decisions)
+* `docs/ARCHITECTURE.md` (system diagrams and structure)
+* `docs/CODING_RULES.md` (coding standards)
 * `PLAN.md` (if task structure changes)
 
 Keep docs short and practical.

@@ -79,6 +79,24 @@ Design priorities: **speed**, **low memory**, **simple distribution**, **read-on
 * `--port <N>` — choose port
 * `--no-open` — don’t auto-open the browser
 
+
+### Package Structure
+
+The backend is organized into internal packages:
+
+```
+backend/
+├── main.go              # Entry point
+└── internal/
+    ├── cli/             # CLI parsing & subcommands
+    ├── config/          # Configuration loading
+    ├── server/          # HTTP handlers, SSE
+    ├── session/         # Instance management
+    ├── state/           # Application state
+    └── watcher/         # File watching
+```
+
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for details.
 ---
 
 ## Frontend: Vite + TypeScript
