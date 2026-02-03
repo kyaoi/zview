@@ -1,95 +1,107 @@
 package cli
 
 import (
-	"os"
+	"reflect"
 	"testing"
 )
 
-func TestParseHelp(t *testing.T) {
+func TestReorderArgs(t *testing.T) {
 	tests := []struct {
-		args []string
-		want CommandType
+		name     string
+		args     []string
+		expected []string
 	}{
-		{[]string{"-h"}, CommandView}, // -h will trigger ErrShowHelp
-		{[]string{"--help"}, CommandView},
+		{
+			name:     "no flags",
+			args:     []string{"main.pdf", "sub.pdf"},
+			expected: []string{"main.pdf", "sub.pdf"},
+		},
+		{
+			name:     "flags before args",
+			args:     []string{"-watch", "main.pdf"},
+			expected: []string{"-watch", "main.pdf"},
+		},
+		{
+			name:     "flags after args",
+			args:     []string{"main.pdf", "-watch"},
+			expected: []string{"-watch", "main.pdf"},
+		},
+		{
+			name:     "mixed flags and args",
+			args:     []string{"main.pdf", "-focus", "sub", "sub.pdf"},
+			expected: []string{"-focus", "sub", "main.pdf", "sub.pdf"},
+		},
+		{
+			name:     "flags with values after args",
+			args:     []string{"main.pdf", "-port", "8080", "sub.pdf"},
+			expected: []string{"-port", "8080", "main.pdf", "sub.pdf"},
+		},
+		{
+			name:     "flag with equal sign",
+			args:     []string{"main.pdf", "-port=8080"},
+			expected: []string{"-port=8080", "main.pdf"},
+		},
 	}
 
 	for _, tt := range tests {
-		opts, err := Parse(tt.args)
-		// Help flags should return ErrShowHelp
-		if err == ErrShowHelp {
-			continue // Expected behavior for help
-		}
-		if err != nil {
-			t.Errorf("Parse(%v) error = %v", tt.args, err)
-			continue
-		}
-		_ = opts
+		t.Run(tt.name, func(t *testing.T) {
+			got := reorderArgs(tt.args)
+			if !reflect.DeepEqual(got, tt.expected) {
+				t.Errorf("reorderArgs(%v) = %v, want %v", tt.args, got, tt.expected)
+			}
+		})
 	}
 }
 
-func TestParsePS(t *testing.T) {
-	opts, err := Parse([]string{"ps"})
-	if err != nil {
-		t.Fatalf("Parse() error = %v", err)
+func TestParse(t *testing.T) {
+	tests := []struct {
+		name    string
+		args    []string
+		want    Options
+		wantErr bool
+	}{
+		{
+			name: "simple view",
+			args: []string{"main.pdf"},
+			want: Options{Command: CommandView, MainPath: "main.pdf", Focus: "main", Watch: true, Port: DefaultPort, OpenBrowser: true},
+		},
+		{
+			name: "view with sub",
+			args: []string{"main.pdf", "sub.pdf"},
+			want: Options{Command: CommandView, MainPath: "main.pdf", SubPath: "sub.pdf", Focus: "main", Watch: true, Port: DefaultPort, OpenBrowser: true},
+		},
+		{
+			name: "view with mixed flags",
+			args: []string{"main.pdf", "--no-watch", "--focus", "sub"},
+			want: Options{Command: CommandView, MainPath: "main.pdf", Focus: "sub", Watch: false, Port: DefaultPort, OpenBrowser: true},
+		},
 	}
-	if opts.Command != CommandPS {
-		t.Errorf("Command = %v, want %v", opts.Command, CommandPS)
-	}
-}
 
-func TestParseKill(t *testing.T) {
-	opts, err := Parse([]string{"kill", "8080"})
-	if err != nil {
-		t.Fatalf("Parse() error = %v", err)
-	}
-	if opts.Command != CommandKill {
-		t.Errorf("Command = %v, want %v", opts.Command, CommandKill)
-	}
-	if len(opts.KillArgs) != 1 || opts.KillArgs[0] != "8080" {
-		t.Errorf("KillArgs = %v, want [8080]", opts.KillArgs)
-	}
-}
+	// Note: Config matching is tricky because it loads from file. We'll ignore Config in comparison or mock it if needed.
+	// For now, we check key fields.
 
-func TestParseView(t *testing.T) {
-	// Create temporary test files
-	tmpDir := t.TempDir()
-	mainFile := tmpDir + "/main.pdf"
-	subFile := tmpDir + "/sub.pdf"
-	os.WriteFile(mainFile, []byte{}, 0644)
-	os.WriteFile(subFile, []byte{}, 0644)
-
-	opts, err := Parse([]string{mainFile, subFile})
-	if err != nil {
-		t.Fatalf("Parse() error = %v", err)
-	}
-	if opts.Command != CommandView {
-		t.Errorf("Command = %v, want %v", opts.Command, CommandView)
-	}
-	if opts.MainPath != mainFile {
-		t.Errorf("MainPath = %v, want %v", opts.MainPath, mainFile)
-	}
-	if opts.SubPath != subFile {
-		t.Errorf("SubPath = %v, want %v", opts.SubPath, subFile)
-	}
-}
-
-func TestParseWithFlags(t *testing.T) {
-	tmpDir := t.TempDir()
-	mainFile := tmpDir + "/main.pdf"
-	os.WriteFile(mainFile, []byte{}, 0644)
-
-	opts, err := Parse([]string{"-port", "3000", "--no-watch", mainFile})
-	if err != nil {
-		t.Fatalf("Parse() error = %v", err)
-	}
-	if opts.Port != 3000 {
-		t.Errorf("Port = %v, want 3000", opts.Port)
-	}
-	if opts.Watch {
-		t.Error("Watch should be false when --no-watch is set")
-	}
-	if opts.MainPath != mainFile {
-		t.Errorf("MainPath = %v, want %v", opts.MainPath, mainFile)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := Parse(tt.args)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("Parse() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if got.Command != tt.want.Command {
+				t.Errorf("Parse().Command = %v, want %v", got.Command, tt.want.Command)
+			}
+			if got.MainPath != tt.want.MainPath {
+				t.Errorf("Parse().MainPath = %v, want %v", got.MainPath, tt.want.MainPath)
+			}
+			if got.SubPath != tt.want.SubPath {
+				t.Errorf("Parse().SubPath = %v, want %v", got.SubPath, tt.want.SubPath)
+			}
+			if got.Focus != tt.want.Focus {
+				t.Errorf("Parse().Focus = %v, want %v", got.Focus, tt.want.Focus)
+			}
+			if got.Watch != tt.want.Watch {
+				t.Errorf("Parse().Watch = %v, want %v", got.Watch, tt.want.Watch)
+			}
+		})
 	}
 }

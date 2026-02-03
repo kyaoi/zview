@@ -14,7 +14,7 @@ A task is "done" when:
 
 * Builds locally (dev and prod path for the touched side)
 * Formatting/lint pass for touched code
-* Any new behavior has at least minimal tests **or** a documented manual test recipe
+* Any new behavior has **automated tests** (manual test recipe is only a fallback for UI-heavy logic)
 * Docs updated if user-facing behavior/CLI/keybindings changed
 
 ---

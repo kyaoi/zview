@@ -93,6 +93,8 @@ if err != nil {
 - Unit tests alongside source files (`*_test.go`, `*.test.ts`)
 - Test public interfaces, not internals
 - Use table-driven tests in Go
+- **Mandatory**: All new features and bug fixes MUST include corresponding tests.
+- **Mandatory**: All existing tests MUST pass before merging.
 
 ## Git Commits
 

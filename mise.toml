@@ -83,6 +83,11 @@ run = "pnpm test"
 dir = "backend"
 run = "go test -v ./..."
 
+# Run E2E tests
+[tasks."test:e2e"]
+dir = "frontend"
+run = "npx playwright test"
+
 # Type-check frontend code
 [tasks."check:frontend"]
 dir = "frontend"
