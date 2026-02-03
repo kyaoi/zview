@@ -106,11 +106,12 @@ zview kill
 | `+` / `-` | Zoom in / out |
 | `=` | Fit to width |
 | **Panes** | |
-| `Tab` | Toggle focus (MAIN ↔ SUB) |
+| `Tab` / `<Tab>` | Toggle focus (MAIN ↔ SUB) |
 | `s` | Swap left/right pane positions |
 | **General** | |
 | `r` | Reload MAIN |
 | `?` | Show help overlay |
+| `q` / `<Escape>` | Quit (close tab) |
 
 ## Configuration
 
@@ -142,6 +143,26 @@ page_scroll_ratio = 0.5
 # Single key:   scroll_down = "j"
 # Multiple keys: scroll_down = ["j", "ArrowDown"]
 # Key sequence: jump_top = ["g g"]  (space-separated)
+# Modifiers:    scroll_down = ["<C-j>"] (Ctrl+j)
+# Special keys: toggle_focus = ["<Tab>"]
+#
+# Blocked keys (prevent browser default behavior):
+# blocked_keys = ["<C-p>", "<C-f>"]
+#
+# Aggressively disable browser shortcuts:
+# disable_browser_shortcuts = true
+```
+
+### Key Notation
+
+* **Basic**: `"j"`, `"G"`, `"?"`
+* **Special Keys**: Enclosed in `<...>` (e.g., `<Space>`, `<Tab>`, `<Enter>`, `<Escape>`, `<Backspace>`, `<Delete>`, `<ArrowUp>`, etc.)
+* **Modifiers**: `<M-j>` (Meta+j), `<C-u>` (Ctrl+u), `<A-Left>` (Alt+Left), `<S-Tab>` (Shift+Tab)
+    * `C`: Ctrl
+    * `M`: Meta (Command on Mac, Win on Windows)
+    * `A`: Alt
+    * `S`: Shift
+* **Sequences**: Space-separated (e.g., `"g g"`, `"<Space> j"`)
 ```
 
 ## Troubleshooting
