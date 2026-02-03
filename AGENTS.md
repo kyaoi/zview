@@ -74,17 +74,23 @@ Example:
 
 ### Always run (for touched area)
 
-* Frontend:
+Use the mise task runner for consistency:
 
-  * `pnpm lint` (or repo equivalent)
-  * `pnpm fmt` (or repo equivalent)
-  * `pnpm test` (if present)
-  * `pnpm build`
-* Backend:
+```bash
+# Format, lint, check, and test everything
+mise run verify
 
-  * `gofmt` (or `go fmt ./...`)
-  * `go test ./...`
-  * `go build ./...`
+# Or run individual tasks:
+mise run fmt       # Format all code
+mise run lint      # Run linters
+mise run test      # Run tests
+mise run build     # Build all
+```
+
+Alternatively, run directly in the relevant directory:
+
+* Frontend: `cd frontend && pnpm lint && pnpm fmt && pnpm test && pnpm build`
+* Backend: `cd backend && go fmt ./... && go vet ./... && go test ./... && go build`
 
 ### Manual test checklist (minimum)
 
