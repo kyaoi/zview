@@ -10,6 +10,8 @@ import {
 	isKeySequence,
 	parseKeySequence,
 	validateKeyConflicts,
+	getBlockedKeys,
+	getDisableBrowserShortcuts,
 } from "../lib/config";
 import { keyActionDefs } from "../lib/keyActions";
 import type { ScrollSnapshot, ToastType, ViewerHandle } from "../lib/types";
@@ -94,37 +96,17 @@ function matchesAnyKey(event: KeyboardEvent, keys: string[]): boolean {
 		const hasModifiersMismatch = () => {
 			const eventMods = new Set(modifiers);
 			const bindMods = new Set(bindingModifiers);
-			// If binding has explicit Shift (e.g. <S-Tab>), we check it.
-			// If binding is a single char (e.g. "G"), Shift is implicit in the key char, so we don't treat event.shiftKey as a mismatch modifier.
-			// But if binding is "g" and we press "Ctrl-g", that's a mismatch.
 
-			// For simple single chars (e.g. "A"), event will have Shift+a.
-			// matchesAnyKey is called with "A".
-			// parse logic: bindingKey="A", bindingModifiers=[]
-			// event logic: eventKey="A", modifiers=["S"] (maybe? depends on OS/browser)
-
-			// Let's rely on explicit modifiers required by binding.
-			// If binding specifies mod, event MUST have it.
-			for (const m of bindingModifiers) {
-				if (!eventMods.has(m)) return true; // Missing required modifier
+			// For single character keys (e.g. "G", "j", "+"), the key value itself
+			// encapsulates the Shift state (case-sensitive).
+			// So we ignore the "S" modifier in the set comparison for these cases.
+			// This allows binding="G" to match Shift+g (event.key="G", mods=["S"])
+			// without requiring the binding to explicitly be "<S-g>".
+			if (bindingKey.length === 1) {
+				eventMods.delete("S");
+				bindMods.delete("S");
 			}
 
-			// If event has extra modifiers NOT in binding?
-			// e.g. binding="j", event="Ctrl+j" -> Should fail.
-			// e.g. binding="G", event="Shift+g" -> Should succeed (Shift produces G).
-			// We filter out Shift if the key itself implies it?
-			// Actually, simpler:
-			// If binding has no modifiers, and event has modifiers, fail (UNLESS simple key match handles it?)
-
-			// Simplification strategy:
-			// 1. Check Key/Code match first.
-			// 2. Then check Modifiers.
-
-			// Filter out 'S' from eventMods if the key match implicitly handles it (case sensitive char).
-			// But we are normalizing.
-
-			// Strict check:
-			// bindingModifiers must equal eventModifiers (ignoring order)
 			if (eventMods.size !== bindMods.size) return true;
 			for (const m of eventMods) {
 				if (!bindMods.has(m)) return true;
@@ -136,13 +118,9 @@ function matchesAnyKey(event: KeyboardEvent, keys: string[]): boolean {
 		let keyMatches = false;
 
 		// Case 1: Special name match (Space, Tab, Escape, etc.)
-		// We compare bindingKey (e.g. "Space") with event.code (e.g. "Space") OR event.key (e.g. " ")
 		if (bindingKey.length > 1) {
-			// It's a special key name (Enter, Space, Tab)
-			// Check Code
 			if (eventCode.toLowerCase() === bindingKey.toLowerCase()) keyMatches = true;
 			else if (eventCode.toLowerCase() === `key${bindingKey.toLowerCase()}`) keyMatches = true;
-			// Check Key (e.g. "Tab" === "Tab")
 			else if (eventKey.toLowerCase() === bindingKey.toLowerCase()) keyMatches = true;
 			else if (bindingKey.toLowerCase() === "space" && eventKey === " ") keyMatches = true;
 		} else {
@@ -322,7 +300,6 @@ export function useKeyboardNavigation({
 			if (!keysEnabledRef.current) return;
 			const target = event.target as HTMLElement | null;
 			const tag = target?.tagName?.toLowerCase();
-			if (event.metaKey || event.ctrlKey || event.altKey) return;
 			if (tag === "input" || tag === "textarea" || tag === "select" || target?.isContentEditable)
 				return;
 
@@ -331,6 +308,13 @@ export function useKeyboardNavigation({
 				event.stopPropagation();
 				event.stopImmediatePropagation();
 			};
+
+			// Check blocked keys first
+			const blockedKeys = getBlockedKeys();
+			if (matchesAnyKey(event, blockedKeys)) {
+				consume();
+				return;
+			}
 
 			const targetViewer =
 				focusedPaneRef.current === "sub" && hasSubRef.current
@@ -535,6 +519,14 @@ export function useKeyboardNavigation({
 						handler(targetViewer, event, context);
 					}
 					return;
+				}
+			}
+
+			// If no action matched, check if we should block browser shortcuts
+			if (getDisableBrowserShortcuts()) {
+				// Block if any modifier is used (Ctrl, Alt, Meta)
+				if (event.ctrlKey || event.altKey || event.metaKey) {
+					consume();
 				}
 			}
 		};
