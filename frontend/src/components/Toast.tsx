@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-
-export type ToastType = "success" | "error" | "info";
+import type { ToastType } from "../lib/types";
 
 export interface ToastMessage {
 	id: string;
@@ -39,10 +38,11 @@ function ToastItem({ toast, onRemove }: { toast: ToastMessage; onRemove: () => v
 		return () => clearTimeout(timer);
 	}, [onRemove]);
 
-	const bgColors = {
+	const bgColors: Record<ToastType, string> = {
 		success: "bg-emerald-950/90 border-emerald-500/50 text-emerald-100",
 		error: "bg-red-950/90 border-red-500/50 text-red-100",
 		info: "bg-slate-800/90 border-slate-600/50 text-slate-100",
+		warning: "bg-amber-950/90 border-amber-500/50 text-amber-100",
 	};
 
 	return (

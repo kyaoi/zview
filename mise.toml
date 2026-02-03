@@ -100,10 +100,11 @@ run = "rm -rf frontend/dist frontend/node_modules backend/bin dist tmp"
 
 # Execute all main tasks to verify the project is ready
 [tasks.verify]
-description = "Format, lint, test, and build the project"
+description = "Format, lint, check, test, and build the project"
 run = [
   "mise run fmt",
   "mise run lint",
+  "mise run check:frontend",
   "mise run test",
   "mise run build",
 ]

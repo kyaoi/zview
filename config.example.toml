@@ -25,3 +25,62 @@ scroll_step_horizontal = 64.0
 # Page scroll ratio (default: 0.5)
 # Controls how much to scroll relative to the view height when using d/u keys.
 page_scroll_ratio = 0.5
+
+# Blocked keys
+# Keys defined here will be blocked from reaching the browser/extensions.
+# Useful for preventing conflicts with browser shortcuts or global hotkeys.
+# blocked_keys = ["<C-p>", "<C-f>"]
+
+# Disable browser shortcuts (default: false)
+# If true, blocks all undefined key combinations involving modifiers (Ctrl/Alt/Meta).
+# This is an aggressive setting to make the viewer behave more like a native app.
+# disable_browser_shortcuts = true
+
+# [keys]
+# Customize keybindings (defaults shown below).
+# You can specify a single string or an array of strings for multiple bindings.
+#
+# Example (single key):
+# scroll_down = "j"
+#
+# Example (multiple keys):
+# scroll_down = ["j", "ArrowDown"]
+# scroll_up = ["k", "ArrowUp"]
+#
+# Example (sequence keys):
+# jump_top = ["g g"]        # press g twice
+# next_tab = ["g t"]        # press g then t
+#
+# Example (modifiers and special keys):
+# scroll_down = ["<C-j>"]   # Ctrl + j
+# toggle_focus = ["<Tab>"]  # Tab key
+# quit = ["<Escape>", "q"]  # Escape or q
+#
+# Note on Shift:
+# Just use the resulting uppercase or special character.
+# e.g. Use "G" for Shift+g, and "<" for Shift+,.
+# For Ctrl/Alt/Meta, use the <Mod-Key> notation.
+# e.g. "<C-j>" for Ctrl+j.
+#
+# Available key bindings:
+# scroll_down = ["j"]
+# scroll_up = ["k"]
+# scroll_left = ["h"]
+# scroll_right = ["l"]
+# half_page_down = ["d"]
+# half_page_up = ["u"]
+# jump_top = ["g g"]      # compound key: press g twice
+# jump_bottom = ["G"]
+# next_page = ["n"]
+# prev_page = ["p"]
+# zoom_in = ["+"]
+# zoom_out = ["-"]
+# fit_width = ["="]
+# toggle_focus = ["Tab"]
+# swap_panes = ["s"]
+# prev_tab = ["H"]
+# next_tab = ["L"]
+# reload_main = ["r"]
+# reload_all = ["R"]
+# toggle_help = ["?"]
+# quit = ["q"]

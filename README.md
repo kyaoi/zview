@@ -6,7 +6,7 @@ Runs in your browser, powered by PDF.js, with Vim-like navigation.
 ## Features
 
 * **Fast & Lightweight**: Virtualized rendering for smooth scrolling even with large PDFs.
-* **Vim-like Keybindings**: Navigate with `j`, `k`, `d`, `u`, `gg`, `G`, etc.
+* **Vim-like Keybindings**: Navigate with `j`, `k`, `d`, `u`, `g g`, `G`, etc.
 * **Dual Pane Support**: View two PDFs side-by-side (MAIN and SUB).
     * **MAIN Pane**: Supports auto-reload on file change.
     * **SUB Pane**: Static reference view; supports multiple tabs.
@@ -99,18 +99,21 @@ zview kill
 | `j` / `k` | Scroll down / up |
 | `d` / `u` | Scroll half-page down / up |
 | `h` / `l` | Scroll left / right |
-| `gg` | Jump to top |
+| `g g` | Jump to top |
 | `G` | Jump to bottom |
 | `n` / `p` | Next / Previous page |
 | **Zoom** | |
 | `+` / `-` | Zoom in / out |
 | `=` | Fit to width |
 | **Panes** | |
-| `Tab` | Toggle focus (MAIN ↔ SUB) |
+| `Tab` / `<Tab>` | Toggle focus (MAIN ↔ SUB) |
 | `s` | Swap left/right pane positions |
+| `H` | Prev tab (SUB) / Fast scroll left |
+| `L` | Next tab (SUB) / Fast scroll right |
 | **General** | |
 | `r` | Reload MAIN |
 | `?` | Show help overlay |
+| `q` / `<Escape>` | Quit (close tab) |
 
 ## Configuration
 
@@ -136,6 +139,34 @@ scroll_step_horizontal = 64.0
 # Page scroll ratio (default: 0.5)
 # How much to scroll (relative to screen height) for 'd' / 'u' commands.
 page_scroll_ratio = 0.5
+
+# [keys]
+# You can define custom keybindings.
+# Single key:   scroll_down = "j"
+# Multiple keys: scroll_down = ["j", "ArrowDown"]
+# Key sequence: jump_top = ["g g"]  (space-separated)
+# Modifiers:    scroll_down = ["<C-j>"] (Ctrl+j)
+# Special keys: toggle_focus = ["<Tab>"]
+#
+# Blocked keys (prevent browser default behavior):
+# blocked_keys = ["<C-p>", "<C-f>"]
+#
+# Aggressively disable browser shortcuts:
+# disable_browser_shortcuts = true
+```
+
+### Key Notation
+
+* **Basic**: `"j"`, `"G"`, `"?"`
+* **Special Keys**: Enclosed in `<...>` (e.g., `<Space>`, `<Tab>`, `<Enter>`, `<Escape>`, `<Backspace>`, `<Delete>`, `<ArrowUp>`, etc.)
+* **Modifiers**: `<M-j>` (Meta+j), `<C-u>` (Ctrl+u), `<A-Left>` (Alt+Left)
+    * `C`: Ctrl
+    * `M`: Meta (Command on Mac, Win on Windows)
+    * `A`: Alt
+* **Note on Shift**: Do not plain Shift modifier (e.g. `<S-g>`). Just use the resulting character directly.
+    * Use `"G"` for Shift+g.
+    * Use `"<"` for Shift+,.
+* **Sequences**: Space-separated (e.g., `"g g"`, `"<Space> j"`)
 ```
 
 ## Troubleshooting
