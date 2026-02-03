@@ -83,7 +83,7 @@ A task is “done” when:
 
 #### `task/enhance-ci`
 
-* [ ] Not Started
+* [x] Done
 
 **Goal:** strengthen the development workflow and ensure quality gates are automated locally and in CI.
 
