@@ -157,15 +157,13 @@ page_scroll_ratio = 0.5
 
 * **Basic**: `"j"`, `"G"`, `"?"`
 * **Special Keys**: Enclosed in `<...>` (e.g., `<Space>`, `<Tab>`, `<Enter>`, `<Escape>`, `<Backspace>`, `<Delete>`, `<ArrowUp>`, etc.)
-* **Modifiers**: `<M-j>` (Meta+j), `<C-u>` (Ctrl+u), `<A-Left>` (Alt+Left), `<S-Tab>` (Shift+Tab)
+* **Modifiers**: `<M-j>` (Meta+j), `<C-u>` (Ctrl+u), `<A-Left>` (Alt+Left)
     * `C`: Ctrl
     * `M`: Meta (Command on Mac, Win on Windows)
     * `A`: Alt
-    * `S`: Shift
-* **Note on Shift**: For printable characters, use the character itself.
-    * Use `"G"` instead of `"<S-g>"`.
-    * Use `"<"` instead of `"<S-,>"`.
-    * Use `"<C-G>"` for Ctrl+Shift+g.
+* **Note on Shift**: Do not plain Shift modifier (e.g. `<S-g>`). Just use the resulting character directly.
+    * Use `"G"` for Shift+g.
+    * Use `"<"` for Shift+,.
 * **Sequences**: Space-separated (e.g., `"g g"`, `"<Space> j"`)
 ```
 

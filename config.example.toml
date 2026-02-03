@@ -56,11 +56,11 @@ page_scroll_ratio = 0.5
 # toggle_focus = ["<Tab>"]  # Tab key
 # quit = ["<Escape>", "q"]  # Escape or q
 #
-# Note on modifiers with char keys:
-# For Shift bindings, use the resulting character directly.
-# e.g. Use "G" instead of "<S-g>", and "<" instead of "<S-,>".
+# Note on Shift:
+# Just use the resulting uppercase or special character.
+# e.g. Use "G" for Shift+g, and "<" for Shift+,.
 # For Ctrl/Alt/Meta, use the <Mod-Key> notation.
-# e.g. "<C-j>" for Ctrl+j, "<C-G>" for Ctrl+Shift+g.
+# e.g. "<C-j>" for Ctrl+j.
 #
 # Available key bindings:
 # scroll_down = ["j"]
