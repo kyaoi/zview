@@ -13,6 +13,7 @@
 		"build": "vite build",
 		"preview": "vite preview",
 		"lint": "biome lint .",
+		"lint:fix": "biome lint --write .",
 		"fmt": "biome format .",
 		"fmt:write": "biome format --write .",
 		"check": "tsc --noEmit",
