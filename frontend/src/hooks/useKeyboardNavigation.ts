@@ -122,7 +122,7 @@ export function useKeyboardNavigation({
 				? subViewerRef.current
 				: mainViewerRef.current;
 
-		const handleHelpModeAction = (actionId: string, event: KeyboardEvent): boolean => {
+		const handleHelpModeAction = (actionId: string, _event: KeyboardEvent): boolean => {
 			const helpContent = document.getElementById("help-overlay-content");
 			if (!helpContent) return false;
 

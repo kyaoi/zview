@@ -13,8 +13,6 @@ export interface UseZoomManagerOptions {
 	pageSize: { width: number; height: number } | null;
 	/** Total number of pages */
 	pageCount: number;
-	/** Current page (1-indexed) from parent */
-	currentPage: number;
 }
 
 export interface UseZoomManagerResult {
@@ -47,7 +45,6 @@ export function useZoomManager({
 	scrollRef,
 	pageSize,
 	pageCount,
-	currentPage,
 }: UseZoomManagerOptions): UseZoomManagerResult {
 	const [zoomMode, setZoomMode] = useState<ZoomMode>("fit-width");
 	const [fitScale, setFitScale] = useState(1);

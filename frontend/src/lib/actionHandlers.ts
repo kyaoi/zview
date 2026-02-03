@@ -7,7 +7,7 @@ import {
 	SCROLL_STEP_HORIZONTAL,
 	SCROLL_STEP_VERTICAL,
 } from "./constants";
-import type { ScrollSnapshot, ToastType, ViewerHandle } from "./types";
+import type { ToastType, ViewerHandle } from "./types";
 
 /**
  * Context passed to action handlers.
