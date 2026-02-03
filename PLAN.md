@@ -10,7 +10,7 @@ This plan breaks development of **zview** into small, reviewable tasks.
 
 ## Progress tracking
 
-* [ ] **Task 1:** Fix PDF darkening on swap
+* [x] **Task 1:** Fix PDF darkening on swap
 * [x] **Task 2:** Configurable Keybindings
 * [x] **Task 3:** Enhance CI and Pre-commit/Pre-push hooks
 * [ ] **Task 4:** Documentation Maintenance
@@ -43,7 +43,7 @@ A task is “done” when:
 
 #### `task/fix-swap-darkening`
 
-* [ ] Not Started
+* [x] Done
 
 **Goal:** Fix the issue where the PDF becomes dark (dimmed) incorrectly when swapping panes.
 
