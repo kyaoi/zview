@@ -1,0 +1,31 @@
+pre-commit:
+  parallel: true
+  commands:
+    # Lint frontend code (read-only)
+    frontend-lint:
+      run: mise run lint:frontend
+    # Format frontend code and stage the changes
+    frontend-fmt:
+      run: mise run fmt:frontend && git add frontend
+    # Type-check frontend code (TypeScript)
+    frontend-check:
+      run: mise run check:frontend
+    # Format backend code and stage the changes
+    backend-fmt:
+      run: mise run fmt:backend && git add backend
+    # Vet backend code (Go static analysis)
+    backend-vet:
+      run: mise run lint:backend
+
+pre-push:
+  parallel: true
+  commands:
+    # Build frontend to ensure it compiles
+    frontend-build:
+      run: mise run build:frontend
+    # Build backend to ensure it compiles
+    backend-build:
+      run: mise run build:backend
+    # Run backend tests
+    backend-test:
+      run: mise run test:backend
