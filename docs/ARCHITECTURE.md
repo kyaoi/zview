@@ -31,9 +31,8 @@ graph TB
     subgraph Frontend
         K[App.tsx] --> L[PdfViewer]
         K --> M[useKeyboardNavigation]
-        L --> N[usePdfDocument]
-        L --> O[useScaleManager]
-        L --> P[useScrollControls]
+        K --> N[useBootstrap]
+        K --> O[useFileWatcher]
     end
     
     E <-->|HTTP/SSE| K
@@ -78,11 +77,17 @@ frontend/src/
 │   └── SubTabBar/             # SUB pane tabs
 ├── hooks/
 │   ├── useKeyboardNavigation  # Keyboard handling
-│   ├── usePdfDocument         # PDF loading
-│   ├── useScaleManager        # Zoom control
-│   └── useScrollControls      # Scroll navigation
+│   ├── useBootstrap           # Initial state loading
+│   ├── useFileWatcher         # SSE file change watching
+│   ├── useContinuousScroll    # Momentum-based scrolling
+│   ├── useZoomManager         # Zoom state management
+│   └── useTabManager          # SUB tab management
 └── lib/
+    ├── actionHandlers.ts      # Keyboard action handlers
+    ├── config.ts              # Configuration loading
     ├── constants.ts           # Magic numbers
+    ├── keyActions.ts          # Keybinding definitions
+    ├── keyMatcher.ts          # Key matching utilities
     ├── types.ts               # Shared types
     └── utils.ts               # Utility functions
 ```

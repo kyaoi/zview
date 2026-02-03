@@ -17,7 +17,7 @@ If a file exceeds these limits, consider splitting it.
 | Type | Convention | Example |
 |------|------------|---------|
 | React Component | PascalCase | `PageCanvas` |
-| Custom Hook | use + verb/noun | `usePdfDocument` |
+| Custom Hook | use + verb/noun | `useBootstrap` |
 | Props type | Component + Props | `PageCanvasProps` |
 | Go package | lowercase | `internal/server` |
 | Go type | PascalCase | `AppState` |
@@ -30,7 +30,7 @@ If a file exceeds these limits, consider splitting it.
 ```
 components/  → UI rendering only
 hooks/       → Business logic & state
-lib/         → Utilities, types, constants
+lib/         → Utilities, types, constants, config
 ```
 
 - Components should be pure view logic
@@ -51,6 +51,21 @@ internal/session/ → Session management
 
 - Each package has a single responsibility
 - `main` imports from `internal/`, not vice versa
+
+## Quality Gates
+
+Before committing, run:
+
+```bash
+# All-in-one verification
+mise run verify
+
+# Or separately
+mise run fmt     # Format code
+mise run lint    # Run linters
+mise run test    # Run tests
+mise run build   # Build all
+```
 
 ## Error Handling
 
@@ -98,3 +113,4 @@ Example: `feat: add fit-to-height zoom mode`
 - [ ] Types are explicit (no `any`)
 - [ ] Tests added for new logic
 - [ ] Documentation updated if behavior changed
+- [ ] `mise run verify` passes
