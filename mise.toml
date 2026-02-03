@@ -7,7 +7,10 @@ pnpm = "latest"
 # Build all components
 [tasks.build]
 description = "Build frontend and backend"
-depends = ["build:frontend", "build:backend"]
+run = [
+  "mise run build:frontend",
+  "mise run build:backend",
+]
 
 # Build frontend assets using Vite
 [tasks."build:frontend"]
@@ -94,3 +97,13 @@ run = "echo 'Dev server placeholder'"
 [tasks.clean]
 description = "Clean artifacts"
 run = "rm -rf frontend/dist frontend/node_modules backend/bin dist tmp"
+
+# Execute all main tasks to verify the project is ready
+[tasks.verify]
+description = "Format, lint, test, and build the project"
+run = [
+  "mise run fmt",
+  "mise run lint",
+  "mise run test",
+  "mise run build",
+]
