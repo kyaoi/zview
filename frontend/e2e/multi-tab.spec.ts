@@ -1,6 +1,6 @@
 import { test, expect } from "@playwright/test";
-import path from "path";
-import fs from "fs";
+import path from "node:path";
+import fs from "node:fs";
 
 test.describe("Multi-tab SUB pane", () => {
 	test.beforeEach(async ({ page }) => {
