@@ -92,6 +92,11 @@ frontend/src/
     └── utils.ts               # Utility functions
 ```
 
+## Password-Protected PDFs
+
+When PDF.js requests a password, the viewer overlays a password prompt in the active pane.
+Incorrect entries re-open the prompt. Canceling leaves the current rendering intact.
+
 ## Data Flow
 
 ```mermaid

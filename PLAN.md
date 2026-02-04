@@ -30,7 +30,7 @@ A task is "done" when:
 ## Planned Tasks
 
 * [x] **Task 1:** Multi-tab SUB PDF Support
-* [ ] **Task 2:** Password Protected PDF Support
+* [x] **Task 2:** Password Protected PDF Support
 
 ---
 
@@ -72,12 +72,12 @@ Allow users to open multiple secondary PDFs and switch between them easily in th
 * Keyboard shortcuts to switch tabs (e.g., `Shift+H`/`Shift+L` or similar).
 
 **Acceptance Criteria:**
-* [ ] User can open multiple PDFs in the SUB pane.
-* [ ] User can switch between open SUB PDFs using UI/Keyboard.
-* [ ] Performance remains stable with multiple PDFs loaded.
+* [x] User can open multiple PDFs in the SUB pane.
+* [x] User can switch between open SUB PDFs using UI/Keyboard.
+* [x] Performance remains stable with multiple PDFs loaded.
 
 #### `task/password-pdf`
-* [ ] **Task 2:** Password Protected PDF Support
+* [x] **Task 2:** Password Protected PDF Support
 
 **Goal:**
 Allow users to view password-protected PDFs by providing a mechanism to enter the password.
@@ -89,8 +89,7 @@ Allow users to view password-protected PDFs by providing a mechanism to enter th
 * Handle incorrect passwords gracefully (re-prompt).
 
 **Acceptance Criteria:**
-* [ ] Opening a locked PDF triggers a password prompt.
-* [ ] Entering the correct password opens the PDF successfully.
-* [ ] Entering an incorrect password shows an error and allows retry.
-* [ ] Canceling leaves the viewer in a safe state.
-
+* [x] Opening a locked PDF triggers a password prompt.
+* [x] Entering the correct password opens the PDF successfully.
+* [x] Entering an incorrect password shows an error and allows retry.
+* [x] Canceling leaves the viewer in a safe state.

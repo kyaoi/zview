@@ -96,6 +96,10 @@ if err != nil {
 - **Mandatory**: All new features and bug fixes MUST include corresponding tests.
 - **Mandatory**: All existing tests MUST pass before merging.
 
+## Security & Privacy
+
+- Never persist PDF passwords; keep them in memory only for the current viewer session.
+
 ## Git Commits
 
 Use prefixes:

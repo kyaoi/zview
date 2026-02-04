@@ -120,6 +120,7 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for details.
 * Use `pdfjs-dist` as the sole source for both core and worker.
 * Explicitly set `GlobalWorkerOptions.workerSrc` to the bundled worker output to prevent version mismatch.
 * Avoid mixing CDN versions.
+* Handle password-protected PDFs with PDF.js `onPassword` prompts; keep passwords in memory only.
 
 ### Rendering/performance strategy (must-have)
 
