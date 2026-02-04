@@ -1,7 +1,7 @@
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useTabManager } from "./useTabManager";
-import type { SubTab, ToastType } from "../lib/types";
+import type { SubTab } from "../lib/types";
 
 describe("useTabManager", () => {
 	const mockSetSubTabs = vi.fn();

@@ -3,15 +3,17 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { useContinuousScroll } from "./useContinuousScroll";
 
 describe("useContinuousScroll", () => {
-	let requestAnimationFrameSpy: any;
-	let cancelAnimationFrameSpy: any;
+	// biome-ignore lint/suspicious/noExplicitAny: Mock spy
+	let _requestAnimationFrameSpy: any;
+	// biome-ignore lint/suspicious/noExplicitAny: Mock spy
+	let _cancelAnimationFrameSpy: any;
 
 	beforeEach(() => {
 		vi.useFakeTimers();
-		requestAnimationFrameSpy = vi
+		_requestAnimationFrameSpy = vi
 			.spyOn(window, "requestAnimationFrame")
-			.mockImplementation((cb: any) => setTimeout(cb, 16));
-		cancelAnimationFrameSpy = vi
+			.mockImplementation((cb: FrameRequestCallback) => setTimeout(cb, 16));
+		_cancelAnimationFrameSpy = vi
 			.spyOn(window, "cancelAnimationFrame")
 			.mockImplementation(clearTimeout);
 	});

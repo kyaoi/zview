@@ -58,7 +58,6 @@ export default function App() {
 		handleSubClose,
 		handleTabSwitch,
 		registerSubViewer,
-		saveCurrentSnapshot,
 	} = useTabManager({
 		subTabs,
 		setSubTabs,
@@ -392,7 +391,6 @@ export default function App() {
 		handleTabSelect,
 		handleSubClose,
 		registerSubViewer,
-		// biome-ignore lint/correctness/useExhaustiveDependencies: tabSnapshotsRef is a ref
 		tabSnapshotsRef,
 	]);
 

@@ -11,7 +11,7 @@ const OUT_DIR = path.resolve(__dirname, "../e2e/pdfs");
 async function ensureDir() {
 	try {
 		await fs.mkdir(OUT_DIR, { recursive: true });
-	} catch (e) {
+	} catch (_e) {
 		// ignore
 	}
 }
