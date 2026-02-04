@@ -77,17 +77,29 @@ func Parse(args []string) (Options, error) {
 	fs := flag.NewFlagSet("zview", flag.ContinueOnError)
 	fs.SetOutput(os.Stdout)
 	fs.Usage = func() {
-		fmt.Fprintf(fs.Output(), "Usage: zview [options] [MAIN.pdf] [SUB.pdf...]\n")
-		fmt.Fprintf(fs.Output(), "       zview ps                  - list running instances\n")
-		fmt.Fprintf(fs.Output(), "       zview kill [port]         - terminate instance(s)\n")
-		fmt.Fprintln(fs.Output(), "\nOptions:")
-		fs.PrintDefaults()
-		fmt.Fprintln(fs.Output(), "\nExamples:")
-		fmt.Fprintln(fs.Output(), "  zview main.pdf")
-		fmt.Fprintln(fs.Output(), "  zview -m main.pdf -s sub1.pdf -s sub2.pdf")
-		fmt.Fprintln(fs.Output(), "  zview main.pdf sub1.pdf sub2.pdf")
-		fmt.Fprintln(fs.Output(), "  zview main.pdf -s sub1.pdf --active-sub sub1.pdf")
-		fmt.Fprintln(fs.Output(), "  zview main.pdf --no-watch")
+		out := fs.Output()
+		fmt.Fprintf(out, "Usage: zview [options] [MAIN.pdf] [SUB.pdf...]\n")
+		fmt.Fprintf(out, "       zview ps                  - list running instances\n")
+		fmt.Fprintf(out, "       zview kill [port]         - terminate instance(s)\n")
+		fmt.Fprintln(out, "\nOptions:")
+		// Manually print flags to enforce double-hyphen style for long flags
+		fmt.Fprintln(out, "  -m, --main <path>        path to MAIN PDF")
+		fmt.Fprintln(out, "  -s, --sub <path>         path to SUB PDF (can be repeated)")
+		fmt.Fprintln(out, "      --active-sub <path>  filename/path of SUB PDF to activate initially")
+		fmt.Fprintln(out, "      --focus <pane>       initial focus: main|sub (default \"main\")")
+		fmt.Fprintln(out, "      --help               show this help and exit")
+		fmt.Fprintln(out, "      --watch              enable file watching for MAIN (default: true)")
+		fmt.Fprintln(out, "      --no-watch           disable file watching for MAIN")
+		fmt.Fprintln(out, "      --port <int>         port to bind (0 = auto-select) (default 8571)")
+		fmt.Fprintln(out, "      --no-open            do not auto-open browser tab")
+		fmt.Fprintln(out, "      --version            print version and exit")
+
+		fmt.Fprintln(out, "\nExamples:")
+		fmt.Fprintln(out, "  zview main.pdf")
+		fmt.Fprintln(out, "  zview -m main.pdf -s sub1.pdf -s sub2.pdf")
+		fmt.Fprintln(out, "  zview main.pdf sub1.pdf sub2.pdf")
+		fmt.Fprintln(out, "  zview main.pdf -s sub1.pdf --active-sub sub1.pdf")
+		fmt.Fprintln(out, "  zview main.pdf --no-watch")
 	}
 
 	// Load config first
@@ -103,11 +115,12 @@ func Parse(args []string) (Options, error) {
 
 	var subFlags RepeatedString
 
-	// Standard flags
+	// Standard flags - usage strings here are less important as we manualy print Usage,
+	// but good to keep them for documentation/completeness if we revert to PrintDefaults.
 	fs.StringVar(&opts.MainPath, "main", "", "path to MAIN PDF")
-	fs.StringVar(&opts.MainPath, "m", "", "path to MAIN PDF (short)")
-	fs.Var(&subFlags, "sub", "path to SUB PDF (can be repeated)")
-	fs.Var(&subFlags, "s", "path to SUB PDF (short, can be repeated)")
+	fs.StringVar(&opts.MainPath, "m", "", "path to MAIN PDF")
+	fs.Var(&subFlags, "sub", "path to SUB PDF")
+	fs.Var(&subFlags, "s", "path to SUB PDF")
 	fs.StringVar(&opts.ActiveSub, "active-sub", "", "filename/path of SUB PDF to activate initially")
 	fs.StringVar(&opts.Focus, "focus", opts.Focus, "initial focus: main|sub")
 
