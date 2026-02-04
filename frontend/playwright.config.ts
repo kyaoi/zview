@@ -23,7 +23,7 @@ export default defineConfig({
 		// For now, let's use the actual binary if available, or just skip if we assume user runs it?
 		// User requested "automate", so better to have it self-contained.
 		// We can rely on `mise run build` being run before test.
-		command: "../zview -no-open e2e/test.pdf",
+		command: "../zview -no-open e2e/pdfs/02_multipage_navigation.pdf",
 		url: "http://127.0.0.1:8571",
 		reuseExistingServer: !process.env.CI,
 		stdout: "pipe",

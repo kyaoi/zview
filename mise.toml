@@ -71,7 +71,7 @@ run = "gofmt -w backend"
 # Run all tests
 [tasks.test]
 description = "Run tests"
-depends = ["test:frontend", "test:backend"]
+depends = ["test:frontend", "test:backend", "test:e2e"]
 
 # Run frontend tests
 [tasks."test:frontend"]

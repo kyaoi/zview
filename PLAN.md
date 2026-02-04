@@ -24,3 +24,73 @@ A task is "done" when:
 * `backend/` — Go CLI + local HTTP server
 * `frontend/` — Vite + TS web app
 * `docs/` — extra documentation (optional)
+
+---
+
+## Planned Tasks
+
+* [ ] **Task 1:** Multi-tab SUB PDF Support
+* [ ] **Task 2:** Password Protected PDF Support
+
+---
+
+## Task Format Example
+
+When adding new tasks, please follow this format to maintain consistency with the project history:
+
+### List Entry
+* `* [ ] **Task N:** Task Name`
+
+### Detailed Description (Optional, for active tasks)
+#### `task/branch-slug`
+* [ ] Not Started
+
+**Goal:**
+Brief description of the goal.
+
+**Details:**
+* Bullet points of specific requirements.
+
+**Acceptance Criteria:**
+* [ ] Criteria 1
+* [ ] Criteria 2
+
+---
+
+## Task Details
+
+#### `task/multi-tab-sub`
+* [ ] **Task 1:** Multi-tab SUB PDF Support
+
+**Goal:**
+Allow users to open multiple secondary PDFs and switch between them easily in the SUB pane, improving reference capabilities.
+
+**Details:**
+* Implement a tab bar or switcher in the SUB pane.
+* Allow opening a new SUB PDF without replacing the existing one (add to tabs).
+* Limit the number of open tabs if necessary to prevent memory issues.
+* Keyboard shortcuts to switch tabs (e.g., `Shift+H`/`Shift+L` or similar).
+
+**Acceptance Criteria:**
+* [ ] User can open multiple PDFs in the SUB pane.
+* [ ] User can switch between open SUB PDFs using UI/Keyboard.
+* [ ] Performance remains stable with multiple PDFs loaded.
+
+#### `task/password-pdf`
+* [ ] **Task 2:** Password Protected PDF Support
+
+**Goal:**
+Allow users to view password-protected PDFs by providing a mechanism to enter the password.
+
+**Details:**
+* Detect when a PDF requires a password.
+* Display a prompt (dialog or input field) to enter the password.
+* Retry opening the PDF with the provided password.
+* Handle incorrect passwords gracefully (re-prompt).
+
+**Acceptance Criteria:**
+* [ ] Opening a locked PDF triggers a password prompt.
+* [ ] Entering the correct password opens the PDF successfully.
+* [ ] Entering an incorrect password shows an error and allows retry.
+* [ ] Canceling leaves the viewer in a safe state.
+
