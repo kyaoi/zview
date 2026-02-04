@@ -25,6 +25,7 @@ export function Pane({ children, focused, paneRole, status, onFocus }: PaneProps
 			}}
 			tabIndex={-1}
 			aria-label={`${paneRole} pane`}
+			data-testid={`pane-${paneRole.toLowerCase()}`}
 		>
 			{/* Pane Header Overlay */}
 			<div
@@ -40,6 +41,7 @@ export function Pane({ children, focused, paneRole, status, onFocus }: PaneProps
 							? "bg-brand/90 text-white shadow-brand/20"
 							: "bg-fuchsia-600/90 text-white shadow-fuchsia-500/20",
 					)}
+					data-testid={`pane-label-${paneRole.toLowerCase()}`}
 				>
 					{paneRole}
 				</div>

@@ -28,12 +28,25 @@ const (
 	CommandKill
 )
 
+// RepeatedString captures multiple flag occurrences.
+type RepeatedString []string
+
+func (r *RepeatedString) String() string {
+	return strings.Join(*r, ", ")
+}
+
+func (r *RepeatedString) Set(value string) error {
+	*r = append(*r, value)
+	return nil
+}
+
 // Options holds the parsed command-line options.
 type Options struct {
 	Command       CommandType
 	KillArgs      []string // args for kill command
 	MainPath      string
-	SubPath       string
+	SubPaths      []string
+	ActiveSub     string
 	Focus         string
 	Watch         bool
 	Port          int
@@ -64,19 +77,29 @@ func Parse(args []string) (Options, error) {
 	fs := flag.NewFlagSet("zview", flag.ContinueOnError)
 	fs.SetOutput(os.Stdout)
 	fs.Usage = func() {
-		fmt.Fprintf(fs.Output(), "Usage: zview [options] [MAIN.pdf] [SUB.pdf]\n")
-		fmt.Fprintf(fs.Output(), "       zview ps                  - list running instances\n")
-		fmt.Fprintf(fs.Output(), "       zview kill [port]         - terminate instance(s)\n")
-		fmt.Fprintln(fs.Output(), "\nOptions:")
-		fs.PrintDefaults()
-		fmt.Fprintln(fs.Output(), "\nExamples:")
-		fmt.Fprintln(fs.Output(), "  zview main.pdf")
-		fmt.Fprintln(fs.Output(), "  zview main.pdf sub.pdf")
-		fmt.Fprintln(fs.Output(), "  zview main.pdf --sub sub.pdf")
-		fmt.Fprintln(fs.Output(), "  zview main.pdf sub.pdf --focus sub")
-		fmt.Fprintln(fs.Output(), "  zview main.pdf --no-watch")
-		fmt.Fprintln(fs.Output(), "  zview ps")
-		fmt.Fprintln(fs.Output(), "  zview kill 8571")
+		out := fs.Output()
+		fmt.Fprintf(out, "Usage: zview [options] [MAIN.pdf] [SUB.pdf...]\n")
+		fmt.Fprintf(out, "       zview ps                  - list running instances\n")
+		fmt.Fprintf(out, "       zview kill [port]         - terminate instance(s)\n")
+		fmt.Fprintln(out, "\nOptions:")
+		// Manually print flags to enforce double-hyphen style for long flags
+		fmt.Fprintln(out, "  -m, --main <path>        path to MAIN PDF")
+		fmt.Fprintln(out, "  -s, --sub <path>         path to SUB PDF (can be repeated)")
+		fmt.Fprintln(out, "      --active-sub <path>  filename/path of SUB PDF to activate initially")
+		fmt.Fprintln(out, "      --focus <pane>       initial focus: main|sub (default \"main\")")
+		fmt.Fprintln(out, "      --help               show this help and exit")
+		fmt.Fprintln(out, "      --watch              enable file watching for MAIN (default: true)")
+		fmt.Fprintln(out, "      --no-watch           disable file watching for MAIN")
+		fmt.Fprintln(out, "      --port <int>         port to bind (0 = auto-select) (default 8571)")
+		fmt.Fprintln(out, "      --no-open            do not auto-open browser tab")
+		fmt.Fprintln(out, "      --version            print version and exit")
+
+		fmt.Fprintln(out, "\nExamples:")
+		fmt.Fprintln(out, "  zview main.pdf")
+		fmt.Fprintln(out, "  zview -m main.pdf -s sub1.pdf -s sub2.pdf")
+		fmt.Fprintln(out, "  zview main.pdf sub1.pdf sub2.pdf")
+		fmt.Fprintln(out, "  zview main.pdf -s sub1.pdf --active-sub sub1.pdf")
+		fmt.Fprintln(out, "  zview main.pdf --no-watch")
 	}
 
 	// Load config first
@@ -90,22 +113,27 @@ func Parse(args []string) (Options, error) {
 		Config:      cfg,
 	}
 
-	fs.StringVar(&opts.SubPath, "sub", "", "path to SUB PDF")
-	fs.StringVar(&opts.Focus, "focus", opts.Focus, "initial focus: main|sub")
-	helpFlag := fs.Bool("help", false, "show this help and exit")
+	var subFlags RepeatedString
 
+	// Standard flags - usage strings here are less important as we manualy print Usage,
+	// but good to keep them for documentation/completeness if we revert to PrintDefaults.
+	fs.StringVar(&opts.MainPath, "main", "", "path to MAIN PDF")
+	fs.StringVar(&opts.MainPath, "m", "", "path to MAIN PDF")
+	fs.Var(&subFlags, "sub", "path to SUB PDF")
+	fs.Var(&subFlags, "s", "path to SUB PDF")
+	fs.StringVar(&opts.ActiveSub, "active-sub", "", "filename/path of SUB PDF to activate initially")
+	fs.StringVar(&opts.Focus, "focus", opts.Focus, "initial focus: main|sub")
+
+	helpFlag := fs.Bool("help", false, "show this help and exit")
 	watchFlag := fs.Bool("watch", cfg.Watch, "enable file watching for MAIN (default)")
 	noWatchFlag := fs.Bool("no-watch", false, "disable file watching for MAIN")
-
 	fs.IntVar(&opts.Port, "port", opts.Port, "port to bind (0 = auto-select)")
-
 	noOpenFlag := fs.Bool("no-open", false, "do not auto-open browser tab")
 	versionFlag := fs.Bool("version", false, "print version and exit")
 
 	reordered := reorderArgs(args)
 	if err := fs.Parse(reordered); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
-			// Usage() is already called by flag package
 			return Options{}, ErrShowHelp
 		}
 		return Options{}, err
@@ -119,28 +147,32 @@ func Parse(args []string) (Options, error) {
 		os.Exit(0)
 	}
 
-	remaining := fs.Args()
-	if len(remaining) > 2 {
-		return Options{}, fmt.Errorf("expected at most MAIN and SUB paths, got %d", len(remaining))
+	// Consolidate arguments
+	// Positionals
+	positionals := fs.Args()
+
+	// 1. Resolve MAIN
+	// If flag not set, take first positional
+	if opts.MainPath == "" && len(positionals) > 0 {
+		opts.MainPath = positionals[0]
+		positionals = positionals[1:]
 	}
-	if len(remaining) >= 1 {
-		opts.MainPath = remaining[0]
-	}
-	if len(remaining) == 2 && opts.SubPath == "" {
-		opts.SubPath = remaining[1]
-	}
+
+	// 2. Resolve SUBs
+	// Add flags first
+	opts.SubPaths = append(opts.SubPaths, subFlags...)
+	// Add remaining positionals
+	opts.SubPaths = append(opts.SubPaths, positionals...)
 
 	// Update watch based on flags
 	opts.Watch = *watchFlag
 	if *noWatchFlag {
 		opts.Watch = false
 	}
-	// Update config with final watch state so frontend knows
 	opts.Config.Watch = opts.Watch
-
 	opts.OpenBrowser = !*noOpenFlag
 
-	// Check if port was explicitly specified
+	// Check port
 	fs.Visit(func(f *flag.Flag) {
 		if f.Name == "port" {
 			opts.PortSpecified = true
@@ -163,7 +195,7 @@ func reorderArgs(args []string) []string {
 
 	needsValue := func(name string) bool {
 		switch name {
-		case "sub", "focus", "port":
+		case "sub", "s", "main", "m", "active-sub", "focus", "port":
 			return true
 		default:
 			return false

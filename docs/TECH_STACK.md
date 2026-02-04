@@ -75,7 +75,7 @@ Design priorities: **speed**, **low memory**, **simple distribution**, **read-on
 * `zview [MAIN.pdf]`
 * `--sub <PATH>` — open a second PDF as SUB
 * `--focus main|sub` — initial focus
-* `--watch / --no-watch` — enable/disable filesystem watching for MAIN
+* `--watch` / `--no-watch` — enable/disable filesystem watching for MAIN
 * `--port <N>` — choose port
 * `--no-open` — don’t auto-open the browser
 
