@@ -68,12 +68,17 @@ func TestParse(t *testing.T) {
 		{
 			name: "view with sub",
 			args: []string{"main.pdf", "sub.pdf"},
-			want: Options{Command: CommandView, MainPath: "main.pdf", SubPath: "sub.pdf", Focus: "main", Watch: true, Port: DefaultPort, OpenBrowser: true},
+			want: Options{Command: CommandView, MainPath: "main.pdf", SubPaths: []string{"sub.pdf"}, Focus: "main", Watch: true, Port: DefaultPort, OpenBrowser: true},
 		},
 		{
 			name: "view with mixed flags",
 			args: []string{"main.pdf", "--no-watch", "--focus", "sub"},
 			want: Options{Command: CommandView, MainPath: "main.pdf", Focus: "sub", Watch: false, Port: DefaultPort, OpenBrowser: true},
+		},
+		{
+			name: "multiple subs and active",
+			args: []string{"-m", "main.pdf", "-s", "sub1.pdf", "--sub", "sub2.pdf", "--active-sub", "sub2.pdf"},
+			want: Options{Command: CommandView, MainPath: "main.pdf", SubPaths: []string{"sub1.pdf", "sub2.pdf"}, ActiveSub: "sub2.pdf", Focus: "main", Watch: true, Port: DefaultPort, OpenBrowser: true},
 		},
 	}
 
@@ -93,8 +98,11 @@ func TestParse(t *testing.T) {
 			if got.MainPath != tt.want.MainPath {
 				t.Errorf("Parse().MainPath = %v, want %v", got.MainPath, tt.want.MainPath)
 			}
-			if got.SubPath != tt.want.SubPath {
-				t.Errorf("Parse().SubPath = %v, want %v", got.SubPath, tt.want.SubPath)
+			if !reflect.DeepEqual(got.SubPaths, tt.want.SubPaths) {
+				t.Errorf("Parse().SubPaths = %v, want %v", got.SubPaths, tt.want.SubPaths)
+			}
+			if got.ActiveSub != tt.want.ActiveSub {
+				t.Errorf("Parse().ActiveSub = %v, want %v", got.ActiveSub, tt.want.ActiveSub)
 			}
 			if got.Focus != tt.want.Focus {
 				t.Errorf("Parse().Focus = %v, want %v", got.Focus, tt.want.Focus)

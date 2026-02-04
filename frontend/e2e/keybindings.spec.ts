@@ -8,8 +8,8 @@ test.describe("Keybindings", () => {
 	test("should have initial focus on main pane", async ({ page }) => {
 		// Check if the main pane has the focus ring/class
 		const _mainPane = page.locator('canvas[aria-label="MAIN PDF page 1"]');
-		// Use exact match to avoid matching "Loading MAIN PDF..."
-		await expect(page.getByText("MAIN", { exact: true })).toBeVisible();
+		// Use data-testid for robustness
+		await expect(page.getByTestId("pane-label-main")).toBeVisible();
 	});
 
 	test("should handle navigation keys (j/k/h/l/d/u/gg/G)", async ({ page }) => {
@@ -137,7 +137,7 @@ test.describe("Keybindings", () => {
 		await page.waitForSelector('canvas[aria-label="MAIN PDF page 1"]', { state: "visible" });
 
 		// Initial: Focus on MAIN
-		await expect(page.getByText("MAIN", { exact: true })).toBeVisible();
+		await expect(page.getByTestId("pane-label-main")).toBeVisible();
 
 		// Press 's' to swap
 		await page.keyboard.press("s");

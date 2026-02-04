@@ -68,25 +68,48 @@ func main() {
 		}
 	}
 
-	// Validate SUB path if provided
-	if opts.SubPath != "" {
-		info, err := os.Stat(opts.SubPath)
+	// Validate SUB paths if provided
+	for _, subPath := range opts.SubPaths {
+		info, err := os.Stat(subPath)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error: SUB file %q does not exist\n", opts.SubPath)
+			fmt.Fprintf(os.Stderr, "Error: SUB file %q does not exist\n", subPath)
 			os.Exit(1)
 		}
 		if info.IsDir() {
-			fmt.Fprintf(os.Stderr, "Error: SUB path %q is a directory, expected file\n", opts.SubPath)
+			fmt.Fprintf(os.Stderr, "Error: SUB path %q is a directory, expected file\n", subPath)
 			os.Exit(1)
 		}
 	}
 
 	// Initialize state
 	appState := state.New(opts.MainPath)
-	if opts.SubPath != "" {
-		// Use filename as tab name
-		name := filepath.Base(opts.SubPath)
-		appState.AddSubTab(name, opts.SubPath, false)
+
+	activeSubSet := false
+	for _, subPath := range opts.SubPaths {
+		name := filepath.Base(subPath)
+		id := appState.AddSubTab(name, subPath, false)
+
+		// If active-sub matches this path or filename, set it as active
+		if opts.ActiveSub != "" && !activeSubSet {
+			if subPath == opts.ActiveSub || name == opts.ActiveSub {
+				appState.SetActiveSubId(id)
+				activeSubSet = true
+			}
+		}
+	}
+
+	// If active-sub was specified but not found in the list, try to add it now
+	if opts.ActiveSub != "" && !activeSubSet {
+		info, err := os.Stat(opts.ActiveSub)
+		if err == nil && !info.IsDir() {
+			name := filepath.Base(opts.ActiveSub)
+			id := appState.AddSubTab(name, opts.ActiveSub, false)
+			appState.SetActiveSubId(id)
+			activeSubSet = true
+		} else {
+			// If we can't load it, just warn but continue
+			fmt.Fprintf(os.Stderr, "Warning: --active-sub %q not found or invalid\n", opts.ActiveSub)
+		}
 	}
 	defer appState.Cleanup()
 
