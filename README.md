@@ -10,6 +10,7 @@ Runs in your browser, powered by PDF.js, with Vim-like navigation.
 * **Dual Pane Support**: View two PDFs side-by-side (MAIN and SUB).
     * **MAIN Pane**: Supports auto-reload on file change.
     * **SUB Pane**: Static reference view; supports multiple tabs.
+* **Password-Protected PDFs**: Prompt for a password and retry on incorrect entry.
 * **Focus Management**: Clear visual indication of the active pane.
 * **Configuration**: Customizable key behaviors via `~/.config/zview/config.toml`.
 * **Session Management**: List and terminate running instances via CLI.
@@ -166,10 +167,11 @@ page_scroll_ratio = 0.5
 * **Note on Shift**: Do not plain Shift modifier (e.g. `<S-g>`). Just use the resulting character directly.
     * Use `"G"` for Shift+g.
     * Use `"<"` for Shift+,.
-* **Sequences**: Space-separated (e.g., `"g g"`, `"<Space> j"`)
+* **Sequences**: Two-key, space-separated (e.g., `"g g"`, `"<Space> j"`)
 ```
 
 ## Troubleshooting
 
 * **Performance**: `zview` prioritizes performance. It does not use a "Text Layer" for selection/search to keep rendering fast and lightweight.
 * **Reloading**: The SUB pane is static and does not watch for changes. Re-open the file in the UI to update it.
+* **Password Prompts**: If a PDF is locked, a prompt appears in the viewer. Cancel keeps the current view unchanged.

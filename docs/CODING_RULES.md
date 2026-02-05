@@ -93,6 +93,32 @@ if err != nil {
 - Unit tests alongside source files (`*_test.go`, `*.test.ts`)
 - Test public interfaces, not internals
 - Use table-driven tests in Go
+- **Mandatory**: All new features and bug fixes MUST include corresponding tests.
+- **Mandatory**: All existing tests MUST pass before merging.
+- Keep tests deterministic (no timers without control, no reliance on network).
+- For keybinding changes, add/adjust unit coverage in `src/lib/keyBindings.defaultKeys.test.ts`.
+- For keybinding changes, update keyboard behavior tests in `src/hooks/useKeyboardNavigation.test.tsx`.
+- For keybinding changes, add/adjust E2E coverage in `frontend/e2e/keybindings.spec.ts` when behavior is user-visible.
+- For keybinding sequences, include coverage for special tokens (e.g., `<Space>`) and the sequence timeout.
+- For keyboard handling changes, include coverage that inputs/textareas/selects/contentEditable are ignored.
+- Use fully-typed mocks for `ViewerHandle` in tests (include all required methods).
+- When updating config behavior, use a complete `ZviewConfig` object in tests.
+- Prefer existing PDF fixtures; add new ones only when behavior needs it.
+- When adding a new test suite, update `docs/TESTING.md`.
+
+See `docs/TESTING.md` for the current test map and how to run them.
+
+## Keyboard Handling
+
+- Sequence bindings are **two-key tokens** (space-separated).
+- Sequence matching must use `parseKeySequence` + `matchesAnyKey` per token.
+  Store the **matched token** (e.g., `"<Space>"`) for the first key, not the raw `event.key`.
+- Do not handle keys when focus is in `input`, `textarea`, `select`, or `contentEditable`.
+- Blocked keys should be checked before action dispatch; help overlay routing should happen before action execution.
+
+## Security & Privacy
+
+- Never persist PDF passwords; keep them in memory only for the current viewer session.
 
 ## Git Commits
 

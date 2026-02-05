@@ -75,7 +75,7 @@ Design priorities: **speed**, **low memory**, **simple distribution**, **read-on
 * `zview [MAIN.pdf]`
 * `--sub <PATH>` — open a second PDF as SUB
 * `--focus main|sub` — initial focus
-* `--watch / --no-watch` — enable/disable filesystem watching for MAIN
+* `--watch` / `--no-watch` — enable/disable filesystem watching for MAIN
 * `--port <N>` — choose port
 * `--no-open` — don’t auto-open the browser
 
@@ -120,6 +120,7 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for details.
 * Use `pdfjs-dist` as the sole source for both core and worker.
 * Explicitly set `GlobalWorkerOptions.workerSrc` to the bundled worker output to prevent version mismatch.
 * Avoid mixing CDN versions.
+* Handle password-protected PDFs with PDF.js `onPassword` prompts; keep passwords in memory only.
 
 ### Rendering/performance strategy (must-have)
 

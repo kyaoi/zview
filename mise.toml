@@ -71,7 +71,7 @@ run = "gofmt -w backend"
 # Run all tests
 [tasks.test]
 description = "Run tests"
-depends = ["test:frontend", "test:backend"]
+depends = ["test:frontend", "test:backend", "test:e2e"]
 
 # Run frontend tests
 [tasks."test:frontend"]
@@ -82,6 +82,21 @@ run = "pnpm test"
 [tasks."test:backend"]
 dir = "backend"
 run = "go test -v ./..."
+
+# Run E2E tests
+[tasks."test:e2e"]
+dir = "frontend"
+run = "npx playwright test"
+
+# Run E2E tests with Playwright debug logs
+[tasks."test:e2e:debug"]
+dir = "frontend"
+run = "pnpm test:e2e:debug"
+
+# Generate E2E PDF fixtures
+[tasks."fixtures:e2e"]
+dir = "frontend"
+run = "pnpm fixtures:e2e"
 
 # Type-check frontend code
 [tasks."check:frontend"]
