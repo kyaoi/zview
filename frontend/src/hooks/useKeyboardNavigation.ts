@@ -1,10 +1,20 @@
 import { useCallback, useEffect, useRef } from "react";
 import {
-	CONT_SCROLL_FAST,
-	CONT_SCROLL_PER_FRAME,
-	SCROLL_STEP_HORIZONTAL,
-	SCROLL_STEP_VERTICAL,
-} from "../lib/constants";
+	getKeyBinding,
+	isKeySequence,
+	parseKeySequence,
+	validateKeyConflicts,
+	getBlockedKeys,
+	getDisableBrowserShortcuts,
+} from "../lib/config";
+import { keyActionDefs } from "../lib/keyActions";
+import { matchesAnyKey } from "../lib/keyMatcher";
+import {
+	createActionHandlers,
+	handleHelpOverlayNavigation,
+	SCROLL_ACTION_IDS,
+	type ActionContext,
+} from "../lib/actionHandlers";
 import type { ScrollSnapshot, ToastType, ViewerHandle } from "../lib/types";
 
 interface UseKeyboardNavigationOptions {
@@ -43,10 +53,10 @@ export function useKeyboardNavigation({
 	const showHelpRef = useRef(showHelp);
 	const keysEnabledRef = useRef(keysEnabled);
 	const onTabSwitchRef = useRef(onTabSwitch);
+
 	useEffect(() => {
 		onTabSwitchRef.current = onTabSwitch;
 	}, [onTabSwitch]);
-
 	useEffect(() => {
 		hasSubRef.current = hasSub;
 	}, [hasSub]);
@@ -59,8 +69,25 @@ export function useKeyboardNavigation({
 	useEffect(() => {
 		keysEnabledRef.current = keysEnabled;
 	}, [keysEnabled]);
+	useEffect(() => {
+		const warnings = validateKeyConflicts();
+		for (const warning of warnings) {
+			console.warn(warning);
+			addToast(warning.message, "warning");
+		}
+	}, [addToast]);
 
 	useEffect(() => {
+		// Create action handlers with current callbacks
+		const actionHandlers = createActionHandlers({
+			setFocusedPane,
+			setMainReloadKey,
+			setShowHelp,
+			swapPanes,
+			addToast,
+			onTabSwitch: (...args) => onTabSwitchRef.current?.(...args),
+		});
+
 		const clearSequence = () => {
 			if (keySeqTimeoutRef.current) {
 				window.clearTimeout(keySeqTimeoutRef.current);
@@ -77,191 +104,171 @@ export function useKeyboardNavigation({
 			}, 600);
 		};
 
+		const consume = (event: KeyboardEvent) => {
+			event.preventDefault();
+			event.stopPropagation();
+			event.stopImmediatePropagation();
+		};
+
+		const getContext = (): ActionContext => ({
+			hasSub: hasSubRef.current,
+			focusedPane: focusedPaneRef.current,
+			showHelp: showHelpRef.current,
+			subViewerRef,
+		});
+
+		const getTargetViewer = () =>
+			focusedPaneRef.current === "sub" && hasSubRef.current
+				? subViewerRef.current
+				: mainViewerRef.current;
+
+		const findSequenceCompletion = (event: KeyboardEvent): string | null => {
+			const lastKey = lastKeyRef.current;
+			if (!lastKey) return null;
+
+			for (const actionDef of keyActionDefs) {
+				const bindings = getKeyBinding(actionDef.id);
+				for (const binding of bindings) {
+					if (!isKeySequence(binding)) continue;
+					const parts = parseKeySequence(binding);
+					if (parts.length !== 2) continue;
+					const [first, second] = parts;
+					if (first !== lastKey) continue;
+					if (matchesAnyKey(event, [second])) {
+						return actionDef.id;
+					}
+				}
+			}
+			return null;
+		};
+
+		const findSingleMatchId = (event: KeyboardEvent): string | null => {
+			let matchId: string | null = null;
+			for (const actionDef of keyActionDefs) {
+				const bindings = getKeyBinding(actionDef.id);
+				const singleKeys = bindings.filter((b) => !isKeySequence(b));
+				if (matchesAnyKey(event, singleKeys)) {
+					matchId = actionDef.id;
+				}
+			}
+			return matchId;
+		};
+
+		const findSequenceStartKey = (event: KeyboardEvent): string | null => {
+			for (const actionDef of keyActionDefs) {
+				const bindings = getKeyBinding(actionDef.id);
+				for (const binding of bindings) {
+					if (!isKeySequence(binding)) continue;
+					const [first] = parseKeySequence(binding);
+					if (!first) continue;
+					if (matchesAnyKey(event, [first])) {
+						return first;
+					}
+				}
+			}
+			return null;
+		};
+
+		const handleHelpModeAction = (actionId: string, _event: KeyboardEvent): boolean => {
+			const helpContent = document.getElementById("help-overlay-content");
+			if (!helpContent) return false;
+
+			// Allow quit/toggle_help
+			if (actionId === "quit" || actionId === "toggle_help") {
+				return false; // Let normal handler execute
+			}
+
+			// Redirect navigation keys to scroll the help content
+			const def = keyActionDefs.find((d) => d.id === actionId);
+			if (def?.category === "navigation") {
+				return handleHelpOverlayNavigation(actionId, helpContent);
+			}
+
+			// Block all other actions
+			return true;
+		};
+
 		const handleKey = (event: KeyboardEvent) => {
 			if (!keysEnabledRef.current) return;
 			const target = event.target as HTMLElement | null;
 			const tag = target?.tagName?.toLowerCase();
-			if (event.metaKey || event.ctrlKey || event.altKey) return;
 			if (tag === "input" || tag === "textarea" || tag === "select" || target?.isContentEditable)
 				return;
 
-			const keyLower = event.key?.toLowerCase?.() ?? "";
-			const codeLower = event.code?.toLowerCase?.() ?? "";
+			// Check blocked keys first
+			const blockedKeys = getBlockedKeys();
+			if (matchesAnyKey(event, blockedKeys)) {
+				consume(event);
+				return;
+			}
 
-			const consume = () => {
-				event.preventDefault();
-				event.stopPropagation();
-				event.stopImmediatePropagation();
-			};
+			const targetViewer = getTargetViewer();
+			const context = getContext();
 
-			const targetViewer =
-				focusedPaneRef.current === "sub" && hasSubRef.current
-					? subViewerRef.current
-					: mainViewerRef.current;
+			// 1. Check if we are completing a sequence
+			const sequenceMatchId = findSequenceCompletion(event);
+			if (sequenceMatchId) {
+				consume(event);
+				clearSequence();
 
-			// multi-key: gg
-			if (event.key === "g") {
-				if (lastKeyRef.current === "g") {
-					consume();
-					clearSequence();
-					targetViewer?.jumpToTop();
+				if (context.showHelp && handleHelpModeAction(sequenceMatchId, event)) {
 					return;
 				}
-				lastKeyRef.current = "g";
+
+				actionHandlers[sequenceMatchId]?.(targetViewer, event, context);
+				return;
+			}
+			if (lastKeyRef.current) {
+				clearSequence();
+			}
+
+			// 2. Check for Single Key Match
+			const singleMatchId = findSingleMatchId(event);
+			if (singleMatchId) {
+				consume(event);
+
+				if (context.showHelp && handleHelpModeAction(singleMatchId, event)) {
+					return;
+				}
+
+				actionHandlers[singleMatchId]?.(targetViewer, event, context);
+				return;
+			}
+
+			// 3. Check for Sequence Start
+			const sequenceStartKey = findSequenceStartKey(event);
+			if (sequenceStartKey) {
+				consume(event);
+				lastKeyRef.current = sequenceStartKey;
 				scheduleSequenceClear();
 				return;
 			}
-			clearSequence();
 
-			if (codeLower === "keys" || keyLower === "s") {
-				consume();
-				if (event.repeat) return;
-				targetViewer?.stopContinuousScroll();
-				swapPanes();
-				return;
-			}
-			switch (event.key) {
-				case "j":
-					consume();
-					if (event.repeat) {
-						targetViewer?.startContinuousScroll(0, CONT_SCROLL_PER_FRAME);
-					} else {
-						targetViewer?.scrollLine(SCROLL_STEP_VERTICAL);
-					}
-					return;
-				case "k":
-					consume();
-					if (event.repeat) {
-						targetViewer?.startContinuousScroll(0, -CONT_SCROLL_PER_FRAME);
-					} else {
-						targetViewer?.scrollLine(-SCROLL_STEP_VERTICAL);
-					}
-					return;
-				case "h":
-					consume();
-					if (event.repeat) {
-						targetViewer?.startContinuousScroll(-CONT_SCROLL_PER_FRAME, 0);
-					} else {
-						targetViewer?.scrollHorizontal(-SCROLL_STEP_HORIZONTAL);
-					}
-					return;
-				case "l":
-					consume();
-					if (event.repeat) {
-						targetViewer?.startContinuousScroll(CONT_SCROLL_PER_FRAME, 0);
-					} else {
-						targetViewer?.scrollHorizontal(SCROLL_STEP_HORIZONTAL);
-					}
-					return;
-				case "d":
-					consume();
-					if (event.repeat) {
-						targetViewer?.startContinuousScroll(0, CONT_SCROLL_FAST);
-					} else {
-						targetViewer?.scrollHalfPage(1);
-					}
-					return;
-				case "u":
-					consume();
-					if (event.repeat) {
-						targetViewer?.startContinuousScroll(0, -CONT_SCROLL_FAST);
-					} else {
-						targetViewer?.scrollHalfPage(-1);
-					}
-					return;
-				case "G":
-					consume();
-					targetViewer?.jumpToBottom();
-					return;
-				case "n":
-					consume();
-					targetViewer?.jumpByPages(1);
-					return;
-				case "p":
-					consume();
-					targetViewer?.jumpByPages(-1);
-					return;
-				case "+":
-					consume();
-					targetViewer?.zoomIn();
-					return;
-				case "-":
-					consume();
-					targetViewer?.zoomOut();
-					return;
-				case "=":
-					consume();
-					targetViewer?.fitToWidth();
-					return;
-				case "Tab":
-					consume();
-					targetViewer?.stopContinuousScroll();
-					if (hasSubRef.current) {
-						setFocusedPane(focusedPaneRef.current === "main" ? "sub" : "main");
-					} else {
-						setFocusedPane("main");
-					}
-					return;
-				case "r":
-					consume();
-					setMainReloadKey((v) => v + 1);
-					setFocusedPane("main");
-					addToast("MAIN: reloading…", "info");
-					return;
-				case "R":
-					consume();
-					setMainReloadKey((v) => v + 1);
-					if (hasSubRef.current) {
-						subViewerRef.current?.rerender();
-					}
-					setFocusedPane("main");
-					addToast(hasSubRef.current ? "MAIN: reload (re-render SUB)" : "MAIN: reloading…", "info");
-					return;
-				case "H":
-					consume();
-					if (hasSubRef.current && focusedPaneRef.current === "sub") {
-						onTabSwitchRef.current?.("prev");
-					} else {
-						// Fallback or do nothing
-						targetViewer?.scrollHorizontal(-SCROLL_STEP_HORIZONTAL * 5); // Faster scroll? Or just ignore
-					}
-					return;
-				case "L":
-					consume();
-					if (hasSubRef.current && focusedPaneRef.current === "sub") {
-						onTabSwitchRef.current?.("next");
-					} else {
-						targetViewer?.scrollHorizontal(SCROLL_STEP_HORIZONTAL * 5);
-					}
-					return;
-				case "?":
-					consume();
-					setShowHelp((open) => !open);
-					return;
-				case "q":
-					consume();
-					if (showHelpRef.current) {
-						setShowHelp(false);
-					} else {
-						addToast("Close the tab to quit", "info");
-					}
-					return;
-				default:
-					return;
+			// If no action matched, check if we should block browser shortcuts
+			if (getDisableBrowserShortcuts()) {
+				// Block if any modifier is used (Ctrl, Alt, Meta)
+				if (event.ctrlKey || event.altKey || event.metaKey) {
+					consume(event);
+				}
 			}
 		};
 
 		window.addEventListener("keydown", handleKey, { capture: true });
+
 		const handleKeyUp = (event: KeyboardEvent) => {
 			if (!keysEnabledRef.current) return;
-			if (["j", "k", "h", "l", "d", "u"].includes(event.key)) {
-				const targetViewer =
-					focusedPaneRef.current === "sub" && hasSubRef.current
-						? subViewerRef.current
-						: mainViewerRef.current;
-				targetViewer?.stopContinuousScroll();
+
+			// Check if released key was a scroll key
+			for (const actionId of SCROLL_ACTION_IDS) {
+				const keys = getKeyBinding(actionId);
+				if (matchesAnyKey(event, keys)) {
+					const targetViewer = getTargetViewer();
+					targetViewer?.stopContinuousScroll();
+					return;
+				}
 			}
 		};
+
 		window.addEventListener("keyup", handleKeyUp);
 		return () => {
 			window.removeEventListener("keydown", handleKey);
@@ -276,7 +283,6 @@ export function useKeyboardNavigation({
 		setFocusedPane,
 		setMainReloadKey,
 		setShowHelp,
-		// onTabSwitch removed from deps, ref used
 	]);
 }
 
@@ -300,7 +306,6 @@ export function useSwapPanes(
 			addToast("Cannot swap without SUB", "error");
 			return false;
 		}
-		// Capture snapshots before state update triggers re-render/layout
 		const mainSnap = mainViewerRef.current?.getSnapshot() ?? null;
 		const subSnap = subViewerRef.current?.getSnapshot() ?? null;
 		swapSnapshotsRef.current = { main: mainSnap, sub: subSnap };

@@ -2,6 +2,7 @@ import { GlobalWorkerOptions, getDocument, type PDFDocumentProxy } from "pdfjs-d
 import workerSrc from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import {
 	forwardRef,
+	type FormEvent,
 	useCallback,
 	useEffect,
 	useImperativeHandle,
@@ -30,6 +31,9 @@ import { clampScaleValue, withCacheBust } from "../../lib/utils";
 
 GlobalWorkerOptions.workerSrc = workerSrc;
 
+const PASSWORD_REASON_NEED = 1;
+const PASSWORD_REASON_INCORRECT = 2;
+
 const releasePageSlot = (slot: PageSlotRef | undefined) => {
 	if (!slot) return;
 	if (slot.renderTask) {
@@ -56,6 +60,10 @@ interface PdfViewerProps {
 	initialSnapshot?: ScrollSnapshot | null;
 }
 
+type PasswordPromptState = {
+	reason: "required" | "incorrect";
+};
+
 export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfViewer(
 	{ paneRole, url, onNotify, reloadKey = 0, initialSnapshot },
 	ref,
@@ -79,6 +87,11 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 	const manualScaleInitializedRef = useRef(false);
 	const currentPageRef = useRef(1);
 	const pdfRef = useRef<PDFDocumentProxy | null>(null);
+	const loadingTaskRef = useRef<ReturnType<typeof getDocument> | null>(null);
+	const passwordResolverRef = useRef<((password: string) => void) | null>(null);
+	const passwordCacheRef = useRef<string | null>(null);
+	const passwordAttemptRef = useRef<string | null>(null);
+	const abortReasonRef = useRef<"password-cancel" | "reload" | null>(null);
 	const pendingRestoreRef = useRef<{ reloadKey: number; snapshot: ScrollSnapshot | null } | null>(
 		null,
 	);
@@ -86,6 +99,9 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 	const scrollLoopRef = useRef<number | null>(null);
 	const scrollVelocityRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
 	const loadedKeyRef = useRef(-1);
+	const [passwordPrompt, setPasswordPrompt] = useState<PasswordPromptState | null>(null);
+	const [passwordInput, setPasswordInput] = useState("");
+	const passwordInputRef = useRef<HTMLInputElement | null>(null);
 
 	const resetPageSlots = useCallback(() => {
 		pageSlotsRef.current.forEach((slot) => {
@@ -106,8 +122,15 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 	// biome-ignore lint/correctness/useExhaustiveDependencies: Reload処理はキー変化時のみ走らせ、現在の表示状態をスナップショットするため依存を限定
 	useEffect(() => {
 		let cancelled = false;
+		let activeLoadingTask: ReturnType<typeof getDocument> | null = null;
 		const bustToken = reloadKey + sessionNonce;
 		const requestUrl = withCacheBust(url, bustToken);
+
+		setPasswordPrompt(null);
+		setPasswordInput("");
+		passwordResolverRef.current = null;
+		passwordAttemptRef.current = null;
+		abortReasonRef.current = null;
 
 		if (initialSnapshot) {
 			pendingRestoreRef.current = { reloadKey, snapshot: initialSnapshot };
@@ -143,17 +166,42 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 
 		async function loadAndRender() {
 			try {
-				const loaded = await getDocument({
+				const loadingTask = getDocument({
 					url: requestUrl,
 					cMapUrl: `${PDFJS_ASSET_BASE}cmaps/`,
 					cMapPacked: true,
 					standardFontDataUrl: `${PDFJS_ASSET_BASE}standard_fonts/`,
 					useSystemFonts: true,
-				}).promise;
+					password: passwordCacheRef.current ?? undefined,
+				});
+				activeLoadingTask = loadingTask;
+				loadingTaskRef.current = loadingTask;
+				loadingTask.onPassword = (updatePassword, reason) => {
+					if (cancelled) return;
+					const promptReason =
+						reason === PASSWORD_REASON_INCORRECT
+							? "incorrect"
+							: reason === PASSWORD_REASON_NEED
+								? "required"
+								: "required";
+					setPasswordPrompt({ reason: promptReason });
+					setPasswordInput("");
+					passwordResolverRef.current = (password) => updatePassword(password);
+					if (promptReason === "required") {
+						onNotify(`${role}: password required`, "info");
+					}
+				};
+
+				const loaded = await loadingTask.promise;
 				if (cancelled) {
 					await loaded.destroy();
 					return;
 				}
+				passwordCacheRef.current = passwordAttemptRef.current ?? passwordCacheRef.current;
+				passwordAttemptRef.current = null;
+				setPasswordPrompt(null);
+				setPasswordInput("");
+				passwordResolverRef.current = null;
 
 				const firstPage = await loaded.getPage(1);
 				if (cancelled) {
@@ -198,12 +246,20 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 				onNotify(restoreSnapshot ? `${role}: restored scroll` : `${role}: loaded`, "success");
 			} catch (err) {
 				if (cancelled) return;
+				if (abortReasonRef.current) {
+					abortReasonRef.current = null;
+					return;
+				}
 				const detail = err instanceof Error ? err.message : String(err);
 				setState((prev) => {
 					if (pdfRef.current && prev.phase === "ready") return prev;
 					return { phase: "error", detail };
 				});
 				onNotify(pdfRef.current ? `${role}: reload failed` : `${role}: failed to load`, "error");
+			} finally {
+				if (activeLoadingTask && loadingTaskRef.current === activeLoadingTask) {
+					loadingTaskRef.current = null;
+				}
 			}
 		}
 
@@ -211,8 +267,49 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 
 		return () => {
 			cancelled = true;
+			if (activeLoadingTask && loadingTaskRef.current === activeLoadingTask) {
+				abortReasonRef.current = "reload";
+				loadingTaskRef.current.destroy();
+				loadingTaskRef.current = null;
+			}
 		};
 	}, [onNotify, reloadKey, resetPageSlots, role, url]);
+
+	useEffect(() => {
+		if (passwordPrompt) {
+			passwordInputRef.current?.focus();
+		}
+	}, [passwordPrompt]);
+
+	const handlePasswordSubmit = useCallback(
+		(event: FormEvent) => {
+			event.preventDefault();
+			const resolver = passwordResolverRef.current;
+			if (!resolver) return;
+			passwordAttemptRef.current = passwordInput;
+			setPasswordPrompt(null);
+			setPasswordInput("");
+			passwordResolverRef.current = null;
+			resolver(passwordInput);
+		},
+		[passwordInput],
+	);
+
+	const handlePasswordCancel = useCallback(() => {
+		setPasswordPrompt(null);
+		setPasswordInput("");
+		passwordResolverRef.current = null;
+		passwordAttemptRef.current = null;
+		if (loadingTaskRef.current) {
+			abortReasonRef.current = "password-cancel";
+			loadingTaskRef.current.destroy();
+			loadingTaskRef.current = null;
+		}
+		if (!pdfRef.current) {
+			setState({ phase: "error", detail: "Password entry cancelled" });
+		}
+		onNotify(`${role}: password entry cancelled`, "warning");
+	}, [onNotify, role]);
 
 	useEffect(
 		() => () => {
@@ -676,6 +773,48 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 			className="relative flex h-full w-full flex-col overflow-hidden bg-slate-900/30"
 			ref={containerRef}
 		>
+			{passwordPrompt ? (
+				<div className="absolute inset-0 z-20 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm">
+					<form
+						onSubmit={handlePasswordSubmit}
+						className="w-full max-w-sm rounded-2xl border border-slate-700/80 bg-slate-900/95 p-6 shadow-2xl"
+						aria-label={`Password prompt for ${role}`}
+					>
+						<div className="text-sm font-semibold text-slate-100">Unlock {role} PDF</div>
+						<p className="mt-2 text-xs text-slate-400">
+							{passwordPrompt.reason === "incorrect"
+								? "Incorrect password. Try again."
+								: "This PDF is password-protected."}
+						</p>
+						<input
+							ref={passwordInputRef}
+							type="password"
+							autoComplete="current-password"
+							placeholder="Enter password"
+							value={passwordInput}
+							onChange={(event) => setPasswordInput(event.target.value)}
+							className="mt-4 w-full rounded-lg border border-slate-700 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 outline-none focus:border-brand focus:ring-2 focus:ring-brand/40"
+							data-testid="pdf-password-input"
+						/>
+						<div className="mt-4 flex items-center justify-end gap-2">
+							<button
+								type="button"
+								onClick={handlePasswordCancel}
+								className="rounded-lg border border-slate-700/80 px-3 py-1.5 text-xs font-semibold text-slate-200 transition-colors hover:border-slate-500 hover:text-white"
+							>
+								Cancel
+							</button>
+							<button
+								type="submit"
+								className="rounded-lg bg-brand px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-brand/90"
+							>
+								Unlock
+							</button>
+						</div>
+					</form>
+				</div>
+			) : null}
+
 			{/* Floating Page Indicator */}
 			<div className="absolute bottom-6 right-6 z-10 select-none rounded-full border border-slate-700/50 bg-slate-900/80 px-3 py-1.5 text-xs font-medium text-slate-200 shadow-lg backdrop-blur transition-opacity duration-300 hover:opacity-100 opacity-60">
 				Page {currentPage} <span className="text-slate-500">/</span> {pageCount}

@@ -1,4 +1,5 @@
-package main
+// Package server provides SSE broadcasting for zview.
+package server
 
 import (
 	"fmt"
@@ -12,18 +13,21 @@ type Broadcaster struct {
 	clients map[chan string]struct{}
 }
 
-func NewBroadcaster() *Broadcaster {
+// New creates a new Broadcaster.
+func New() *Broadcaster {
 	return &Broadcaster{
 		clients: make(map[chan string]struct{}),
 	}
 }
 
+// AddClient registers a new client channel.
 func (b *Broadcaster) AddClient(ch chan string) {
 	b.mu.Lock()
 	b.clients[ch] = struct{}{}
 	b.mu.Unlock()
 }
 
+// RemoveClient unregisters a client channel and closes it.
 func (b *Broadcaster) RemoveClient(ch chan string) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
@@ -33,10 +37,11 @@ func (b *Broadcaster) RemoveClient(ch chan string) {
 	}
 }
 
+// Broadcast sends an event to all connected clients.
 func (b *Broadcaster) Broadcast(event, data string) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
-	msg := formatSSEMessage(event, data)
+	msg := FormatMessage(event, data)
 	for ch := range b.clients {
 		select {
 		case ch <- msg:
@@ -46,6 +51,7 @@ func (b *Broadcaster) Broadcast(event, data string) {
 	}
 }
 
+// HandleSSE returns an HTTP handler for SSE connections.
 func (b *Broadcaster) HandleSSE(w http.ResponseWriter, r *http.Request) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
@@ -75,7 +81,8 @@ func (b *Broadcaster) HandleSSE(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func formatSSEMessage(event, data string) string {
+// FormatMessage formats an SSE message with event and data.
+func FormatMessage(event, data string) string {
 	if data == "" {
 		return fmt.Sprintf("event: %s\ndata: \n\n", event)
 	}

@@ -1,0 +1,125 @@
+[tools]
+node = "22"
+go = "latest"
+lefthook = "latest"
+pnpm = "latest"
+
+# Build all components
+[tasks.build]
+description = "Build frontend and backend"
+run = [
+  "mise run build:frontend",
+  "mise run build:backend",
+]
+
+# Build frontend assets using Vite
+[tasks."build:frontend"]
+description = "Build frontend"
+dir = "frontend"
+run = "pnpm build"
+
+# Build backend Go binary, embedding frontend assets
+[tasks."build:backend"]
+description = "Build backend"
+dir = "backend"
+run = """
+if [ -f "go.mod" ]; then
+  go build -ldflags "-X main.version=$(git describe --tags --always --dirty) -X main.commit=$(git rev-parse --short HEAD) -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o ../zview
+fi
+"""
+
+# Run all linters (frontend and backend)
+[tasks.lint]
+description = "Run linters"
+depends = ["lint:frontend", "lint:backend"]
+
+# Run frontend linters (Biome)
+[tasks."lint:frontend"]
+dir = "frontend"
+run = "pnpm lint"
+
+# Fix lint errors project-wide
+[tasks."lint:fix"]
+depends = ["lint:fix:frontend"]
+
+# Fix frontend lint errors
+[tasks."lint:fix:frontend"]
+dir = "frontend"
+run = "pnpm lint:fix"
+
+# Run backend linters (go vet)
+[tasks."lint:backend"]
+dir = "backend"
+run = "go vet ./..."
+
+# Format all code
+[tasks.fmt]
+description = "Format code"
+depends = ["fmt:frontend", "fmt:backend"]
+
+# Format frontend code using Biome
+[tasks."fmt:frontend"]
+dir = "frontend"
+run = "pnpm biome format --write ."
+
+# Format backend code using gofmt
+[tasks."fmt:backend"]
+description = "Format Go code"
+# Run from root so we can accept arguments like {staged_files} if needed, or just run on backend dir
+run = "gofmt -w backend"
+
+# Run all tests
+[tasks.test]
+description = "Run tests"
+depends = ["test:frontend", "test:backend", "test:e2e"]
+
+# Run frontend tests
+[tasks."test:frontend"]
+dir = "frontend"
+run = "pnpm test"
+
+# Run backend tests
+[tasks."test:backend"]
+dir = "backend"
+run = "go test -v ./..."
+
+# Run E2E tests
+[tasks."test:e2e"]
+dir = "frontend"
+run = "npx playwright test"
+
+# Run E2E tests with Playwright debug logs
+[tasks."test:e2e:debug"]
+dir = "frontend"
+run = "pnpm test:e2e:debug"
+
+# Generate E2E PDF fixtures
+[tasks."fixtures:e2e"]
+dir = "frontend"
+run = "pnpm fixtures:e2e"
+
+# Type-check frontend code
+[tasks."check:frontend"]
+dir = "frontend"
+run = "pnpm check"
+
+# Start development servers (placeholder)
+[tasks.dev]
+description = "Start dev server (placeholder)"
+run = "echo 'Dev server placeholder'"
+
+# Remove all generated artifacts
+[tasks.clean]
+description = "Clean artifacts"
+run = "rm -rf frontend/dist frontend/node_modules backend/bin dist tmp"
+
+# Execute all main tasks to verify the project is ready
+[tasks.verify]
+description = "Format, lint, check, test, and build the project"
+run = [
+  "mise run fmt",
+  "mise run lint",
+  "mise run check:frontend",
+  "mise run test",
+  "mise run build",
+]

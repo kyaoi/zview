@@ -1,0 +1,142 @@
+# Coding Rules
+
+Guidelines for maintaining code quality in zview.
+
+## File Size Limits
+
+| Type | Max Lines | Recommended |
+|------|-----------|-------------|
+| Component | 300 | < 200 |
+| Custom Hook | 200 | < 150 |
+| Go file | 400 | < 300 |
+
+If a file exceeds these limits, consider splitting it.
+
+## Naming Conventions
+
+| Type | Convention | Example |
+|------|------------|---------|
+| React Component | PascalCase | `PageCanvas` |
+| Custom Hook | use + verb/noun | `useBootstrap` |
+| Props type | Component + Props | `PageCanvasProps` |
+| Go package | lowercase | `internal/server` |
+| Go type | PascalCase | `AppState` |
+| Constants | SCREAMING_SNAKE | `PAGE_GAP_PX` |
+
+## Responsibility Separation
+
+### Frontend
+
+```
+components/  → UI rendering only
+hooks/       → Business logic & state
+lib/         → Utilities, types, constants, config
+```
+
+- Components should be pure view logic
+- Side effects belong in hooks
+- No circular dependencies
+
+### Backend
+
+```
+main.go           → Entry point only
+internal/cli/     → CLI parsing
+internal/config/  → Configuration
+internal/server/  → HTTP handlers
+internal/state/   → Application state
+internal/watcher/ → File watching
+internal/session/ → Session management
+```
+
+- Each package has a single responsibility
+- `main` imports from `internal/`, not vice versa
+
+## Quality Gates
+
+Before committing, run:
+
+```bash
+# All-in-one verification
+mise run verify
+
+# Or separately
+mise run fmt     # Format code
+mise run lint    # Run linters
+mise run test    # Run tests
+mise run build   # Build all
+```
+
+## Error Handling
+
+### Frontend
+```typescript
+try {
+  const result = await fetch(...);
+  if (!result.ok) throw new Error("Failed");
+  // success
+} catch (err) {
+  addToast("Operation failed", "error");
+}
+```
+
+### Backend
+```go
+if err != nil {
+    http.Error(w, "description", http.StatusBadRequest)
+    return
+}
+```
+
+## Testing
+
+- Unit tests alongside source files (`*_test.go`, `*.test.ts`)
+- Test public interfaces, not internals
+- Use table-driven tests in Go
+- **Mandatory**: All new features and bug fixes MUST include corresponding tests.
+- **Mandatory**: All existing tests MUST pass before merging.
+- Keep tests deterministic (no timers without control, no reliance on network).
+- For keybinding changes, add/adjust unit coverage in `src/lib/keyBindings.defaultKeys.test.ts`.
+- For keybinding changes, update keyboard behavior tests in `src/hooks/useKeyboardNavigation.test.tsx`.
+- For keybinding changes, add/adjust E2E coverage in `frontend/e2e/keybindings.spec.ts` when behavior is user-visible.
+- For keybinding sequences, include coverage for special tokens (e.g., `<Space>`) and the sequence timeout.
+- For keyboard handling changes, include coverage that inputs/textareas/selects/contentEditable are ignored.
+- Use fully-typed mocks for `ViewerHandle` in tests (include all required methods).
+- When updating config behavior, use a complete `ZviewConfig` object in tests.
+- Prefer existing PDF fixtures; add new ones only when behavior needs it.
+- When adding a new test suite, update `docs/TESTING.md`.
+
+See `docs/TESTING.md` for the current test map and how to run them.
+
+## Keyboard Handling
+
+- Sequence bindings are **two-key tokens** (space-separated).
+- Sequence matching must use `parseKeySequence` + `matchesAnyKey` per token.
+  Store the **matched token** (e.g., `"<Space>"`) for the first key, not the raw `event.key`.
+- Do not handle keys when focus is in `input`, `textarea`, `select`, or `contentEditable`.
+- Blocked keys should be checked before action dispatch; help overlay routing should happen before action execution.
+
+## Security & Privacy
+
+- Never persist PDF passwords; keep them in memory only for the current viewer session.
+
+## Git Commits
+
+Use prefixes:
+- `feat:` new functionality
+- `fix:` bug fix
+- `refactor:` internal restructure
+- `docs:` documentation
+- `test:` tests only
+- `chore:` tooling/CI
+
+Example: `feat: add fit-to-height zoom mode`
+
+## Code Review Checklist
+
+- [ ] No console.log / fmt.Printf left in
+- [ ] Error cases handled
+- [ ] Types are explicit (no `any`)
+- [ ] Tests added for new logic
+- [ ] Documentation updated if behavior changed
+- [ ] `mise run verify` passes

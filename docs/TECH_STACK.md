@@ -75,10 +75,28 @@ Design priorities: **speed**, **low memory**, **simple distribution**, **read-on
 * `zview [MAIN.pdf]`
 * `--sub <PATH>` — open a second PDF as SUB
 * `--focus main|sub` — initial focus
-* `--watch / --no-watch` — enable/disable filesystem watching for MAIN
+* `--watch` / `--no-watch` — enable/disable filesystem watching for MAIN
 * `--port <N>` — choose port
 * `--no-open` — don’t auto-open the browser
 
+
+### Package Structure
+
+The backend is organized into internal packages:
+
+```
+backend/
+├── main.go              # Entry point
+└── internal/
+    ├── cli/             # CLI parsing & subcommands
+    ├── config/          # Configuration loading
+    ├── server/          # HTTP handlers, SSE
+    ├── session/         # Instance management
+    ├── state/           # Application state
+    └── watcher/         # File watching
+```
+
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for details.
 ---
 
 ## Frontend: Vite + TypeScript
@@ -102,6 +120,7 @@ Design priorities: **speed**, **low memory**, **simple distribution**, **read-on
 * Use `pdfjs-dist` as the sole source for both core and worker.
 * Explicitly set `GlobalWorkerOptions.workerSrc` to the bundled worker output to prevent version mismatch.
 * Avoid mixing CDN versions.
+* Handle password-protected PDFs with PDF.js `onPassword` prompts; keep passwords in memory only.
 
 ### Rendering/performance strategy (must-have)
 
@@ -120,11 +139,11 @@ Design priorities: **speed**, **low memory**, **simple distribution**, **read-on
 
 ### Keybindings (default)
 
-* Scroll: `j/k`, half-page: `d/u`, top: `gg`, bottom: `G`
+* Scroll: `j/k`, half-page: `d/u`, top: `g g`, bottom: `G`
 * Page step: `n/p` (best-effort)
 * Zoom: `+/-`, Fit width: `=`
 * Focus: `Tab`
-* Swap panes: `x`
+* Swap panes: `s`
 * Reload: `r` (MAIN), `R` (MAIN + re-render SUB)
 * Help: `?`, Quit: `q`
 
@@ -215,6 +234,5 @@ Restore after the new layout is measured:
 
 ## Future (explicitly optional)
 
-* Config file for keymaps and defaults
 * Persistent UI preferences (zoom mode, last used options)
 * Optional File System Access API enhancements (not required)
