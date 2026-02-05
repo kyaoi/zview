@@ -88,6 +88,16 @@ run = "go test -v ./..."
 dir = "frontend"
 run = "npx playwright test"
 
+# Run E2E tests with Playwright debug logs
+[tasks."test:e2e:debug"]
+dir = "frontend"
+run = "pnpm test:e2e:debug"
+
+# Generate E2E PDF fixtures
+[tasks."fixtures:e2e"]
+dir = "frontend"
+run = "pnpm fixtures:e2e"
+
 # Type-check frontend code
 [tasks."check:frontend"]
 dir = "frontend"
