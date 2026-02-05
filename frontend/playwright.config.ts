@@ -1,5 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
+const showServerLogs = Boolean(process.env.PW_LOG_SERVER);
+
 export default defineConfig({
 	testDir: "./e2e",
 	fullyParallel: true,
@@ -26,8 +28,8 @@ export default defineConfig({
 		command: "../zview -no-open e2e/pdfs/02_multipage_navigation.pdf",
 		url: "http://127.0.0.1:8571",
 		reuseExistingServer: !process.env.CI,
-		stdout: "pipe",
-		stderr: "pipe",
+		stdout: showServerLogs ? "inherit" : "pipe",
+		stderr: showServerLogs ? "inherit" : "pipe",
 		// We need a dummy PDF for the command to work.
 		// Or we rely on `mise run test:e2e` to set up environment.
 		// Let's assume `mise run test:e2e` will handle the build and we just point to the binary.

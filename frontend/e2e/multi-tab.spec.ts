@@ -1,9 +1,11 @@
 import { test, expect } from "@playwright/test";
 import path from "node:path";
 import fs from "node:fs";
+import { resetSubTabs } from "./helpers";
 
 test.describe("Multi-tab SUB pane", () => {
-	test.beforeEach(async ({ page }) => {
+	test.beforeEach(async ({ page, request }) => {
+		await resetSubTabs(request);
 		await page.goto("/");
 	});
 

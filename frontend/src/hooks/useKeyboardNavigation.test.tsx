@@ -2,6 +2,7 @@ import { renderHook } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { useKeyboardNavigation } from "./useKeyboardNavigation";
 import * as config from "../lib/config";
+import type { ViewerHandle } from "../lib/types";
 
 // Mock dependencies
 vi.mock("../lib/config", () => ({
@@ -16,6 +17,9 @@ vi.mock("../lib/config", () => ({
 vi.mock("../lib/keyActions", () => ({
 	keyActionDefs: [
 		{ id: "scroll_down", label: "Scroll Down", category: "navigation" },
+		{ id: "jump_top", label: "Jump Top", category: "navigation" },
+		{ id: "toggle_help", label: "Help", category: "misc" },
+		{ id: "quit", label: "Quit", category: "misc" },
 		{ id: "focus_next", label: "Next Pane", category: "window" },
 		{ id: "reload_main", label: "Reload Main", category: "misc" },
 		{ id: "next_page", label: "Next Page", category: "navigation" },
@@ -28,6 +32,9 @@ vi.mock("../lib/keyActions", () => ({
 vi.mock("../lib/actionHandlers", () => ({
 	createActionHandlers: vi.fn().mockReturnValue({
 		scroll_down: vi.fn(),
+		jump_top: vi.fn(),
+		toggle_help: vi.fn(),
+		quit: vi.fn(),
 		focus_next: vi.fn(),
 		reload_main: vi.fn(),
 		next_page: vi.fn(),
@@ -44,9 +51,25 @@ vi.mock("../lib/keyMatcher", () => ({
 }));
 
 import { matchesAnyKey } from "../lib/keyMatcher";
-import { createActionHandlers } from "../lib/actionHandlers";
+import { createActionHandlers, handleHelpOverlayNavigation } from "../lib/actionHandlers";
 
 describe("useKeyboardNavigation", () => {
+	const createViewerHandle = (): ViewerHandle => ({
+		scrollLine: vi.fn(),
+		scrollHalfPage: vi.fn(),
+		scrollHorizontal: vi.fn(),
+		startContinuousScroll: vi.fn(),
+		stopContinuousScroll: vi.fn(),
+		jumpToTop: vi.fn(),
+		jumpToBottom: vi.fn(),
+		jumpByPages: vi.fn(),
+		zoomIn: vi.fn(),
+		zoomOut: vi.fn(),
+		fitToWidth: vi.fn(),
+		rerender: vi.fn(),
+		getSnapshot: vi.fn().mockReturnValue(null),
+		restoreSnapshot: vi.fn(),
+	});
 	const mockSetFocusedPane = vi.fn();
 	const mockSetMainReloadKey = vi.fn();
 	const mockSetShowHelp = vi.fn();
@@ -60,6 +83,9 @@ describe("useKeyboardNavigation", () => {
 		prev_page: vi.fn(),
 		prev_tab: vi.fn(),
 		next_tab: vi.fn(),
+		jump_top: vi.fn(),
+		toggle_help: vi.fn(),
+		quit: vi.fn(),
 	};
 
 	beforeEach(() => {
@@ -67,6 +93,9 @@ describe("useKeyboardNavigation", () => {
 		vi.mocked(createActionHandlers).mockReturnValue(mockActionHandlers);
 		vi.mocked(config.getKeyBinding).mockImplementation((id: string) => {
 			if (id === "scroll_down") return ["j"];
+			if (id === "jump_top") return ["g g"];
+			if (id === "toggle_help") return ["?"];
+			if (id === "quit") return ["q"];
 			if (id === "focus_next") return ["Tab"];
 			if (id === "reload_main") return ["r"];
 			if (id === "next_page") return ["n"];
@@ -83,7 +112,7 @@ describe("useKeyboardNavigation", () => {
 		focusedPane: "main" as const,
 		hasSub: false,
 		showHelp: false,
-		mainViewerRef: { current: null },
+		mainViewerRef: { current: createViewerHandle() },
 		subViewerRef: { current: null },
 		setFocusedPane: mockSetFocusedPane,
 		setMainReloadKey: mockSetMainReloadKey,
@@ -162,5 +191,87 @@ describe("useKeyboardNavigation", () => {
 
 		window.dispatchEvent(new KeyboardEvent("keydown", { key: "L" }));
 		expect(mockActionHandlers.next_tab).toHaveBeenCalled();
+	});
+
+	it("handles key sequences (g g)", () => {
+		vi.mocked(config.getKeyBinding).mockImplementation((id: string) => {
+			if (id === "jump_top") return ["g g"];
+			return [];
+		});
+		vi.mocked(config.isKeySequence).mockImplementation((binding: string) => binding.includes(" "));
+		vi.mocked(config.parseKeySequence).mockImplementation((binding: string) => binding.split(" "));
+		vi.mocked(matchesAnyKey).mockImplementation((event, keys) => keys.includes(event.key));
+
+		renderHook(() => useKeyboardNavigation(defaultProps));
+
+		window.dispatchEvent(new KeyboardEvent("keydown", { key: "g", cancelable: true }));
+		expect(mockActionHandlers.jump_top).not.toHaveBeenCalled();
+
+		window.dispatchEvent(new KeyboardEvent("keydown", { key: "g", cancelable: true }));
+		expect(mockActionHandlers.jump_top).toHaveBeenCalled();
+	});
+
+	it("blocks configured blocked keys", () => {
+		vi.mocked(config.getBlockedKeys).mockReturnValue(["j"]);
+		vi.mocked(matchesAnyKey).mockImplementation((event, keys) => keys.includes(event.key));
+
+		renderHook(() => useKeyboardNavigation(defaultProps));
+
+		const event = new KeyboardEvent("keydown", { key: "j", cancelable: true });
+		window.dispatchEvent(event);
+		expect(event.defaultPrevented).toBe(true);
+		expect(mockActionHandlers.scroll_down).not.toHaveBeenCalled();
+	});
+
+	it("handles help overlay navigation and blocks other actions", () => {
+		vi.mocked(config.getKeyBinding).mockImplementation((id: string) => {
+			if (id === "scroll_down") return ["j"];
+			if (id === "quit") return ["q"];
+			return [];
+		});
+		vi.mocked(matchesAnyKey).mockImplementation((event, keys) => keys.includes(event.key));
+		vi.mocked(handleHelpOverlayNavigation).mockReturnValue(true);
+
+		document.body.innerHTML = '<div id="help-overlay-content"></div>';
+
+		renderHook(() =>
+			useKeyboardNavigation({
+				...defaultProps,
+				showHelp: true,
+			}),
+		);
+
+		const navEvent = new KeyboardEvent("keydown", { key: "j", cancelable: true });
+		window.dispatchEvent(navEvent);
+		expect(navEvent.defaultPrevented).toBe(true);
+		expect(mockActionHandlers.scroll_down).not.toHaveBeenCalled();
+
+		window.dispatchEvent(new KeyboardEvent("keydown", { key: "q", cancelable: true }));
+		expect(mockActionHandlers.quit).toHaveBeenCalled();
+		document.body.innerHTML = "";
+	});
+
+	it("stops continuous scroll on keyup for scroll actions", () => {
+		vi.mocked(config.getKeyBinding).mockImplementation((id: string) => {
+			if (id === "scroll_down") return ["j"];
+			return [];
+		});
+		vi.mocked(matchesAnyKey).mockImplementation((event, keys) => keys.includes(event.key));
+
+		renderHook(() => useKeyboardNavigation(defaultProps));
+
+		window.dispatchEvent(new KeyboardEvent("keyup", { key: "j" }));
+		expect(defaultProps.mainViewerRef.current?.stopContinuousScroll).toHaveBeenCalled();
+	});
+
+	it("blocks browser shortcuts when configured", () => {
+		vi.mocked(config.getDisableBrowserShortcuts).mockReturnValue(true);
+		vi.mocked(matchesAnyKey).mockReturnValue(false);
+
+		renderHook(() => useKeyboardNavigation(defaultProps));
+
+		const event = new KeyboardEvent("keydown", { key: "k", ctrlKey: true, cancelable: true });
+		window.dispatchEvent(event);
+		expect(event.defaultPrevented).toBe(true);
 	});
 });

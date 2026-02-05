@@ -1,202 +1,265 @@
 import { test, expect } from "@playwright/test";
+import path from "node:path";
+import fs from "node:fs";
+import { resetSubTabs } from "./helpers";
+
+type ScrollInfo = {
+	top: number;
+	left: number;
+	scrollHeight: number;
+	scrollWidth: number;
+	clientHeight: number;
+	clientWidth: number;
+};
+
+const pdfPaths = {
+	minimal: path.resolve("e2e/pdfs/01_minimal.pdf"),
+	multipage: path.resolve("e2e/pdfs/02_multipage_navigation.pdf"),
+	wide: path.resolve("e2e/pdfs/04_wide_landscape.pdf"),
+};
+
+const ensurePdfFiles = () => {
+	expect(fs.existsSync(pdfPaths.minimal)).toBe(true);
+	expect(fs.existsSync(pdfPaths.multipage)).toBe(true);
+	expect(fs.existsSync(pdfPaths.wide)).toBe(true);
+};
+
+const getScrollInfo = async (page, paneTestId = "pane-main"): Promise<ScrollInfo> => {
+	return page.evaluate((testId) => {
+		const pane = document.querySelector(`[data-testid="${testId}"]`);
+		const scroller = pane?.querySelector(".overflow-auto") as HTMLElement | null;
+		if (!scroller) {
+			return {
+				top: 0,
+				left: 0,
+				scrollHeight: 0,
+				scrollWidth: 0,
+				clientHeight: 0,
+				clientWidth: 0,
+			};
+		}
+		return {
+			top: scroller.scrollTop,
+			left: scroller.scrollLeft,
+			scrollHeight: scroller.scrollHeight,
+			scrollWidth: scroller.scrollWidth,
+			clientHeight: scroller.clientHeight,
+			clientWidth: scroller.clientWidth,
+		};
+	}, paneTestId);
+};
+
+const setScroll = async (page, paneTestId: string, top: number, left: number) => {
+	await page.evaluate(
+		({ testId, topValue, leftValue }) => {
+			const pane = document.querySelector(`[data-testid="${testId}"]`);
+			const scroller = pane?.querySelector(".overflow-auto") as HTMLElement | null;
+			if (!scroller) return;
+			scroller.scrollTop = topValue;
+			scroller.scrollLeft = leftValue;
+		},
+		{ testId: paneTestId, topValue: top, leftValue: left },
+	);
+};
+
+const getCanvasWidth = async (page, role: "MAIN" | "SUB", pageIndex = 1) => {
+	const box = await page
+		.locator(`canvas[aria-label="${role} PDF page ${pageIndex}"]`)
+		.boundingBox();
+	return box?.width ?? 0;
+};
+
+const expectFocused = async (page, paneTestId: string) => {
+	await expect
+		.poll(async () =>
+			page.getByTestId(paneTestId).evaluate((el) => el.classList.contains("ring-2")),
+		)
+		.toBe(true);
+};
+
+const getPaneOrder = async (page) => {
+	return page.evaluate(() => {
+		const container = document.querySelector("div.flex.flex-1.min-h-0.w-full.flex-row.gap-0");
+		if (!container) return [] as string[];
+		const children = Array.from(container.children);
+		return children
+			.map((child) => child.querySelector("[data-testid^=pane-]")?.getAttribute("data-testid"))
+			.filter((id): id is string => Boolean(id));
+	});
+};
+
+const toggleHelp = async (page) => {
+	const help = page.getByText("Keyboard Shortcuts");
+	const wasVisible = await help.isVisible();
+
+	await page.keyboard.press("Shift+/");
+	await page.waitForTimeout(50);
+
+	if ((await help.isVisible()) === wasVisible) {
+		await page.keyboard.press("?");
+		await page.waitForTimeout(50);
+	}
+};
 
 test.describe("Keybindings", () => {
-	test.beforeEach(async ({ page }) => {
+	test.beforeEach(async ({ page, request }) => {
+		ensurePdfFiles();
+		await resetSubTabs(request);
+		await page.setViewportSize({ width: 640, height: 480 });
 		await page.goto("/");
-	});
-
-	test("should have initial focus on main pane", async ({ page }) => {
-		// Check if the main pane has the focus ring/class
-		const _mainPane = page.locator('canvas[aria-label="MAIN PDF page 1"]');
-		// Use data-testid for robustness
-		await expect(page.getByTestId("pane-label-main")).toBeVisible();
-	});
-
-	test("should handle navigation keys (j/k/h/l/d/u/gg/G)", async ({ page }) => {
-		// Set small viewport
-		await page.setViewportSize({ width: 500, height: 400 });
-
-		// Wait for content
 		await page.waitForSelector('canvas[aria-label="MAIN PDF page 1"]', { state: "visible" });
-		await page.click("body");
+		await page.getByTestId("pane-main").click();
+	});
 
-		// Identify the scroll container (it has overflow-auto)
-		const scrollSelector = ".overflow-auto";
-		const getScrollTop = () =>
-			page.evaluate((sel) => {
-				const el = document.querySelector(sel);
-				return el ? el.scrollTop : 0;
-			}, scrollSelector);
+	test("navigation keys (j/k/d/u/g g/G)", async ({ page }) => {
+		await setScroll(page, "pane-main", 0, 0);
+		const before = await getScrollInfo(page, "pane-main");
+		expect(before.scrollHeight).toBeGreaterThan(before.clientHeight);
 
-		// Initial state
-		await page.evaluate((sel) => {
-			const el = document.querySelector(sel);
-			if (el) el.scrollTop = 0;
-		}, scrollSelector);
-		const initialScrollY = await getScrollTop();
-
-		// Check if scrollable
-		const isScrollable = await page.evaluate((sel) => {
-			const el = document.querySelector(sel);
-			return el ? el.scrollHeight > el.clientHeight : false;
-		}, scrollSelector);
-		expect(isScrollable, "Inner container must be scrollable").toBeTruthy();
-
-		// j: Scroll Down
 		await page.keyboard.press("j");
-		await page.waitForTimeout(300);
-		const scrollAfterJ = await getScrollTop();
-		expect(scrollAfterJ).toBeGreaterThan(initialScrollY);
+		await page.waitForTimeout(200);
+		const afterJ = await getScrollInfo(page, "pane-main");
+		expect(afterJ.top).toBeGreaterThan(before.top);
 
-		// k: Scroll Up
 		await page.keyboard.press("k");
-		await page.waitForTimeout(300);
-		const scrollAfterK = await getScrollTop();
-		expect(scrollAfterK).toBeLessThan(scrollAfterJ);
+		await page.waitForTimeout(200);
+		const afterK = await getScrollInfo(page, "pane-main");
+		expect(afterK.top).toBeLessThan(afterJ.top);
 
-		// d: Half page down
 		await page.keyboard.press("d");
-		await page.waitForTimeout(300);
-		const scrollAfterD = await getScrollTop();
-		expect(scrollAfterD).toBeGreaterThan(scrollAfterK);
+		await page.waitForTimeout(200);
+		const afterD = await getScrollInfo(page, "pane-main");
+		expect(afterD.top).toBeGreaterThan(afterK.top);
 
-		// u: Half page up
 		await page.keyboard.press("u");
-		await page.waitForTimeout(300);
-		const scrollAfterU = await getScrollTop();
-		expect(scrollAfterU).toBeLessThan(scrollAfterD);
+		await page.waitForTimeout(200);
+		const afterU = await getScrollInfo(page, "pane-main");
+		expect(afterU.top).toBeLessThan(afterD.top);
 
-		// G: Jump to bottom
 		await page.keyboard.press("Shift+G");
 		await page.waitForTimeout(300);
-		const scrollAfterBigG = await getScrollTop();
-		expect(scrollAfterBigG).toBeGreaterThan(0);
+		const afterG = await getScrollInfo(page, "pane-main");
+		expect(afterG.top).toBeGreaterThan(0);
 
-		// gg: Jump to top
 		await page.keyboard.press("g");
 		await page.keyboard.press("g");
-		await page.waitForTimeout(500); // Wait for sequence + smooth scroll start
-		// Wait for scroll to reach 0 (or close to it)
-		await page.waitForFunction(
-			(sel) => {
-				const el = document.querySelector(sel);
-				return el && el.scrollTop === 0;
-			},
-			scrollSelector,
-			{ timeout: 2000 },
-		);
-
-		const scrollAfterGG = await getScrollTop();
-		expect(scrollAfterGG).toBe(0);
+		await page.waitForFunction(() => {
+			const pane = document.querySelector('[data-testid="pane-main"]');
+			const scroller = pane?.querySelector(".overflow-auto") as HTMLElement | null;
+			return scroller ? scroller.scrollTop === 0 : false;
+		});
+		const afterGG = await getScrollInfo(page, "pane-main");
+		expect(afterGG.top).toBe(0);
 	});
 
-	test("should handle zoom keys (+/-/p)", async ({ page }) => {
-		await page.waitForSelector('canvas[aria-label="MAIN PDF page 1"]', { state: "visible" });
-		await page.click("body");
+	test("page jump keys (n/p)", async ({ page }) => {
+		await expect(page.locator('canvas[aria-label="MAIN PDF page 1"]')).toBeVisible();
 
-		// Use first canvas width
-		const getPageWidth = async () => {
-			const box = await page.locator('canvas[aria-label="MAIN PDF page 1"]').boundingBox();
-			return box ? box.width : 0;
-		};
+		await page.keyboard.press("n");
+		await page.waitForTimeout(200);
+		await expect(page.locator('canvas[aria-label="MAIN PDF page 2"]')).toBeVisible();
 
-		const initialWidth = await getPageWidth();
+		await page.keyboard.press("p");
+		await page.waitForTimeout(200);
+		await expect(page.locator('canvas[aria-label="MAIN PDF page 1"]')).toBeVisible();
+	});
+
+	test("zoom and horizontal scroll keys (+/-/=, h/l)", async ({ page }) => {
+		const initialWidth = await getCanvasWidth(page, "MAIN", 1);
 		expect(initialWidth).toBeGreaterThan(0);
 
-		// +: Zoom In
 		await page.keyboard.press("+");
-		await page.waitForTimeout(300);
-		const widthAfterZoomIn = await getPageWidth();
-		expect(widthAfterZoomIn).toBeGreaterThan(initialWidth);
+		await page.waitForTimeout(200);
+		const afterZoomIn = await getCanvasWidth(page, "MAIN", 1);
+		expect(afterZoomIn).toBeGreaterThan(initialWidth);
 
-		// -: Zoom Out
 		await page.keyboard.press("-");
-		await page.waitForTimeout(300);
-		const widthAfterZoomOut = await getPageWidth();
-		expect(widthAfterZoomOut).toBeLessThan(widthAfterZoomIn);
+		await page.waitForTimeout(200);
+		const afterZoomOut = await getCanvasWidth(page, "MAIN", 1);
+		expect(afterZoomOut).toBeLessThan(afterZoomIn);
 
-		// =: Fit Width (assuming it might change width or at least not crash)
 		await page.keyboard.press("=");
-		await page.waitForTimeout(100);
-		// Check that it did something, difficult to assert exact logic without knowing viewport
+		await page.waitForTimeout(200);
+		const fitWidth = await getCanvasWidth(page, "MAIN", 1);
+		expect(fitWidth).toBeGreaterThan(0);
+
+		await page.keyboard.press("+");
+		await page.keyboard.press("+");
+		await page.waitForTimeout(200);
+		const afterZoom = await getScrollInfo(page, "pane-main");
+		if (afterZoom.scrollWidth <= afterZoom.clientWidth + 2) {
+			return;
+		}
+
+		await setScroll(page, "pane-main", afterZoom.top, 0);
+		await page.keyboard.press("l");
+		await page.waitForTimeout(150);
+		const afterL = await getScrollInfo(page, "pane-main");
+		expect(afterL.left).toBeGreaterThan(0);
+
+		await page.keyboard.press("h");
+		await page.waitForTimeout(150);
+		const afterH = await getScrollInfo(page, "pane-main");
+		expect(afterH.left).toBeLessThan(afterL.left);
 	});
 
-	test("should handle help overlay (?)", async ({ page }) => {
-		await page.waitForSelector("canvas");
-
-		// Open help
-		await page.keyboard.press("?");
+	test("help and quit keys (?, q)", async ({ page }) => {
+		await toggleHelp(page);
 		await expect(page.getByText("Keyboard Shortcuts")).toBeVisible();
 
-		// Close help
-		await page.keyboard.press("?");
+		await toggleHelp(page);
 		await expect(page.getByText("Keyboard Shortcuts")).not.toBeVisible();
+
+		await page.keyboard.press("q");
+		await expect(page.getByText("Close the tab to quit")).toBeVisible();
 	});
 
-	test("should handle swap pane (s)", async ({ page }) => {
-		await page.waitForSelector('canvas[aria-label="MAIN PDF page 1"]', { state: "visible" });
-
-		// Initial: Focus on MAIN
-		await expect(page.getByTestId("pane-label-main")).toBeVisible();
-
-		// Press 's' to swap
-		await page.keyboard.press("s");
-
-		// Since we don't have a SUB loaded, visual indicators might be limited,
-		// but we can check if the focus ring moved or if a toast appeared (if any).
-		// Currently 's' just swaps the positions/roles visually but maintaining focus logic might depend on content.
-		// However, let's verify it doesn't crash and potentially check logs or attributes if possible.
-		// For now, simple crash check:
-		await expect(page.locator("body")).toBeVisible();
-	});
-
-	test("should handle pane focus (Tab)", async ({ page }) => {
-		await page.waitForSelector('canvas[aria-label="MAIN PDF page 1"]', { state: "visible" });
-
-		// Initial state: MAIN focused
-		const mainPane = page.locator('canvas[aria-label="MAIN PDF page 1"]'); // Use canvas logic
-
-		// Press Tab
-		await page.keyboard.press("Tab");
-
-		// Without SUB, behavior might be restricted, but should not crash.
-		// Detailed focus logic requires SUB to be present to switch focus meaningfully
-		// between separate panes.
-		await expect(mainPane).toBeVisible();
-	});
-
-	test("should reload with r/R", async ({ page }) => {
-		// Pressing 'r' should trigger a reload toast
-		// Matching partial text to be safe against case sensitivity and ellipsis
-		// Also accepting "loaded" because "reloading" might be too fast
+	test("reload keys (r, R)", async ({ page }) => {
 		await page.keyboard.press("r");
 		await expect(page.getByText(/MAIN: (reloading|loaded|restored)/i).first()).toBeVisible();
 
-		// 'R' for reload all (re-render sub)
 		await page.keyboard.press("Shift+R");
 		await expect(page.getByText(/MAIN: (reloading|loaded|restored)/i).first()).toBeVisible();
 	});
 
-	test("should handle next/previous page (n/p)", async ({ page }) => {
-		await page.waitForSelector('canvas[aria-label="MAIN PDF page 1"]', { state: "visible" });
-		await page.click("body");
+	test.describe("with SUB", () => {
+		test.beforeEach(async ({ page }) => {
+			const fileInput = page.locator("#sub-file-input");
+			await fileInput.setInputFiles(pdfPaths.minimal);
+			await expect(page.getByTestId("pane-label-sub")).toBeVisible();
+			await page.getByTestId("pane-main").click();
+		});
 
-		// Initial: Page 1
-		await expect(page.locator('canvas[aria-label="MAIN PDF page 1"]')).toBeVisible();
+		test("focus toggle (Tab) and swap panes (s)", async ({ page }) => {
+			await expectFocused(page, "pane-main");
 
-		// n: Next Page
-		await page.keyboard.press("n");
-		await page.waitForTimeout(300); // Wait for scroll/render
+			await page.keyboard.press("Tab");
+			await expectFocused(page, "pane-sub");
 
-		// Should see Page 2
-		// We can check if Page 2 canvas is visible/in viewport
-		await expect(page.locator('canvas[aria-label="MAIN PDF page 2"]')).toBeVisible();
+			const beforeOrder = await getPaneOrder(page);
+			await page.keyboard.press("s");
+			await expect.poll(async () => getPaneOrder(page)).not.toEqual(beforeOrder);
+		});
 
-		// p: Previous Page
-		await page.keyboard.press("p");
-		await page.waitForTimeout(300);
+		test("tab switching keys (H/L)", async ({ page }) => {
+			const fileInput = page.locator("#sub-file-input");
+			await fileInput.setInputFiles(pdfPaths.wide);
 
-		// Should see Page 1 again
-		await expect(page.locator('canvas[aria-label="MAIN PDF page 1"]')).toBeVisible();
+			const wideTab = page.locator(".group.relative.flex", {
+				hasText: "04_wide_landscape.pdf",
+			});
+			await expect(wideTab).toBeVisible();
+			await expect(wideTab.locator(".bg-fuchsia-500")).toBeVisible();
+
+			await page.getByTestId("pane-sub").click();
+			await expectFocused(page, "pane-sub");
+
+			await page.keyboard.press("Shift+H");
+			await expect(wideTab.locator(".bg-fuchsia-500")).not.toBeVisible();
+			await expect(page.locator(".bg-fuchsia-500")).toBeVisible();
+
+			await page.keyboard.press("Shift+L");
+			await expect(wideTab.locator(".bg-fuchsia-500")).toBeVisible();
+		});
 	});
 });

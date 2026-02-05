@@ -17,7 +17,9 @@
 		"fmt": "biome format .",
 		"fmt:write": "biome format --write .",
 		"check": "tsc --noEmit",
-		"test": "vitest run"
+		"test": "vitest run",
+		"fixtures:e2e": "node scripts/generate-test-pdfs.mjs",
+		"test:e2e:debug": "PW_LOG_SERVER=1 DEBUG=pw:server,pw:browser npx playwright test"
 	},
 	"dependencies": {
 		"@fontsource-variable/noto-sans-jp": "^5.2.10",
