@@ -122,6 +122,53 @@ export function useKeyboardNavigation({
 				? subViewerRef.current
 				: mainViewerRef.current;
 
+		const findSequenceCompletion = (event: KeyboardEvent): string | null => {
+			const lastKey = lastKeyRef.current;
+			if (!lastKey) return null;
+
+			for (const actionDef of keyActionDefs) {
+				const bindings = getKeyBinding(actionDef.id);
+				for (const binding of bindings) {
+					if (!isKeySequence(binding)) continue;
+					const parts = parseKeySequence(binding);
+					if (parts.length !== 2) continue;
+					const [first, second] = parts;
+					if (first !== lastKey) continue;
+					if (matchesAnyKey(event, [second])) {
+						return actionDef.id;
+					}
+				}
+			}
+			return null;
+		};
+
+		const findSingleMatchId = (event: KeyboardEvent): string | null => {
+			let matchId: string | null = null;
+			for (const actionDef of keyActionDefs) {
+				const bindings = getKeyBinding(actionDef.id);
+				const singleKeys = bindings.filter((b) => !isKeySequence(b));
+				if (matchesAnyKey(event, singleKeys)) {
+					matchId = actionDef.id;
+				}
+			}
+			return matchId;
+		};
+
+		const findSequenceStartKey = (event: KeyboardEvent): string | null => {
+			for (const actionDef of keyActionDefs) {
+				const bindings = getKeyBinding(actionDef.id);
+				for (const binding of bindings) {
+					if (!isKeySequence(binding)) continue;
+					const [first] = parseKeySequence(binding);
+					if (!first) continue;
+					if (matchesAnyKey(event, [first])) {
+						return first;
+					}
+				}
+			}
+			return null;
+		};
+
 		const handleHelpModeAction = (actionId: string, _event: KeyboardEvent): boolean => {
 			const helpContent = document.getElementById("help-overlay-content");
 			if (!helpContent) return false;
@@ -159,49 +206,24 @@ export function useKeyboardNavigation({
 			const context = getContext();
 
 			// 1. Check if we are completing a sequence
-			if (lastKeyRef.current) {
-				const currentKey = event.key;
-				const candidateSeq = `${lastKeyRef.current} ${currentKey}`;
+			const sequenceMatchId = findSequenceCompletion(event);
+			if (sequenceMatchId) {
+				consume(event);
+				clearSequence();
 
-				for (const actionDef of keyActionDefs) {
-					const bindings = getKeyBinding(actionDef.id);
-					if (bindings.includes(candidateSeq)) {
-						consume(event);
-						clearSequence();
-
-						if (context.showHelp && handleHelpModeAction(actionDef.id, event)) {
-							return;
-						}
-
-						actionHandlers[actionDef.id]?.(targetViewer, event, context);
-						return;
-					}
+				if (context.showHelp && handleHelpModeAction(sequenceMatchId, event)) {
+					return;
 				}
+
+				actionHandlers[sequenceMatchId]?.(targetViewer, event, context);
+				return;
+			}
+			if (lastKeyRef.current) {
 				clearSequence();
 			}
 
-			// 2. Check for Single Key Match OR Sequence Start
-			let singleMatchId: string | null = null;
-			let startsSequence = false;
-
-			for (const actionDef of keyActionDefs) {
-				const bindings = getKeyBinding(actionDef.id);
-
-				const singleKeys = bindings.filter((b) => !isKeySequence(b));
-				if (matchesAnyKey(event, singleKeys)) {
-					singleMatchId = actionDef.id;
-				}
-
-				for (const binding of bindings) {
-					if (isKeySequence(binding)) {
-						const [first] = parseKeySequence(binding);
-						if (matchesAnyKey(event, [first])) {
-							startsSequence = true;
-						}
-					}
-				}
-			}
-
+			// 2. Check for Single Key Match
+			const singleMatchId = findSingleMatchId(event);
 			if (singleMatchId) {
 				consume(event);
 
@@ -213,26 +235,13 @@ export function useKeyboardNavigation({
 				return;
 			}
 
-			if (startsSequence) {
+			// 3. Check for Sequence Start
+			const sequenceStartKey = findSequenceStartKey(event);
+			if (sequenceStartKey) {
 				consume(event);
-				lastKeyRef.current = event.key;
+				lastKeyRef.current = sequenceStartKey;
 				scheduleSequenceClear();
 				return;
-			}
-
-			// Iterate through all actions and check for matches
-			for (const actionDef of keyActionDefs) {
-				const keys = getKeyBinding(actionDef.id);
-				if (matchesAnyKey(event, keys)) {
-					consume(event);
-
-					if (context.showHelp && handleHelpModeAction(actionDef.id, event)) {
-						return;
-					}
-
-					actionHandlers[actionDef.id]?.(targetViewer, event, context);
-					return;
-				}
 			}
 
 			// If no action matched, check if we should block browser shortcuts

@@ -33,4 +33,20 @@ describe("matchesAnyKey", () => {
 		const event = createEvent({ key: "G", code: "KeyG", shiftKey: true });
 		expect(matchesAnyKey(event, ["G"])).toBe(true);
 	});
+
+	it("does not match single-character bindings with extra modifiers", () => {
+		const event = createEvent({
+			key: "G",
+			code: "KeyG",
+			shiftKey: true,
+			ctrlKey: true,
+		});
+		expect(matchesAnyKey(event, ["G"])).toBe(false);
+	});
+
+	it("requires explicit shift for special keys when specified", () => {
+		const shiftedTab = createEvent({ key: "Tab", code: "Tab", shiftKey: true });
+		expect(matchesAnyKey(shiftedTab, ["<S-Tab>"])).toBe(true);
+		expect(matchesAnyKey(shiftedTab, ["<Tab>"])).toBe(false);
+	});
 });
