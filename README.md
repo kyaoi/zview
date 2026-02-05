@@ -167,7 +167,7 @@ page_scroll_ratio = 0.5
 * **Note on Shift**: Do not plain Shift modifier (e.g. `<S-g>`). Just use the resulting character directly.
     * Use `"G"` for Shift+g.
     * Use `"<"` for Shift+,.
-* **Sequences**: Space-separated (e.g., `"g g"`, `"<Space> j"`)
+* **Sequences**: Two-key, space-separated (e.g., `"g g"`, `"<Space> j"`)
 ```
 
 ## Troubleshooting

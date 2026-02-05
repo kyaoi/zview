@@ -12,10 +12,10 @@ Quick reference for current automated tests and how to extend them.
 Frontend unit tests (Vitest)
 - `src/lib/config.test.ts`: key config normalization, conflicts, display format
 - `src/lib/keyActions.test.ts`: key action definitions and categories
-- `src/lib/keyMatcher.test.ts`: key matching, modifiers, special keys
+- `src/lib/keyMatcher.test.ts`: key matching, modifiers, special keys, shift rules
 - `src/lib/keyBindings.defaultKeys.test.ts`: default bindings are matchable
 - `src/lib/actionHandlers.test.ts`: action handler behavior and help overlay navigation
-- `src/hooks/useKeyboardNavigation.test.tsx`: key handling, sequences, blocked keys, help mode
+- `src/hooks/useKeyboardNavigation.test.tsx`: key handling, sequences (incl. `<Space>`), sequence timeout, blocked keys, help mode, conflict warnings, form-field ignore
 - `src/hooks/useTabManager.test.ts`: tab switching, close behavior, snapshots, error paths
 - `src/hooks/useFileWatcher.test.ts`: EventSource wiring for watch
 - `src/hooks/useBootstrap.test.ts`: bootstrap fetch success/failure
