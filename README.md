@@ -51,28 +51,11 @@ zview main.pdf --no-watch
 
 ## Screenshots / Demo
 
-This section is prepared so you can drop in real screenshots or videos quickly.
-Store media files under `docs/media/` and update the paths below.
+### Screenshot
+<img width="1920" height="945" alt="image" src="https://github.com/user-attachments/assets/d945ce64-fdb5-4290-a762-48e59451fbd7" />
 
-### Screenshot slots
-
-```md
-![MAIN pane (watching)](docs/media/main-pane.png)
-![Dual pane (MAIN + SUB)](docs/media/dual-pane.png)
-![Help overlay](docs/media/help-overlay.png)
-```
-
-### Video slot
-
-```md
-[Demo video (MP4)](docs/media/demo.mp4)
-```
-
-If you prefer GitHub-hosted uploads:
-
-```md
-[Demo video](https://github.com/user-attachments/assets/REPLACE_WITH_YOUR_VIDEO_ID)
-```
+### Demo Video
+[demo](https://github.com/user-attachments/assets/3392a0cc-0795-4459-9224-26c6be15397b)
 
 ## Usage
 
@@ -84,6 +67,8 @@ zview
 
 # Open MAIN + multiple SUB tabs
 zview main.pdf --sub sub1.pdf --sub sub2.pdf
+# or
+zview main.pdf sub1.pdf sub2.pdf
 
 # Choose initial focus
 zview main.pdf --focus sub
