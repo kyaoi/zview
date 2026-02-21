@@ -1,177 +1,178 @@
 # zview
 
 A **fast, lightweight, read-only PDF viewer** for Linux.
-Runs in your browser, powered by PDF.js, with Vim-like navigation.
+It runs in your browser (PDF.js), but serves files from your local machine only.
 
-## Features
+## What zview is for
 
-* **Fast & Lightweight**: Virtualized rendering for smooth scrolling even with large PDFs.
-* **Vim-like Keybindings**: Navigate with `j`, `k`, `d`, `u`, `g g`, `G`, etc.
-* **Dual Pane Support**: View two PDFs side-by-side (MAIN and SUB).
-    * **MAIN Pane**: Supports auto-reload on file change.
-    * **SUB Pane**: Static reference view; supports multiple tabs.
-* **Password-Protected PDFs**: Prompt for a password and retry on incorrect entry.
-* **Focus Management**: Clear visual indication of the active pane.
-* **Configuration**: Customizable key behaviors via `~/.config/zview/config.toml`.
-* **Session Management**: List and terminate running instances via CLI.
+`zview` is designed for fast reading and comparison of local PDFs.
 
-## Installation
+- Performance-first rendering (virtualized pages + canceled offscreen renders)
+- Vim-like keyboard navigation
+- Two-pane workflow with clear roles: `MAIN` and `SUB`
+- Local server bound to `127.0.0.1` (no remote PDF fetching)
 
-### Homebrew (Recommended)
+## Quick Start
+
+### 1. Install
 
 ```bash
 brew install kyaoi/zview/zview
 ```
 
-### Build from source
-
-Requirements: `go`, `pnpm`
+Or build from source:
 
 ```bash
-# Clone the repository
 git clone https://github.com/kyaoi/zview.git
 cd zview
-
-# Build frontend and backend
 make build
-
-# Install (optional, or add to $PATH)
 sudo cp zview /usr/local/bin/
 ```
 
-## Usage
+Requirements: `go`, `pnpm`
 
-### Basic Usage
-
-Open a PDF in the MAIN pane:
+### 2. Open a PDF
 
 ```bash
 zview document.pdf
 ```
 
-Open without arguments (select file in UI):
+### 3. Open MAIN + SUB
 
 ```bash
+zview main.pdf --sub ref.pdf
+```
+
+### 4. Disable auto-watch (manual reload only)
+
+```bash
+zview main.pdf --no-watch
+```
+
+## Screenshots / Demo
+
+This section is prepared so you can drop in real screenshots or videos quickly.
+Store media files under `docs/media/` and update the paths below.
+
+### Screenshot slots
+
+```md
+![MAIN pane (watching)](docs/media/main-pane.png)
+![Dual pane (MAIN + SUB)](docs/media/dual-pane.png)
+![Help overlay](docs/media/help-overlay.png)
+```
+
+### Video slot
+
+```md
+[Demo video (MP4)](docs/media/demo.mp4)
+```
+
+If you prefer GitHub-hosted uploads:
+
+```md
+[Demo video](https://github.com/user-attachments/assets/REPLACE_WITH_YOUR_VIDEO_ID)
+```
+
+## Usage
+
+### Common patterns
+
+```bash
+# Start with file picker UI
 zview
-```
 
-### Dual Pane View
+# Open MAIN + multiple SUB tabs
+zview main.pdf --sub sub1.pdf --sub sub2.pdf
 
-Open two PDFs side-by-side:
+# Choose initial focus
+zview main.pdf --focus sub
 
-```bash
-zview main.pdf sub.pdf
-# or
-zview main.pdf --sub sub.pdf
-```
-
-* **MAIN Pane**: The primary document. Auto-reloads when the file changes (unless disabled).
-* **SUB Pane**: Secondary reference document(s). Configurable via tabs in the UI.
-
-### Session Management
-
-List running `zview` instances:
-
-```bash
+# Session management
 zview ps
-```
-
-Terminate an instance:
-
-```bash
 zview kill <port>
-# or interactive selection:
-zview kill
 ```
 
-### CLI Options
+### Pane roles
 
-* `--sub <PATH>`: Open a second PDF as SUB.
-* `--focus <main|sub>`: Set initial focus (default: main).
-* `--port <N>`: Bind to a specific port (default: auto).
-* `--no-watch`: Disable file watching for MAIN.
-* `--no-open`: Don't open the browser automatically.
+| Pane | Role | Reload behavior |
+| :--- | :--- | :--- |
+| `MAIN` | Primary document | Auto-reload on file change (when watch is on) + manual reload |
+| `SUB` | Reference document(s) | Static (no file watching). Replace via "Open Sub" |
 
-## Keybindings
+## CLI Options
+
+| Option | Description |
+| :--- | :--- |
+| `-m, --main <PATH>` | Path to MAIN PDF |
+| `-s, --sub <PATH>` | Path to SUB PDF (repeatable) |
+| `--active-sub <PATH>` | SUB tab to activate initially |
+| `--focus <main|sub>` | Initial focus pane (default: `main`) |
+| `--watch` / `--no-watch` | Enable/disable MAIN file watching |
+| `--port <N>` | Port to bind (`0` = auto-select) |
+| `--no-open` | Do not open browser automatically |
+| `--help` | Show help |
+| `--version` | Print version |
+
+## Default Keybindings
 
 | Key | Action |
 | :--- | :--- |
-| **Navigation** | |
 | `j` / `k` | Scroll down / up |
-| `d` / `u` | Scroll half-page down / up |
 | `h` / `l` | Scroll left / right |
-| `g g` | Jump to top |
-| `G` | Jump to bottom |
-| `n` / `p` | Next / Previous page |
-| **Zoom** | |
-| `+` / `-` | Zoom in / out |
-| `=` | Fit to width |
-| **Panes** | |
-| `Tab` / `<Tab>` | Toggle focus (MAIN ↔ SUB) |
+| `d` / `u` | Half-page down / up |
+| `g g` / `G` | Jump to top / bottom |
+| `n` / `p` | Next / previous page |
+| `+` / `-` / `=` | Zoom in / out / fit width |
+| `Tab` | Toggle focus (`MAIN` ↔ `SUB`) |
 | `s` | Swap left/right pane positions |
-| `H` | Prev tab (SUB) / Fast scroll left |
-| `L` | Next tab (SUB) / Fast scroll right |
-| **General** | |
-| `r` | Reload MAIN |
-| `?` | Show help overlay |
+| `H` / `L` | Prev / next SUB tab (or fast horizontal scroll) |
+| `r` / `R` | Reload MAIN / Reload MAIN + re-render SUB |
+| `?` | Toggle help overlay |
 | `q` / `<Escape>` | Quit (close tab) |
 
 ## Configuration
 
-You can configure `zview` by creating a file at `~/.config/zview/config.toml`.
+Configuration file:
 
-**Example `config.toml`:**
+```text
+~/.config/zview/config.toml
+```
+
+Example:
 
 ```toml
-# Enable file watching for MAIN PDF (default: true)
 watch = true
-
-# Zoom step factor (default: 1.2)
 zoom_step = 1.2
-
-# Device Pixel Ratio cap (default: 2.0)
-# Lower this to 1.0 if you experience memory issues or lag on high-DPI screens.
 dpr_cap = 2.0
-
-# Scroll step in pixels (default: 64.0)
 scroll_step_vertical = 64.0
 scroll_step_horizontal = 64.0
-
-# Page scroll ratio (default: 0.5)
-# How much to scroll (relative to screen height) for 'd' / 'u' commands.
 page_scroll_ratio = 0.5
 
 # [keys]
-# You can define custom keybindings.
-# Single key:   scroll_down = "j"
-# Multiple keys: scroll_down = ["j", "ArrowDown"]
-# Key sequence: jump_top = ["g g"]  (space-separated)
-# Modifiers:    scroll_down = ["<C-j>"] (Ctrl+j)
-# Special keys: toggle_focus = ["<Tab>"]
-#
-# Blocked keys (prevent browser default behavior):
-# blocked_keys = ["<C-p>", "<C-f>"]
-#
-# Aggressively disable browser shortcuts:
+# scroll_down = ["j", "ArrowDown"]
+# jump_top = ["g g"]
+# toggle_focus = ["<Tab>"]
+# blocked_keys = ["<C-p>"]
 # disable_browser_shortcuts = true
-```
-
-### Key Notation
-
-* **Basic**: `"j"`, `"G"`, `"?"`
-* **Special Keys**: Enclosed in `<...>` (e.g., `<Space>`, `<Tab>`, `<Enter>`, `<Escape>`, `<Backspace>`, `<Delete>`, `<ArrowUp>`, etc.)
-* **Modifiers**: `<M-j>` (Meta+j), `<C-u>` (Ctrl+u), `<A-Left>` (Alt+Left)
-    * `C`: Ctrl
-    * `M`: Meta (Command on Mac, Win on Windows)
-    * `A`: Alt
-* **Note on Shift**: Do not plain Shift modifier (e.g. `<S-g>`). Just use the resulting character directly.
-    * Use `"G"` for Shift+g.
-    * Use `"<"` for Shift+,.
-* **Sequences**: Two-key, space-separated (e.g., `"g g"`, `"<Space> j"`)
 ```
 
 ## Troubleshooting
 
-* **Performance**: `zview` prioritizes performance. It does not use a "Text Layer" for selection/search to keep rendering fast and lightweight.
-* **Reloading**: The SUB pane is static and does not watch for changes. Re-open the file in the UI to update it.
-* **Password Prompts**: If a PDF is locked, a prompt appears in the viewer. Cancel keeps the current view unchanged.
+- Performance: `zview` does not enable TextLayer/in-document search by default to keep rendering fast.
+- Reload behavior: `SUB` is static; re-open via UI to refresh it.
+- Watch behavior: with `--no-watch`, file changes are not detected.
+- Password-protected PDFs: the viewer prompts for a password and keeps the current view on cancel/failure.
+
+## Development
+
+```bash
+mise run verify
+```
+
+Additional docs:
+
+- `docs/TECH_STACK.md`
+- `docs/ARCHITECTURE.md`
+- `docs/CODING_RULES.md`
+- `docs/TESTING.md`
