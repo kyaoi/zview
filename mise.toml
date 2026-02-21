@@ -4,9 +4,16 @@ go = "latest"
 lefthook = "latest"
 pnpm = "latest"
 
+# Install frontend
+[tasks."install:frontend"]
+description = "Install frontend"
+dir = "frontend"
+run = "pnpm install"
+
 # Build all components
 [tasks.build]
 description = "Build frontend and backend"
+depends = ["install:frontend"]
 run = [
   "mise run build:frontend",
   "mise run build:backend",
@@ -16,6 +23,7 @@ run = [
 [tasks."build:frontend"]
 description = "Build frontend"
 dir = "frontend"
+depends = ["install:frontend"]
 run = "pnpm build"
 
 # Build backend Go binary, embedding frontend assets
@@ -36,6 +44,7 @@ depends = ["lint:frontend", "lint:backend"]
 # Run frontend linters (Biome)
 [tasks."lint:frontend"]
 dir = "frontend"
+depends = ["install:frontend"]
 run = "pnpm lint"
 
 # Fix lint errors project-wide
@@ -45,6 +54,7 @@ depends = ["lint:fix:frontend"]
 # Fix frontend lint errors
 [tasks."lint:fix:frontend"]
 dir = "frontend"
+depends = ["install:frontend"]
 run = "pnpm lint:fix"
 
 # Run backend linters (go vet)
@@ -60,6 +70,7 @@ depends = ["fmt:frontend", "fmt:backend"]
 # Format frontend code using Biome
 [tasks."fmt:frontend"]
 dir = "frontend"
+depends = ["install:frontend"]
 run = "pnpm biome format --write ."
 
 # Format backend code using gofmt
@@ -76,6 +87,7 @@ depends = ["test:frontend", "test:backend", "test:e2e"]
 # Run frontend tests
 [tasks."test:frontend"]
 dir = "frontend"
+depends = ["install:frontend"]
 run = "pnpm test"
 
 # Run backend tests
@@ -86,21 +98,25 @@ run = "go test -v ./..."
 # Run E2E tests
 [tasks."test:e2e"]
 dir = "frontend"
+depends = ["install:frontend"]
 run = "npx playwright test"
 
 # Run E2E tests with Playwright debug logs
 [tasks."test:e2e:debug"]
 dir = "frontend"
+depends = ["install:frontend"]
 run = "pnpm test:e2e:debug"
 
 # Generate E2E PDF fixtures
 [tasks."fixtures:e2e"]
 dir = "frontend"
+depends = ["install:frontend"]
 run = "pnpm fixtures:e2e"
 
 # Type-check frontend code
 [tasks."check:frontend"]
 dir = "frontend"
+depends = ["install:frontend"]
 run = "pnpm check"
 
 # Start development servers (placeholder)
