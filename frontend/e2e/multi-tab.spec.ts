@@ -58,11 +58,10 @@ test.describe("Multi-tab SUB pane", () => {
 		await expect(tabs.nth(0).locator(".bg-fuchsia-500")).toBeVisible();
 
 		// 6. Close a tab
-		// Hove over tab to see close button (if testing hover behavior) or just click it
-		// The close button is the second button inside the tab div
-		const closeBtn = tabs.nth(0).locator("button").nth(1);
-		// Force click because it might be hidden until hover
-		await closeBtn.click({ force: true });
+		// Hover over the tab to reveal the close button (it's hidden via opacity-0 until hover)
+		await tabs.nth(0).hover();
+		const closeBtn = page.getByRole("button", { name: "Close tab 01_minimal.pdf" });
+		await closeBtn.click();
 
 		// Verify tab count reduced
 		await expect(tabs).toHaveCount(1);

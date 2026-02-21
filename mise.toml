@@ -3,6 +3,7 @@ node = "22"
 go = "latest"
 lefthook = "latest"
 pnpm = "latest"
+biome = "latest"
 
 # Build all components
 [tasks.build]
