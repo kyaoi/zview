@@ -20,6 +20,18 @@ It runs in your browser (PDF.js), but serves files from your local machine only.
 brew install kyaoi/zview/zview
 ```
 
+Or install via the install script (Linux / macOS):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/kyaoi/zview/main/install.sh | sh
+```
+
+You can customize the install directory with `INSTALL_DIR`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/kyaoi/zview/main/install.sh | INSTALL_DIR=/usr/local/bin sh
+```
+
 Or build from source:
 
 ```bash
