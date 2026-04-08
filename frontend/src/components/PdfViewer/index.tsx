@@ -210,8 +210,8 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 				}
 
 				const baseViewport = firstPage.getViewport({ scale: 1 });
-				const hostHeight = scrollRef.current?.clientHeight || baseViewport.height;
-				const nextFitScale = hostHeight / baseViewport.height;
+				const hostWidth = scrollRef.current?.clientWidth || baseViewport.width;
+				const nextFitScale = hostWidth / baseViewport.width;
 				const restoreSnapshot =
 					pendingRestoreRef.current?.reloadKey === reloadKey
 						? pendingRestoreRef.current.snapshot
@@ -327,9 +327,9 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 
 		const node = scrollRef.current;
 		const updateScale = () => {
-			const height = node.clientHeight || pageSize.height;
-			if (height <= 0) return; // Prevent invalid scale
-			const nextFit = height / pageSize.height;
+			const width = node.clientWidth || pageSize.width;
+			if (width <= 0) return; // Prevent invalid scale
+			const nextFit = width / pageSize.width;
 			setFitScale(nextFit);
 		};
 
