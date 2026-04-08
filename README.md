@@ -32,6 +32,12 @@ You can customize the install directory with `INSTALL_DIR`:
 curl -fsSL https://raw.githubusercontent.com/kyaoi/zview/main/install.sh | INSTALL_DIR=/usr/local/bin sh
 ```
 
+You can also install a specific version using `VERSION`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/kyaoi/zview/main/install.sh | VERSION=v1.1.0 sh
+```
+
 Or build from source:
 
 ```bash

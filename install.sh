@@ -6,6 +6,7 @@
 #
 # Environment variables:
 #   INSTALL_DIR  — directory to install the binary into (default: $HOME/.local/bin)
+#   VERSION      — install a specific version (e.g., v1.1.0) instead of the latest
 
 set -eu
 
@@ -56,11 +57,16 @@ main() {
   platform="$(detect_platform)"
   info "Platform: $platform"
 
-  info "Fetching latest release tag..."
-  tag="$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
-    | grep '"tag_name"' \
-    | head -1 \
-    | sed 's/.*"tag_name": *"//;s/".*//')"
+  if [ -n "${VERSION:-}" ]; then
+    tag="$VERSION"
+    info "Using specified release tag: $tag"
+  else
+    info "Fetching latest release tag..."
+    tag="$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" \
+      | grep '"tag_name"' \
+      | head -1 \
+      | sed 's/.*"tag_name": *"//;s/".*//')"
+  fi
 
   if [ -z "$tag" ]; then
     error "Failed to determine the latest release tag."
