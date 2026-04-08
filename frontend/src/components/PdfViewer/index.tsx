@@ -444,23 +444,23 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 			const outputScale = Math.min(window.devicePixelRatio || 1, DPR_CAP);
 			try {
 				const page = await pdf.getPage(pageIndex + 1);
-				const viewport = page.getViewport({ scale: displayScale * outputScale });
+				const viewport = page.getViewport({ scale: displayScale });
 				const context = canvas.getContext("2d");
 				if (!context) return;
 
 				slot.renderTask?.cancel();
 				slot.renderedScale = null;
-				canvas.width = Math.floor(viewport.width);
-				canvas.height = Math.floor(viewport.height);
-				canvas.style.width = `${Math.floor(viewport.width / outputScale)}px`;
-				canvas.style.height = `${Math.floor(viewport.height / outputScale)}px`;
+				canvas.width = Math.floor(viewport.width * outputScale);
+				canvas.height = Math.floor(viewport.height * outputScale);
+				canvas.style.width = `${Math.floor(viewport.width)}px`;
+				canvas.style.height = `${Math.floor(viewport.height)}px`;
 				canvas.style.backgroundColor = "#0f172a";
 
 				slot.renderTask = page.render({
 					canvasContext: context,
 					canvas,
 					viewport,
-					transform: outputScale !== 1 ? [1 / outputScale, 0, 0, 1 / outputScale, 0, 0] : undefined,
+					transform: outputScale !== 1 ? [outputScale, 0, 0, outputScale, 0, 0] : undefined,
 				});
 
 				await slot.renderTask.promise;

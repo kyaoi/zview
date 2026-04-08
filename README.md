@@ -35,7 +35,7 @@ curl -fsSL https://raw.githubusercontent.com/kyaoi/zview/main/install.sh | INSTA
 You can also install a specific version using `VERSION`:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kyaoi/zview/main/install.sh | VERSION=v1.1.0 sh
+curl -fsSL https://raw.githubusercontent.com/kyaoi/zview/main/install.sh | VERSION=v1.1.1 sh
 ```
 
 Or build from source:
