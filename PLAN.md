@@ -64,7 +64,7 @@ A task is "done" when:
 
 * [x] **Task A1:** Refactor PdfViewer to a page-overlay architecture
 * [x] **Task A2:** Integrate PDF.js TextLayer for selectable text
-* [ ] **Task A3:** Selection polish (cross-page, copy fidelity, pointer-events hygiene)
+* [x] **Task A3:** Selection polish (cross-page, copy fidelity, pointer-events hygiene)
 * [ ] **Task A4:** Config + CLI toggle (`text_select`)
 * [ ] **Task A5:** E2E tests: select and copy text from a sample PDF
 
