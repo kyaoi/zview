@@ -66,7 +66,7 @@ A task is "done" when:
 * [x] **Task A2:** Integrate PDF.js TextLayer for selectable text
 * [x] **Task A3:** Selection polish (cross-page, copy fidelity, pointer-events hygiene)
 * [x] **Task A4:** Config + CLI toggle (`text_select`)
-* [ ] **Task A5:** E2E tests: select and copy text from a sample PDF
+* [x] **Task A5:** E2E tests: select and copy text from a sample PDF
 
 ### Initiative B
 
@@ -184,7 +184,7 @@ Let users opt out for performance or paranoia.
 ---
 
 #### `task/text-select-e2e`
-* [ ] **Task A5:** E2E: select and copy text
+* [x] **Task A5:** E2E: select and copy text
 
 **Goal:**
 Regression guard for A2–A4.
