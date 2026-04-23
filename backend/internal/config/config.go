@@ -17,6 +17,7 @@ type Config struct {
 	ScrollStepVertical      float64        `toml:"scroll_step_vertical" json:"scroll_step_vertical"`
 	ScrollStepHorizontal    float64        `toml:"scroll_step_horizontal" json:"scroll_step_horizontal"`
 	PageScrollRatio         float64        `toml:"page_scroll_ratio" json:"page_scroll_ratio"`
+	TextSelect              bool           `toml:"text_select" json:"text_select"`
 	Keys                    map[string]any `toml:"keys" json:"keys"`
 	BlockedKeys             []string       `toml:"blocked_keys" json:"blocked_keys"`
 	DisableBrowserShortcuts bool           `toml:"disable_browser_shortcuts" json:"disable_browser_shortcuts"`
@@ -57,6 +58,7 @@ func Default() Config {
 		ScrollStepVertical:   64.0,
 		ScrollStepHorizontal: 64.0,
 		PageScrollRatio:      0.5,
+		TextSelect:           true,
 		Keys:                 DefaultKeysMap(),
 	}
 }

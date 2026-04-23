@@ -28,6 +28,7 @@ import type {
 	ZoomMode,
 } from "../../lib/types";
 import { clampScaleValue, withCacheBust } from "../../lib/utils";
+import { getTextSelect } from "../../lib/config";
 import { PageSlot, type PageOverlay } from "./PageSlot";
 import "./textLayer.css";
 import { TextLayerOverlay } from "./TextLayerOverlay";
@@ -559,8 +560,9 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 	);
 
 	const combinedOverlays = useMemo<readonly PageOverlay[]>(() => {
-		const defaults: PageOverlay[] = [
-			{
+		const defaults: PageOverlay[] = [];
+		if (getTextSelect()) {
+			defaults.push({
 				key: "textLayer",
 				render: (ctx) => (
 					<TextLayerOverlay
@@ -570,8 +572,8 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 						isVisible={ctx.isVisible}
 					/>
 				),
-			},
-		];
+			});
+		}
 		return overlays ? [...defaults, ...overlays] : defaults;
 	}, [overlays]);
 

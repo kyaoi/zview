@@ -26,6 +26,11 @@ scroll_step_horizontal = 64.0
 # Controls how much to scroll relative to the view height when using d/u keys.
 page_scroll_ratio = 0.5
 
+# Selectable text layer (default: true)
+# When true, text on each page is selectable and copyable (Chrome-like).
+# Set to false to skip the text layer entirely for smaller memory use.
+text_select = true
+
 # Blocked keys
 # Keys defined here will be blocked from reaching the browser/extensions.
 # Useful for preventing conflicts with browser shortcuts or global hotkeys.

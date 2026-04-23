@@ -65,7 +65,7 @@ A task is "done" when:
 * [x] **Task A1:** Refactor PdfViewer to a page-overlay architecture
 * [x] **Task A2:** Integrate PDF.js TextLayer for selectable text
 * [x] **Task A3:** Selection polish (cross-page, copy fidelity, pointer-events hygiene)
-* [ ] **Task A4:** Config + CLI toggle (`text_select`)
+* [x] **Task A4:** Config + CLI toggle (`text_select`)
 * [ ] **Task A5:** E2E tests: select and copy text from a sample PDF
 
 ### Initiative B
@@ -166,7 +166,7 @@ Make the selection experience match Chrome's PDF viewer expectations.
 ---
 
 #### `task/text-select-config`
-* [ ] **Task A4:** Config + CLI toggle for text selection
+* [x] **Task A4:** Config + CLI toggle for text selection
 
 **Goal:**
 Let users opt out for performance or paranoia.

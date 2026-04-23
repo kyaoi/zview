@@ -112,6 +112,7 @@ zview kill <port>
 | `--active-sub <PATH>` | SUB tab to activate initially |
 | `--focus <main|sub>` | Initial focus pane (default: `main`) |
 | `--watch` / `--no-watch` | Enable/disable MAIN file watching |
+| `--no-text-select` | Disable the selectable text layer (smaller memory footprint) |
 | `--port <N>` | Port to bind (`0` = auto-select) |
 | `--no-open` | Do not open browser automatically |
 | `--help` | Show help |
@@ -151,6 +152,7 @@ dpr_cap = 2.0
 scroll_step_vertical = 64.0
 scroll_step_horizontal = 64.0
 page_scroll_ratio = 0.5
+text_select = true
 
 # [keys]
 # scroll_down = ["j", "ArrowDown"]
@@ -162,7 +164,7 @@ page_scroll_ratio = 0.5
 
 ## Troubleshooting
 
-- Performance: `zview` does not enable TextLayer/in-document search by default to keep rendering fast.
+- Text selection: the TextLayer is enabled by default for Chrome-like text selection and copy. Disable it with `--no-text-select` or `text_select = false` if memory pressure matters more than selectability.
 - Reload behavior: `SUB` is static; re-open via UI to refresh it.
 - Watch behavior: with `--no-watch`, file changes are not detected.
 - Password-protected PDFs: the viewer prompts for a password and keeps the current view on cancel/failure.

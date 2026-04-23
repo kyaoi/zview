@@ -41,6 +41,11 @@ export const getDisableBrowserShortcuts = (): boolean => {
 	return window.ZVIEW_CONFIG?.disable_browser_shortcuts ?? false;
 };
 
+export const getTextSelect = (): boolean => {
+	if (typeof window === "undefined") return true;
+	return window.ZVIEW_CONFIG?.text_select ?? true;
+};
+
 // Format keys for display (e.g., ["j", "ArrowDown"] -> "`j` / `ArrowDown`")
 export const formatKeysForDisplay = (keys: string[]): string => {
 	return keys.map((k) => `\`${k}\``).join(" / ");
@@ -54,6 +59,7 @@ export const getConfig = () => {
 		scroll_step_vertical: 64.0,
 		scroll_step_horizontal: 64.0,
 		page_scroll_ratio: 0.5,
+		text_select: true,
 	};
 	if (typeof window !== "undefined" && window.ZVIEW_CONFIG) {
 		return { ...defaults, ...window.ZVIEW_CONFIG };
