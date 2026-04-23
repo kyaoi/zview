@@ -62,7 +62,7 @@ A task is "done" when:
 
 ### Initiative A
 
-* [ ] **Task A1:** Refactor PdfViewer to a page-overlay architecture
+* [x] **Task A1:** Refactor PdfViewer to a page-overlay architecture
 * [ ] **Task A2:** Integrate PDF.js TextLayer for selectable text
 * [ ] **Task A3:** Selection polish (cross-page, copy fidelity, pointer-events hygiene)
 * [ ] **Task A4:** Config + CLI toggle (`text_select`)
@@ -70,7 +70,7 @@ A task is "done" when:
 
 ### Initiative B
 
-* [ ] **Task B0:** Research spike — `animate` / OCG structure (produces `docs/ANIMATE_RESEARCH.md`)
+* [x] **Task B0:** Research spike — `animate` / OCG structure (produces `docs/ANIMATE_RESEARCH.md`)
 * [ ] **Task B1:** Animate detector module (`lib/animate/detect.ts`)
 * [ ] **Task B2:** Offscreen frame-cache renderer
 * [ ] **Task B3:** Player driver hook (`IntersectionObserver` + rAF loop)
@@ -110,7 +110,7 @@ Brief description of the goal.
 ### Initiative A — Text Selection
 
 #### `task/overlay-architecture`
-* [ ] **Task A1:** Refactor PdfViewer to a page-overlay architecture
+* [x] **Task A1:** Refactor PdfViewer to a page-overlay architecture
 
 **Goal:**
 Introduce a pluggable "page overlay" slot above each page canvas so multiple features (text layer, animate layer, future annotations) can co-exist without tangling `PdfViewer/index.tsx`.
@@ -201,7 +201,7 @@ Regression guard for A2–A4.
 ### Initiative B — Beamer `animate` Playback
 
 #### `task/animate-research`
-* [ ] **Task B0:** Research spike — `animate` structure report
+* [x] **Task B0:** Research spike — `animate` structure report
 
 **Goal:**
 Land `docs/ANIMATE_RESEARCH.md` documenting the confirmed widget-based structure of `animate` output (see Initiative header), and pick the rendering strategy for B2.

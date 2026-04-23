@@ -28,6 +28,7 @@ import type {
 	ZoomMode,
 } from "../../lib/types";
 import { clampScaleValue, withCacheBust } from "../../lib/utils";
+import { PageSlot, type PageOverlay } from "./PageSlot";
 
 GlobalWorkerOptions.workerSrc = workerSrc;
 
@@ -58,6 +59,7 @@ interface PdfViewerProps {
 	onFocus?: () => void;
 	reloadKey?: number;
 	initialSnapshot?: ScrollSnapshot | null;
+	overlays?: readonly PageOverlay[];
 }
 
 type PasswordPromptState = {
@@ -65,7 +67,7 @@ type PasswordPromptState = {
 };
 
 export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfViewer(
-	{ paneRole, url, onNotify, reloadKey = 0, initialSnapshot },
+	{ paneRole, url, onNotify, reloadKey = 0, initialSnapshot, overlays },
 	ref,
 ) {
 	const role = paneRole;
@@ -108,6 +110,34 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 			releasePageSlot(slot);
 		});
 		pageSlotsRef.current = [];
+	}, []);
+
+	const registerContainer = useCallback((index: number, node: HTMLDivElement | null) => {
+		const existing = pageSlotsRef.current[index];
+		if (existing) {
+			existing.container = node;
+		} else {
+			pageSlotsRef.current[index] = {
+				container: node,
+				canvas: null,
+				renderTask: null,
+				renderedScale: null,
+			};
+		}
+	}, []);
+
+	const registerCanvas = useCallback((index: number, node: HTMLCanvasElement | null) => {
+		const existing = pageSlotsRef.current[index];
+		if (existing) {
+			existing.canvas = node;
+		} else {
+			pageSlotsRef.current[index] = {
+				container: null,
+				canvas: node,
+				renderTask: null,
+				renderedScale: null,
+			};
+		}
 	}, []);
 
 	useEffect(
@@ -851,56 +881,18 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 							}
 							const isVisible = index >= visibleRange[0] && index <= visibleRange[1];
 							return (
-								<div key={`page-${index + 1}`} className="flex flex-col items-center gap-2">
-									<div
-										ref={(node) => {
-											const existing = pageSlotsRef.current[index];
-											if (existing) {
-												existing.container = node;
-											} else {
-												pageSlotsRef.current[index] = {
-													container: node,
-													canvas: null,
-													renderTask: null,
-													renderedScale: null,
-												};
-											}
-										}}
-										className="relative overflow-visible bg-slate-950/60 shadow-lg"
-										style={{
-											margin: "0 auto",
-											height: placeholderHeight
-												? `${placeholderHeight}px`
-												: `${Math.round(pageSize.height * layoutScale)}px`,
-											width: displayWidth ? `${displayWidth}px` : "auto",
-											minWidth: displayWidth ? `${displayWidth}px` : "auto",
-										}}
-									>
-										<canvas
-											ref={(node) => {
-												const existing = pageSlotsRef.current[index];
-												if (existing) {
-													existing.canvas = node;
-												} else {
-													pageSlotsRef.current[index] = {
-														container: null,
-														canvas: node,
-														renderTask: null,
-														renderedScale: null,
-													};
-												}
-											}}
-											className="block h-full w-full bg-slate-900"
-											aria-label={`${role} PDF page ${index + 1}`}
-											style={{
-												opacity: isVisible ? 1 : 0.4,
-											}}
-										/>
-										{!isVisible ? (
-											<div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-slate-900/70 via-slate-900/30 to-slate-900/70" />
-										) : null}
-									</div>
-								</div>
+								<PageSlot
+									key={`page-${index + 1}`}
+									pageIndex={index}
+									role={role}
+									isVisible={isVisible}
+									displayWidth={displayWidth ?? Math.round(pageSize.width * layoutScale)}
+									displayHeight={placeholderHeight ?? Math.round(pageSize.height * layoutScale)}
+									layoutScale={layoutScale}
+									registerContainer={registerContainer}
+									registerCanvas={registerCanvas}
+									overlays={overlays}
+								/>
 							);
 						})
 					)}
