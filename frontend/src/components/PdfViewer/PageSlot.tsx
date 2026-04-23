@@ -1,3 +1,4 @@
+import type { PDFDocumentProxy } from "pdfjs-dist";
 import { Fragment, memo, type ReactNode, useCallback } from "react";
 import type { ViewerRole } from "../../lib/types";
 
@@ -7,6 +8,7 @@ export type OverlayContext = {
 	displayWidth: number;
 	displayHeight: number;
 	isVisible: boolean;
+	pdf: PDFDocumentProxy | null;
 };
 
 export type PageOverlay = {
@@ -21,6 +23,7 @@ interface PageSlotProps {
 	displayWidth: number;
 	displayHeight: number;
 	layoutScale: number;
+	pdf: PDFDocumentProxy | null;
 	registerContainer: (index: number, node: HTMLDivElement | null) => void;
 	registerCanvas: (index: number, node: HTMLCanvasElement | null) => void;
 	overlays?: readonly PageOverlay[];
@@ -33,6 +36,7 @@ function PageSlotComponent({
 	displayWidth,
 	displayHeight,
 	layoutScale,
+	pdf,
 	registerContainer,
 	registerCanvas,
 	overlays,
@@ -57,6 +61,7 @@ function PageSlotComponent({
 		displayWidth,
 		displayHeight,
 		isVisible,
+		pdf,
 	};
 
 	return (

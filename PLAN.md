@@ -63,7 +63,7 @@ A task is "done" when:
 ### Initiative A
 
 * [x] **Task A1:** Refactor PdfViewer to a page-overlay architecture
-* [ ] **Task A2:** Integrate PDF.js TextLayer for selectable text
+* [x] **Task A2:** Integrate PDF.js TextLayer for selectable text
 * [ ] **Task A3:** Selection polish (cross-page, copy fidelity, pointer-events hygiene)
 * [ ] **Task A4:** Config + CLI toggle (`text_select`)
 * [ ] **Task A5:** E2E tests: select and copy text from a sample PDF
@@ -128,7 +128,7 @@ Introduce a pluggable "page overlay" slot above each page canvas so multiple fea
 ---
 
 #### `task/text-layer`
-* [ ] **Task A2:** Integrate PDF.js TextLayer for selectable text
+* [x] **Task A2:** Integrate PDF.js TextLayer for selectable text
 
 **Goal:**
 Make text selectable on visible pages via PDF.js `TextLayerBuilder` / `renderTextLayer`.

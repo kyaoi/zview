@@ -29,6 +29,8 @@ import type {
 } from "../../lib/types";
 import { clampScaleValue, withCacheBust } from "../../lib/utils";
 import { PageSlot, type PageOverlay } from "./PageSlot";
+import "./textLayer.css";
+import { TextLayerOverlay } from "./TextLayerOverlay";
 
 GlobalWorkerOptions.workerSrc = workerSrc;
 
@@ -556,6 +558,23 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 		[fitScale, manualScale, zoomMode],
 	);
 
+	const combinedOverlays = useMemo<readonly PageOverlay[]>(() => {
+		const defaults: PageOverlay[] = [
+			{
+				key: "textLayer",
+				render: (ctx) => (
+					<TextLayerOverlay
+						pageIndex={ctx.pageIndex}
+						pdf={ctx.pdf}
+						layoutScale={ctx.layoutScale}
+						isVisible={ctx.isVisible}
+					/>
+				),
+			},
+		];
+		return overlays ? [...defaults, ...overlays] : defaults;
+	}, [overlays]);
+
 	const announceZoom = useCallback((_nextScale: number, _mode: ZoomMode) => {
 		// Optional: could toast on zoom, but acts as noise. Keeping silent for now.
 	}, []);
@@ -889,9 +908,10 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 									displayWidth={displayWidth ?? Math.round(pageSize.width * layoutScale)}
 									displayHeight={placeholderHeight ?? Math.round(pageSize.height * layoutScale)}
 									layoutScale={layoutScale}
+									pdf={pdf}
 									registerContainer={registerContainer}
 									registerCanvas={registerCanvas}
-									overlays={overlays}
+									overlays={combinedOverlays}
 								/>
 							);
 						})
