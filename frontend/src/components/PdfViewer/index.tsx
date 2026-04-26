@@ -558,11 +558,14 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 	const [animateClips, setAnimateClips] = useState<readonly AnimateClip[]>([]);
 
 	useEffect(() => {
-		if (!pdf) {
-			setAnimateClips([]);
-			animateCache.releaseAll();
-			return;
-		}
+		// Always reset upfront so a stale clips list cannot survive a `pdf`
+		// swap (MAIN reload, SUB-tab switch, --watch trigger). Otherwise the
+		// AnimatePlayer instances would briefly call `cache.ensure(newPdf,
+		// oldClipId)` and race against the next detection pass.
+		setAnimateClips([]);
+		animateCache.releaseAll();
+		if (!pdf) return;
+
 		let cancelled = false;
 		detectAnimateClips(pdf)
 			.then((clips) => {
@@ -583,7 +586,6 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 			.catch((err) => {
 				if (!cancelled) {
 					console.warn("[animate] detect failed:", err);
-					setAnimateClips([]);
 				}
 			});
 		return () => {
