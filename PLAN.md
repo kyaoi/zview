@@ -78,8 +78,8 @@ A task is "done" when:
 * [x] **Task B1:** Animate detector module (`lib/animate/detect.ts`)
 * [x] **Task B2:** Offscreen frame-cache renderer
 * [x] **Task B3:** Player driver hook (`IntersectionObserver` + rAF loop)
-* [ ] **Task B4:** Zoom / reload / scroll integrity
-* [ ] **Task B5:** Performance validation & budget tuning
+* [x] **Task B4:** Zoom / reload / scroll integrity
+* [x] **Task B5:** Performance validation & budget tuning
 * [ ] **Task B6:** Config + CLI (`--no-animate`, `[animate]` TOML section)
 * [ ] **Task B7:** Docs + E2E (sample animate PDF fixture)
 * [ ] **Task B8 (stretch):** `media9` embedded video overlay
@@ -288,7 +288,7 @@ Turn each detected `AnimateClip` into a sequence of ready-to-blit frame canvases
 ---
 
 #### `task/animate-integrity`
-* [ ] **Task B4:** Zoom / reload / scroll integrity
+* [x] **Task B4:** Zoom / reload / scroll integrity
 
 **Goal:**
 Ensure `animate` clips behave correctly under the full range of zview user actions.
@@ -306,7 +306,7 @@ Ensure `animate` clips behave correctly under the full range of zview user actio
 ---
 
 #### `task/animate-perf`
-* [ ] **Task B5:** Performance validation & budget tuning
+* [x] **Task B5:** Performance validation & budget tuning
 
 **Goal:**
 Prove the committed sample workload (41 frames × 2 clips × fit-width, 8 fps) stays within a stable budget, and extrapolate to 81-frame / larger-canvas TDGL decks.

@@ -235,7 +235,72 @@ budget after the optimization in §6.3.
 
 ---
 
-## 7. Known variations to watch for
+## 7. Measured performance baseline (Task B5)
+
+All numbers from `sample/sample_animation.pdf` (3 pages, 2 clips on page 2,
+41 frames each at 8 fps, fit-width displayed at scale 2.006, dpr 1) on the
+development workstation. Times are wall-clock from the `[animate]` console
+breadcrumbs.
+
+### 7.1 Time-to-first-motion
+
+This is the user-visible latency between scrolling to the animated page and
+seeing actual movement, *not* full cache completion.
+
+| Implementation | Clip A | Clip B |
+|---|---|---|
+| B3 baseline (full-page render per frame, all-or-nothing cache) | ~12 600 ms | ~20 600 ms |
+| + clip-bbox-sized canvas (Task B3 perf commit) | ~6 700 ms | ~11 700 ms |
+| + streamed onFrame + per-build serialization | **191 ms** | ~11 200 ms |
+| **+ interleaved concurrent builds (current)** | **306 ms** | **507 ms** |
+
+### 7.2 Total cache build wallclock
+
+| Implementation | Clip A | Clip B | Total |
+|---|---|---|---|
+| B3 baseline | ~12 600 ms | ~20 600 ms | ~33 200 ms |
+| + clip-bbox-sized canvas | ~6 700 ms | ~11 700 ms | ~18 400 ms |
+| **+ interleaved concurrent builds (current)** | **~10 900 ms** | **~11 000 ms** | **~11 000 ms wallclock** |
+
+### 7.3 Steady-state cost
+
+Once both clips are cached, playback is a `drawImage(cachedCanvas, 0, 0, w, h)`
+per frame at 8 fps × 2 clips = 16 blits/sec. CPU is dominated by background
+PdfViewer page rendering, not the animate overlay. No measurable steady-state
+cost increase observed when toggling `--no-animate` (tracked under Task B6).
+
+### 7.4 Scaling notes for larger clips
+
+The TDGL deck the user originally targeted has ~80 frames per clip. Linear
+extrapolation from the measured ~270 ms per frame:
+
+* Time-to-first-motion: still ~300-500 ms (interleaving is per-frame).
+* Total cache build for two 80-frame clips: ~22 s wallclock.
+
+If that becomes a perceived burden, the next levers are:
+
+1. **Multi-document parallelism** — open the same PDF as a second
+   `PDFDocumentProxy` so each clip has its own worker thread and
+   `annotationStorage`. Roughly 1.5–2× wallclock improvement, ~2× memory.
+2. **Dynamic FPS during build** — if the user clicked "play" before the cache
+   completed, drop the perceived FPS to match the build rate so the playhead
+   never has to "hold" on the previous frame.
+3. **Eviction cap tuning** — current `DEFAULT_MAX_ACTIVE_CLIPS = 4` is fine
+   for 1-2 clips per page; bump for decks with more.
+
+These are deliberately not implemented in B2-B5; they are the documented next
+steps if real-world TDGL usage exceeds the budget.
+
+### 7.5 Reproduction
+
+The console breadcrumbs (`[animate] first frame: ...`, `[animate] cache
+ready: ...`) are emitted by `AnimatePlayer` and are how the numbers above were
+captured. They will be removed in Task B7 (docs); until then they're useful
+diagnostics for any user who suspects animate playback is broken.
+
+---
+
+## 8. Known variations to watch for
 
 Later `animate` versions or `\animategraphics` option combinations may change:
 
