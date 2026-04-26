@@ -68,6 +68,10 @@ A task is "done" when:
 * [x] **Task A4:** Config + CLI toggle (`text_select`)
 * [x] **Task A5:** E2E tests: select and copy text from a sample PDF
 
+### Maintenance
+
+* [x] **Chore C1:** Trim toast notification noise (open/reload/upload)
+
 ### Initiative B
 
 * [x] **Task B0:** Research spike — `animate` / OCG structure (produces `docs/ANIMATE_RESEARCH.md`)

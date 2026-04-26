@@ -192,10 +192,6 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 		}
 
 		setState({ phase: "loading" });
-		// Only notify if this looks like a reload (manual or verify), not initial load
-		if (reloadKey > 0) {
-			onNotify(`${role}: Reloading…`, "info");
-		}
 
 		async function loadAndRender() {
 			try {
@@ -220,9 +216,6 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 					setPasswordPrompt({ reason: promptReason });
 					setPasswordInput("");
 					passwordResolverRef.current = (password) => updatePassword(password);
-					if (promptReason === "required") {
-						onNotify(`${role}: password required`, "info");
-					}
 				};
 
 				const loaded = await loadingTask.promise;
@@ -276,7 +269,6 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 				setZoomMode(restoredZoomMode);
 				setRenderNonce((v) => v + 1);
 				manualScaleInitializedRef.current = Boolean(restoreSnapshot);
-				onNotify(restoreSnapshot ? `${role}: restored scroll` : `${role}: loaded`, "success");
 			} catch (err) {
 				if (cancelled) return;
 				if (abortReasonRef.current) {
@@ -761,7 +753,6 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 			rerender: () => {
 				resetPageSlots();
 				setRenderNonce((v) => v + 1);
-				onNotify(`${role}: re-rendering`, "info");
 			},
 			getSnapshot: () => {
 				const scrollEl = scrollRef.current;
@@ -795,7 +786,6 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 			jumpByPages,
 			jumpToBottom,
 			jumpToTop,
-			onNotify,
 			resetPageSlots,
 			scrollHalfPage,
 			scrollHorizontal,
@@ -804,7 +794,6 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 			scrollLine,
 			zoomIn,
 			zoomOut,
-			role,
 			zoomMode,
 			fitScale,
 			manualScale,
