@@ -174,7 +174,68 @@ Non-goals for v1:
 
 ---
 
-## 6. Known variations to watch for
+## 6. Real-PDF validation (B2 prototype)
+
+A throwaway probe (`frontend/scripts/probe-animate.ts`, kept as a diagnostic) was
+run against `sample/sample_animation.pdf` after Task B1 to confirm Strategy 1
+before implementing B2. Run it locally with:
+
+```bash
+cd frontend && node --experimental-strip-types --no-warnings scripts/probe-animate.ts
+```
+
+### 6.1 Detector against the real document
+
+The detector returned 2 clips on page 2 in 25 ms, both with `frames=41`,
+`fps=8`, `autoplay=true`, `loop=true`, distinct bboxes (left vs right column),
+and the expected controller / frame annotation ids. **B1 is confirmed correct
+on the real fixture, not just on the synthetic test.**
+
+### 6.2 Strategy 1 viability — `annotationStorage.noView` works
+
+Using `page.getOperatorList({ annotationMode: 3 })` (`ENABLE_STORAGE`) plus
+mutations on `pdf.annotationStorage`, we measured the operator-list size
+under different visibility configurations:
+
+| Config | `fnArray.length` | Interpretation |
+|---|---|---|
+| baseline (all annotations honored) | 32 212 | static page (~11.6k) + frame 0 of both clips (~10k each) |
+| `frame[0].noView = true` (one clip) | 11 597 | confirms a normally-visible widget can be **suppressed** by the storage override |
+| every frame `.noView = true` | 11 597 | matches the previous row → frame 0 was the only widget being drawn statically |
+| only `frame[5].noView = false` | 32 299 | confirms a normally-hidden widget can be **un-hidden** by the storage override; frame 5's drawing cost matches frame 0's |
+
+This validates the entire B2 plumbing using **only the public PDF.js API**.
+No internal hacks required. Each frame contributes ≈ 10 k ops, the static
+background ≈ 11.6 k ops.
+
+### 6.3 Implications for B2 implementation
+
+* Pre-warm a frame cache by, for each frame f:
+  1. Set `noView = true` on every other frame of the clip's `frameAnnotationIds`.
+  2. Set `noView = false` on `frameAnnotationIds[f]`.
+  3. `page.render({ canvas, viewport, annotationMode: 3 })` to a temporary
+     full-page canvas, then `drawImage` the clip-bbox sub-region into the
+     cached `OffscreenCanvas`.
+* Cost per frame is one full-page render. For the sample (3 pages, 2 clips,
+  41 frames) that's 82 page renders for cold warm-up — measure against budget
+  in Task B5.
+* If B5 shows the warm-up cost is too high, optimize by issuing a single
+  render with all clip frames hidden as a "background" canvas, then issuing
+  N renders with the page contents *also* suppressed (only the un-hidden
+  widget remains). Suppressing page contents requires keeping `noView` on
+  everything but the chosen frame and using `annotationMode: 3` on a
+  viewport sized to the clip bbox.
+
+### 6.4 Decision: stay on Strategy 1
+
+The probe removes the chief uncertainty (whether the public API can drive
+per-widget visibility). Strategy 2 (server-side `pdftoppm`) remains the
+documented fallback only if Task B5 finds Strategy 1 cannot meet the perf
+budget after the optimization in §6.3.
+
+---
+
+## 7. Known variations to watch for
 
 Later `animate` versions or `\animategraphics` option combinations may change:
 
