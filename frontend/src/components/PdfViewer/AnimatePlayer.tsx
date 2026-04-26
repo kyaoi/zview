@@ -54,17 +54,29 @@ export function AnimatePlayer({ clip, pdf, cache, scale }: AnimatePlayerProps) {
 	useEffect(() => {
 		if (!pdf || !page) return;
 		let cancelled = false;
+		const t0 = performance.now();
+		console.info(
+			`[animate] building cache: clip=${clip.controllerAnnotationId} ` +
+				`page=${clip.pageIndex + 1} frames=${clip.frameCount} ` +
+				`scale=${scale.toFixed(3)} dpr=${dpr}`,
+		);
 		cache
 			.ensure(pdf, page, clip, scale, dpr)
 			.then((cached) => {
 				if (cancelled) return;
+				const ms = performance.now() - t0;
+				console.info(
+					`[animate] cache ready: clip=${clip.controllerAnnotationId} ` +
+						`frames=${cached.frames.length} in ${ms.toFixed(0)}ms ` +
+						`bbox=${JSON.stringify(cached.pixelBox)}`,
+				);
 				setFrames(cached.frames);
 				setBox(cached.pixelBox);
 			})
 			.catch((err) => {
 				if (!cancelled) {
 					console.error(
-						`AnimatePlayer: cache build failed for ${clip.controllerAnnotationId}`,
+						`[animate] cache build failed for ${clip.controllerAnnotationId}`,
 						err,
 					);
 				}
@@ -74,6 +86,7 @@ export function AnimatePlayer({ clip, pdf, cache, scale }: AnimatePlayerProps) {
 		};
 	}, [pdf, page, cache, clip, scale, dpr]);
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: re-run when `box` first becomes non-null so containerRef has mounted; the value itself isn't read inside the effect.
 	useEffect(() => {
 		const el = containerRef.current;
 		if (!el) return;
@@ -87,7 +100,7 @@ export function AnimatePlayer({ clip, pdf, cache, scale }: AnimatePlayerProps) {
 		);
 		observer.observe(el);
 		return () => observer.disconnect();
-	}, []);
+	}, [box]);
 
 	// Paint the current frame whenever new frames arrive or canvas remounts.
 	useEffect(() => {
@@ -151,6 +164,9 @@ export function AnimatePlayer({ clip, pdf, cache, scale }: AnimatePlayerProps) {
 		pointerEvents: "auto",
 		zIndex: 2,
 		cursor: frames ? "pointer" : "wait",
+		// Debug aid (Task B3 verification): visible outline + label until cache lands.
+		outline: frames ? "none" : "2px dashed rgb(28 202 216 / 0.85)",
+		outlineOffset: "-2px",
 	};
 
 	const canvasWidth = Math.max(1, Math.floor(box.width * dpr));
