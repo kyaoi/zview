@@ -75,7 +75,7 @@ A task is "done" when:
 ### Initiative B
 
 * [x] **Task B0:** Research spike — `animate` / OCG structure (produces `docs/ANIMATE_RESEARCH.md`)
-* [ ] **Task B1:** Animate detector module (`lib/animate/detect.ts`)
+* [x] **Task B1:** Animate detector module (`lib/animate/detect.ts`)
 * [ ] **Task B2:** Offscreen frame-cache renderer
 * [ ] **Task B3:** Player driver hook (`IntersectionObserver` + rAF loop)
 * [ ] **Task B4:** Zoom / reload / scroll integrity
@@ -225,7 +225,7 @@ Land `docs/ANIMATE_RESEARCH.md` documenting the confirmed widget-based structure
 ---
 
 #### `task/animate-detect`
-* [ ] **Task B1:** Animate detector module
+* [x] **Task B1:** Animate detector module
 
 **Goal:**
 Produce a structured `AnimateClip[]` from a loaded PDF by walking annotation widgets.
