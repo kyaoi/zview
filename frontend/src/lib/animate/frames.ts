@@ -66,15 +66,24 @@ async function defaultBuilder(
 	scale: number,
 	dpr: number,
 ): Promise<CachedClipFrames> {
+	// Render directly into a clip-bbox-sized canvas. The full-page op list still
+	// runs in the worker, but Canvas2D skips paint operations that fall outside
+	// the small canvas — significantly cheaper than full-page rendering, while
+	// preserving native rendering scale (no display-time upscaling).
 	const viewport = page.getViewport({ scale });
 	const pixelBox = clipPixelBox(clip, page, scale);
 
-	const fullCanvas = document.createElement("canvas");
-	fullCanvas.width = Math.max(1, Math.floor(viewport.width * dpr));
-	fullCanvas.height = Math.max(1, Math.floor(viewport.height * dpr));
-	const fullCtx = fullCanvas.getContext("2d", { willReadFrequently: false });
-	if (!fullCtx) {
-		throw new Error("animate frames: failed to get full-page 2d context");
+	const clipWidthPx = Math.max(1, Math.floor(pixelBox.width * dpr));
+	const clipHeightPx = Math.max(1, Math.floor(pixelBox.height * dpr));
+	const offsetX = -pixelBox.x * dpr;
+	const offsetY = -pixelBox.y * dpr;
+
+	const renderCanvas = document.createElement("canvas");
+	renderCanvas.width = clipWidthPx;
+	renderCanvas.height = clipHeightPx;
+	const renderCtx = renderCanvas.getContext("2d", { willReadFrequently: false });
+	if (!renderCtx) {
+		throw new Error("animate frames: failed to get render 2d context");
 	}
 
 	for (const id of clip.frameAnnotationIds) {
@@ -82,10 +91,6 @@ async function defaultBuilder(
 	}
 
 	const frames: HTMLCanvasElement[] = [];
-	const srcX = Math.floor(pixelBox.x * dpr);
-	const srcY = Math.floor(pixelBox.y * dpr);
-	const srcW = Math.max(1, Math.floor(pixelBox.width * dpr));
-	const srcH = Math.max(1, Math.floor(pixelBox.height * dpr));
 
 	try {
 		for (let f = 0; f < clip.frameCount; f += 1) {
@@ -98,23 +103,25 @@ async function defaultBuilder(
 				});
 			}
 
-			fullCtx.clearRect(0, 0, fullCanvas.width, fullCanvas.height);
+			renderCtx.clearRect(0, 0, renderCanvas.width, renderCanvas.height);
 			await page.render({
-				canvas: fullCanvas,
-				canvasContext: fullCtx,
+				canvas: renderCanvas,
+				canvasContext: renderCtx,
 				viewport,
 				annotationMode: ANNOTATION_MODE_ENABLE_STORAGE,
-				transform: dpr !== 1 ? [dpr, 0, 0, dpr, 0, 0] : undefined,
+				// Pre-viewport transform: scale by dpr, then translate so that the
+				// clip's top-left lands at (0,0) of `renderCanvas`.
+				transform: [dpr, 0, 0, dpr, offsetX, offsetY],
 			}).promise;
 
 			const frameCanvas = document.createElement("canvas");
-			frameCanvas.width = srcW;
-			frameCanvas.height = srcH;
+			frameCanvas.width = renderCanvas.width;
+			frameCanvas.height = renderCanvas.height;
 			const fctx = frameCanvas.getContext("2d");
 			if (!fctx) {
 				throw new Error("animate frames: failed to get frame 2d context");
 			}
-			fctx.drawImage(fullCanvas, srcX, srcY, srcW, srcH, 0, 0, srcW, srcH);
+			fctx.drawImage(renderCanvas, 0, 0);
 			frames.push(frameCanvas);
 		}
 	} finally {

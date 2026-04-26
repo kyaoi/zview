@@ -53,6 +53,9 @@ export function AnimatePlayer({ clip, pdf, cache, scale }: AnimatePlayerProps) {
 
 	useEffect(() => {
 		if (!pdf || !page) return;
+		// Defer expensive cache build until the clip (or its near-viewport
+		// neighborhood; see IntersectionObserver below) is actually relevant.
+		if (!isOnscreen) return;
 		let cancelled = false;
 		const t0 = performance.now();
 		console.info(
@@ -75,16 +78,13 @@ export function AnimatePlayer({ clip, pdf, cache, scale }: AnimatePlayerProps) {
 			})
 			.catch((err) => {
 				if (!cancelled) {
-					console.error(
-						`[animate] cache build failed for ${clip.controllerAnnotationId}`,
-						err,
-					);
+					console.error(`[animate] cache build failed for ${clip.controllerAnnotationId}`, err);
 				}
 			});
 		return () => {
 			cancelled = true;
 		};
-	}, [pdf, page, cache, clip, scale, dpr]);
+	}, [pdf, page, cache, clip, scale, dpr, isOnscreen]);
 
 	// biome-ignore lint/correctness/useExhaustiveDependencies: re-run when `box` first becomes non-null so containerRef has mounted; the value itself isn't read inside the effect.
 	useEffect(() => {
@@ -96,7 +96,9 @@ export function AnimatePlayer({ clip, pdf, cache, scale }: AnimatePlayerProps) {
 					setIsOnscreen(entry.isIntersecting);
 				}
 			},
-			{ threshold: 0 },
+			// Pre-warm cache slightly before the clip enters the viewport so the
+			// user doesn't watch a blank box while scrolling toward it.
+			{ threshold: 0, rootMargin: "200px" },
 		);
 		observer.observe(el);
 		return () => observer.disconnect();
