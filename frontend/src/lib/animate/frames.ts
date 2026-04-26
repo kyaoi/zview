@@ -27,12 +27,20 @@ export type CachedClipFrames = {
 	frames: HTMLCanvasElement[];
 };
 
+/** Optional streaming hook fired as each frame canvas becomes available. */
+export type FrameStreamCallback = (index: number, canvas: HTMLCanvasElement) => void;
+
+export type EnsureOptions = {
+	onFrame?: FrameStreamCallback;
+};
+
 type Builder = (
 	pdf: PDFDocumentProxy,
 	page: PDFPageProxy,
 	clip: AnimateClip,
 	scale: number,
 	dpr: number,
+	onFrame?: FrameStreamCallback,
 ) => Promise<CachedClipFrames>;
 
 export type AnimateFrameCacheOptions = {
@@ -65,6 +73,7 @@ async function defaultBuilder(
 	clip: AnimateClip,
 	scale: number,
 	dpr: number,
+	onFrame?: FrameStreamCallback,
 ): Promise<CachedClipFrames> {
 	// Render directly into a clip-bbox-sized canvas. The full-page op list still
 	// runs in the worker, but Canvas2D skips paint operations that fall outside
@@ -94,17 +103,17 @@ async function defaultBuilder(
 
 	try {
 		for (let f = 0; f < clip.frameCount; f += 1) {
+			// Reveal only this frame just before dispatching the render. The
+			// snapshot of `pdf.annotationStorage` is captured synchronously by
+			// `page.render()`, so we can safely re-hide right after dispatch —
+			// that lets a concurrent build for another clip see a clean
+			// "all hidden" state when it sets up its own next frame.
 			pdf.annotationStorage.setValue(clip.frameAnnotationIds[f], {
 				noView: false,
 			});
-			if (f > 0) {
-				pdf.annotationStorage.setValue(clip.frameAnnotationIds[f - 1], {
-					noView: true,
-				});
-			}
 
 			renderCtx.clearRect(0, 0, renderCanvas.width, renderCanvas.height);
-			await page.render({
+			const renderTask = page.render({
 				canvas: renderCanvas,
 				canvasContext: renderCtx,
 				viewport,
@@ -112,7 +121,15 @@ async function defaultBuilder(
 				// Pre-viewport transform: scale by dpr, then translate so that the
 				// clip's top-left lands at (0,0) of `renderCanvas`.
 				transform: [dpr, 0, 0, dpr, offsetX, offsetY],
-			}).promise;
+			});
+
+			// Snapshot already captured — restore the clean baseline before any
+			// `await` yields control back to the event loop.
+			pdf.annotationStorage.setValue(clip.frameAnnotationIds[f], {
+				noView: true,
+			});
+
+			await renderTask.promise;
 
 			const frameCanvas = document.createElement("canvas");
 			frameCanvas.width = renderCanvas.width;
@@ -123,6 +140,7 @@ async function defaultBuilder(
 			}
 			fctx.drawImage(renderCanvas, 0, 0);
 			frames.push(frameCanvas);
+			onFrame?.(f, frameCanvas);
 		}
 	} finally {
 		for (const id of clip.frameAnnotationIds) {
@@ -151,7 +169,6 @@ export class AnimateFrameCache {
 	private readonly maxClips: number;
 	private readonly builder: Builder;
 	private readonly inflight = new Map<string, Promise<CachedClipFrames>>();
-	private buildChain: Promise<unknown> = Promise.resolve();
 
 	constructor(options: AnimateFrameCacheOptions = {}) {
 		this.maxClips = options.maxActiveClips ?? DEFAULT_MAX_ACTIVE_CLIPS;
@@ -176,28 +193,39 @@ export class AnimateFrameCache {
 		clip: AnimateClip,
 		scale: number,
 		dpr: number,
+		options: EnsureOptions = {},
 	): Promise<CachedClipFrames> {
 		const key = clipKey(clip, scale, dpr);
 		const cached = this.map.get(key);
 		if (cached) {
 			this.touch(key);
+			// Re-emit cached frames so callers get a uniform streaming contract
+			// even on cache hits.
+			const onFrame = options.onFrame;
+			if (onFrame) {
+				cached.frames.forEach((canvas, idx) => {
+					onFrame(idx, canvas);
+				});
+			}
 			return cached;
 		}
 		const pending = this.inflight.get(key);
 		if (pending) return pending;
 
-		// Serialize cross-clip builds so concurrent ensures don't race on the
-		// shared `pdf.annotationStorage` mutated by `defaultBuilder`.
-		const previousChain = this.buildChain;
+		// Builders run concurrently — `defaultBuilder` keeps each frame's noView
+		// mutation tightly scoped (set, dispatch render, restore) so that
+		// PDF.js's per-render storage snapshot is always correct, and the worker
+		// queues per-frame renders in submission order. Net result: with two
+		// clips ensure'd at the same time, the worker processes A.0, B.0, A.1,
+		// B.1, ... so each clip's first frame lands within ~1 frame of the
+		// other.
 		const promise = (async () => {
-			await previousChain.catch(() => undefined);
-			const entry = await this.builder(pdf, page, clip, scale, dpr);
+			const entry = await this.builder(pdf, page, clip, scale, dpr, options.onFrame);
 			this.map.set(key, entry);
 			this.touch(key);
 			this.evict();
 			return entry;
 		})();
-		this.buildChain = promise.catch(() => undefined);
 		this.inflight.set(key, promise);
 		try {
 			return await promise;

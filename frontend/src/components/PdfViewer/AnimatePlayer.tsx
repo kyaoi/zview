@@ -24,9 +24,15 @@ export function AnimatePlayer({ clip, pdf, cache, scale }: AnimatePlayerProps) {
 	const containerRef = useRef<HTMLButtonElement | null>(null);
 	const frameIdxRef = useRef(0);
 
+	// Live frame buffer: index → canvas. Frames stream in during cache build,
+	// so this is a sparse-then-dense array that grows over time. The RAF loop
+	// reads from this ref directly so it never has to re-subscribe to state.
+	const liveFramesRef = useRef<HTMLCanvasElement[]>([]);
+	const tipMaxRef = useRef(-1);
+
 	const [page, setPage] = useState<PDFPageProxy | null>(null);
 	const [box, setBox] = useState<ClipPixelBox | null>(null);
-	const [frames, setFrames] = useState<HTMLCanvasElement[] | null>(null);
+	const [hasFrames, setHasFrames] = useState(false);
 	const [isOnscreen, setIsOnscreen] = useState(false);
 	const [isPlaying, setIsPlaying] = useState<boolean>(clip.autoplay);
 
@@ -53,18 +59,39 @@ export function AnimatePlayer({ clip, pdf, cache, scale }: AnimatePlayerProps) {
 
 	useEffect(() => {
 		if (!pdf || !page) return;
-		// Defer expensive cache build until the clip (or its near-viewport
-		// neighborhood; see IntersectionObserver below) is actually relevant.
 		if (!isOnscreen) return;
+
+		liveFramesRef.current = [];
+		tipMaxRef.current = -1;
+		frameIdxRef.current = 0;
+		setHasFrames(false);
+
 		let cancelled = false;
 		const t0 = performance.now();
+		let firstSeenAt: number | null = null;
 		console.info(
 			`[animate] building cache: clip=${clip.controllerAnnotationId} ` +
 				`page=${clip.pageIndex + 1} frames=${clip.frameCount} ` +
 				`scale=${scale.toFixed(3)} dpr=${dpr}`,
 		);
 		cache
-			.ensure(pdf, page, clip, scale, dpr)
+			.ensure(pdf, page, clip, scale, dpr, {
+				onFrame: (idx, canvas) => {
+					if (cancelled) return;
+					liveFramesRef.current[idx] = canvas;
+					if (idx > tipMaxRef.current) tipMaxRef.current = idx;
+					if (firstSeenAt === null) {
+						firstSeenAt = performance.now();
+						console.info(
+							`[animate] first frame: clip=${clip.controllerAnnotationId} ` +
+								`in ${(firstSeenAt - t0).toFixed(0)}ms`,
+						);
+						// Trigger one re-render so the RAF loop and the static-paint
+						// effect see the first cached frame.
+						setHasFrames(true);
+					}
+				},
+			})
 			.then((cached) => {
 				if (cancelled) return;
 				const ms = performance.now() - t0;
@@ -73,8 +100,9 @@ export function AnimatePlayer({ clip, pdf, cache, scale }: AnimatePlayerProps) {
 						`frames=${cached.frames.length} in ${ms.toFixed(0)}ms ` +
 						`bbox=${JSON.stringify(cached.pixelBox)}`,
 				);
-				setFrames(cached.frames);
 				setBox(cached.pixelBox);
+				// Flag triggers React effects regardless of cache-hit vs build path.
+				setHasFrames(true);
 			})
 			.catch((err) => {
 				if (!cancelled) {
@@ -104,14 +132,17 @@ export function AnimatePlayer({ clip, pdf, cache, scale }: AnimatePlayerProps) {
 		return () => observer.disconnect();
 	}, [box]);
 
-	// Paint the current frame whenever new frames arrive or canvas remounts.
+	// Paint frame 0 once we have it (covers the static frame the PdfViewer
+	// drew underneath while the cache was building).
 	useEffect(() => {
-		if (!frames) return;
-		blit(canvasRef.current, frames[frameIdxRef.current]);
-	}, [frames]);
+		if (!hasFrames) return;
+		const idx = frameIdxRef.current;
+		const canvas = liveFramesRef.current[idx] ?? liveFramesRef.current[0];
+		blit(canvasRef.current, canvas);
+	}, [hasFrames]);
 
 	useEffect(() => {
-		if (!frames || !isOnscreen || !isPlaying) return;
+		if (!hasFrames || !isOnscreen || !isPlaying) return;
 		const intervalMs = Math.max(1, 1000 / clip.fps);
 		let nextFrameAt = performance.now() + intervalMs;
 		let raf = 0;
@@ -119,20 +150,27 @@ export function AnimatePlayer({ clip, pdf, cache, scale }: AnimatePlayerProps) {
 		const tick = (now: number) => {
 			while (now >= nextFrameAt) {
 				nextFrameAt += intervalMs;
-				const next = frameIdxRef.current + 1;
+				const tip = tipMaxRef.current;
+				let next = frameIdxRef.current + 1;
 				if (next >= clip.frameCount) {
 					if (clip.loop) {
-						frameIdxRef.current = 0;
+						next = 0;
 					} else {
 						frameIdxRef.current = clip.frameCount - 1;
-						blit(canvasRef.current, frames[frameIdxRef.current]);
+						blit(canvasRef.current, liveFramesRef.current[frameIdxRef.current]);
 						setIsPlaying(false);
 						return;
 					}
-				} else {
-					frameIdxRef.current = next;
+				} else if (next > tip) {
+					// Cache hasn't reached this frame yet; hold on the previous one
+					// rather than skip ahead. nextFrameAt still advances, so when the
+					// build catches up the playhead resumes without drift.
+					next = frameIdxRef.current;
 				}
-				blit(canvasRef.current, frames[frameIdxRef.current]);
+				if (next !== frameIdxRef.current) {
+					frameIdxRef.current = next;
+					blit(canvasRef.current, liveFramesRef.current[next]);
+				}
 			}
 			raf = requestAnimationFrame(tick);
 		};
@@ -140,15 +178,17 @@ export function AnimatePlayer({ clip, pdf, cache, scale }: AnimatePlayerProps) {
 		return () => {
 			if (raf !== 0) cancelAnimationFrame(raf);
 		};
-	}, [frames, isOnscreen, isPlaying, clip.fps, clip.frameCount, clip.loop]);
+	}, [hasFrames, isOnscreen, isPlaying, clip.fps, clip.frameCount, clip.loop]);
 
 	const onPlayerClick = (event: MouseEvent<HTMLButtonElement>) => {
 		event.stopPropagation();
-		if (!frames) return;
+		if (!hasFrames) return;
 		if (event.shiftKey) {
-			const next = (frameIdxRef.current + 1) % clip.frameCount;
+			const tip = tipMaxRef.current;
+			if (tip < 0) return;
+			const next = (frameIdxRef.current + 1) % (tip + 1);
 			frameIdxRef.current = next;
-			blit(canvasRef.current, frames[next]);
+			blit(canvasRef.current, liveFramesRef.current[next]);
 			setIsPlaying(false);
 			return;
 		}
@@ -165,9 +205,9 @@ export function AnimatePlayer({ clip, pdf, cache, scale }: AnimatePlayerProps) {
 		height: `${box.height}px`,
 		pointerEvents: "auto",
 		zIndex: 2,
-		cursor: frames ? "pointer" : "wait",
+		cursor: hasFrames ? "pointer" : "wait",
 		// Debug aid (Task B3 verification): visible outline + label until cache lands.
-		outline: frames ? "none" : "2px dashed rgb(28 202 216 / 0.85)",
+		outline: hasFrames ? "none" : "2px dashed rgb(28 202 216 / 0.85)",
 		outlineOffset: "-2px",
 	};
 

@@ -115,17 +115,11 @@ describe("AnimateFrameCache", () => {
 		expect(cache.peek(clip, 1, 2)).toBeUndefined();
 	});
 
-	it("serializes builds across keys to avoid annotationStorage races", async () => {
-		const order: string[] = [];
-		let activeBuilds = 0;
-		let maxConcurrent = 0;
+	it("runs concurrent builds in parallel so each clip's first frame lands quickly", async () => {
+		const startedAt = new Map<string, number>();
 		const builder = vi.fn(async (_p, _pg, clip: AnimateClip, scale, dpr) => {
-			activeBuilds += 1;
-			maxConcurrent = Math.max(maxConcurrent, activeBuilds);
-			order.push(`start:${clip.controllerAnnotationId}`);
-			await new Promise((resolve) => setTimeout(resolve, 5));
-			order.push(`end:${clip.controllerAnnotationId}`);
-			activeBuilds -= 1;
+			startedAt.set(clip.controllerAnnotationId, performance.now());
+			await new Promise((resolve) => setTimeout(resolve, 30));
 			return fakeFrames(clip.controllerAnnotationId, scale, dpr, clip.frameCount);
 		});
 		const cache = new AnimateFrameCache({ builder });
@@ -139,15 +133,62 @@ describe("AnimateFrameCache", () => {
 			cache.ensure(pdf, page, c, 1, 1),
 		]);
 
-		expect(maxConcurrent).toBe(1);
-		expect(order).toEqual([
-			"start:anm0R",
-			"end:anm0R",
-			"start:anm1R",
-			"end:anm1R",
-			"start:anm2R",
-			"end:anm2R",
-		]);
+		const t0 = startedAt.get("anm0R") ?? Number.NaN;
+		const t1 = startedAt.get("anm1R") ?? Number.NaN;
+		const t2 = startedAt.get("anm2R") ?? Number.NaN;
+		expect(Number.isFinite(t0) && Number.isFinite(t1) && Number.isFinite(t2)).toBe(true);
+		// All three builds should kick off within a couple of microtasks of each
+		// other — well below one builder's 30 ms simulated work.
+		expect(Math.abs(t1 - t0)).toBeLessThan(15);
+		expect(Math.abs(t2 - t0)).toBeLessThan(15);
+	});
+
+	it("invokes onFrame for every frame in build order", async () => {
+		const builder = vi.fn(async (_p, _pg, clip: AnimateClip, scale, dpr, onFrame) => {
+			const frames = Array.from({ length: clip.frameCount }, () => ({}) as HTMLCanvasElement);
+			frames.forEach((canvas, idx) => {
+				onFrame?.(idx, canvas);
+			});
+			return {
+				clipId: clip.controllerAnnotationId,
+				scale,
+				dpr,
+				pixelBox: { x: 0, y: 0, width: 100, height: 100 },
+				frames,
+			};
+		});
+		const cache = new AnimateFrameCache({ builder });
+		const clip = makeClip("anm0R", 5);
+		const calls: number[] = [];
+		await cache.ensure(pdf, page, clip, 1, 1, {
+			onFrame: (idx) => calls.push(idx),
+		});
+		expect(calls).toEqual([0, 1, 2, 3, 4]);
+	});
+
+	it("re-emits cached frames via onFrame on cache hits", async () => {
+		const builder = vi.fn(async (_p, _pg, clip: AnimateClip, scale, dpr, onFrame) => {
+			const frames = Array.from({ length: clip.frameCount }, () => ({}) as HTMLCanvasElement);
+			frames.forEach((canvas, idx) => {
+				onFrame?.(idx, canvas);
+			});
+			return {
+				clipId: clip.controllerAnnotationId,
+				scale,
+				dpr,
+				pixelBox: { x: 0, y: 0, width: 100, height: 100 },
+				frames,
+			};
+		});
+		const cache = new AnimateFrameCache({ builder });
+		const clip = makeClip("anm0R", 3);
+		await cache.ensure(pdf, page, clip, 1, 1);
+		const seen: number[] = [];
+		await cache.ensure(pdf, page, clip, 1, 1, {
+			onFrame: (idx) => seen.push(idx),
+		});
+		expect(builder).toHaveBeenCalledTimes(1);
+		expect(seen).toEqual([0, 1, 2]);
 	});
 
 	it("releaseClip drops every scale of one clip without touching others", async () => {
