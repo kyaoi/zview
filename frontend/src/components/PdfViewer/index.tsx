@@ -32,6 +32,9 @@ import { getTextSelect } from "../../lib/config";
 import { PageSlot, type PageOverlay } from "./PageSlot";
 import "./textLayer.css";
 import { TextLayerOverlay } from "./TextLayerOverlay";
+import { type AnimateClip, detectAnimateClips } from "../../lib/animate/detect";
+import { AnimateFrameCache } from "../../lib/animate/frames";
+import { AnimatePlayer } from "./AnimatePlayer";
 
 GlobalWorkerOptions.workerSrc = workerSrc;
 
@@ -551,6 +554,37 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 		[fitScale, manualScale, zoomMode],
 	);
 
+	const animateCache = useMemo(() => new AnimateFrameCache(), []);
+	const [animateClips, setAnimateClips] = useState<readonly AnimateClip[]>([]);
+
+	useEffect(() => {
+		if (!pdf) {
+			setAnimateClips([]);
+			animateCache.releaseAll();
+			return;
+		}
+		let cancelled = false;
+		detectAnimateClips(pdf)
+			.then((clips) => {
+				if (!cancelled) setAnimateClips(clips);
+			})
+			.catch((err) => {
+				if (!cancelled) {
+					console.warn("animate detect failed:", err);
+					setAnimateClips([]);
+				}
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, [pdf, animateCache]);
+
+	useEffect(() => {
+		return () => {
+			animateCache.releaseAll();
+		};
+	}, [animateCache]);
+
 	const combinedOverlays = useMemo<readonly PageOverlay[]>(() => {
 		const defaults: PageOverlay[] = [];
 		if (getTextSelect()) {
@@ -566,8 +600,30 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 				),
 			});
 		}
+		if (animateClips.length > 0) {
+			defaults.push({
+				key: "animatePlayers",
+				render: (ctx) => {
+					const clipsForPage = animateClips.filter((c) => c.pageIndex === ctx.pageIndex);
+					if (clipsForPage.length === 0 || !ctx.pdf) return null;
+					return (
+						<>
+							{clipsForPage.map((clip) => (
+								<AnimatePlayer
+									key={clip.controllerAnnotationId}
+									clip={clip}
+									pdf={ctx.pdf}
+									cache={animateCache}
+									scale={ctx.layoutScale}
+								/>
+							))}
+						</>
+					);
+				},
+			});
+		}
 		return overlays ? [...defaults, ...overlays] : defaults;
-	}, [overlays]);
+	}, [overlays, animateClips, animateCache]);
 
 	const announceZoom = useCallback((_nextScale: number, _mode: ZoomMode) => {
 		// Optional: could toast on zoom, but acts as noise. Keeping silent for now.

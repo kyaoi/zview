@@ -144,6 +144,7 @@ export class AnimateFrameCache {
 	private readonly maxClips: number;
 	private readonly builder: Builder;
 	private readonly inflight = new Map<string, Promise<CachedClipFrames>>();
+	private buildChain: Promise<unknown> = Promise.resolve();
 
 	constructor(options: AnimateFrameCacheOptions = {}) {
 		this.maxClips = options.maxActiveClips ?? DEFAULT_MAX_ACTIVE_CLIPS;
@@ -178,12 +179,18 @@ export class AnimateFrameCache {
 		const pending = this.inflight.get(key);
 		if (pending) return pending;
 
-		const promise = this.builder(pdf, page, clip, scale, dpr).then((entry) => {
+		// Serialize cross-clip builds so concurrent ensures don't race on the
+		// shared `pdf.annotationStorage` mutated by `defaultBuilder`.
+		const previousChain = this.buildChain;
+		const promise = (async () => {
+			await previousChain.catch(() => undefined);
+			const entry = await this.builder(pdf, page, clip, scale, dpr);
 			this.map.set(key, entry);
 			this.touch(key);
 			this.evict();
 			return entry;
-		});
+		})();
+		this.buildChain = promise.catch(() => undefined);
 		this.inflight.set(key, promise);
 		try {
 			return await promise;

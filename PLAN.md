@@ -77,7 +77,7 @@ A task is "done" when:
 * [x] **Task B0:** Research spike — `animate` / OCG structure (produces `docs/ANIMATE_RESEARCH.md`)
 * [x] **Task B1:** Animate detector module (`lib/animate/detect.ts`)
 * [x] **Task B2:** Offscreen frame-cache renderer
-* [ ] **Task B3:** Player driver hook (`IntersectionObserver` + rAF loop)
+* [x] **Task B3:** Player driver hook (`IntersectionObserver` + rAF loop)
 * [ ] **Task B4:** Zoom / reload / scroll integrity
 * [ ] **Task B5:** Performance validation & budget tuning
 * [ ] **Task B6:** Config + CLI (`--no-animate`, `[animate]` TOML section)
@@ -270,7 +270,7 @@ Turn each detected `AnimateClip` into a sequence of ready-to-blit frame canvases
 ---
 
 #### `task/animate-player`
-* [ ] **Task B3:** Player driver hook
+* [x] **Task B3:** Player driver hook
 
 **Goal:**
 `useAnimatePlayer` that drives visible clips via `requestAnimationFrame`.

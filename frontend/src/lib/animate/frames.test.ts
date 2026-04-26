@@ -67,6 +67,10 @@ describe("AnimateFrameCache", () => {
 		const p1 = cache.ensure(pdf, page, clip, 1, 1);
 		const p2 = cache.ensure(pdf, page, clip, 1, 1);
 
+		// Allow the serialization chain to flush its initial microtask before
+		// asserting how many times the underlying builder ran.
+		await new Promise((resolve) => setTimeout(resolve, 0));
+
 		expect(builder).toHaveBeenCalledTimes(1);
 		resolveBuild?.(fakeFrames("anm0R", 1, 1, 4));
 		const [r1, r2] = await Promise.all([p1, p2]);
@@ -109,6 +113,41 @@ describe("AnimateFrameCache", () => {
 		expect(cache.peek(clip, 1, 1)).toBeDefined();
 		expect(cache.peek(clip, 1.5, 1)).toBeUndefined();
 		expect(cache.peek(clip, 1, 2)).toBeUndefined();
+	});
+
+	it("serializes builds across keys to avoid annotationStorage races", async () => {
+		const order: string[] = [];
+		let activeBuilds = 0;
+		let maxConcurrent = 0;
+		const builder = vi.fn(async (_p, _pg, clip: AnimateClip, scale, dpr) => {
+			activeBuilds += 1;
+			maxConcurrent = Math.max(maxConcurrent, activeBuilds);
+			order.push(`start:${clip.controllerAnnotationId}`);
+			await new Promise((resolve) => setTimeout(resolve, 5));
+			order.push(`end:${clip.controllerAnnotationId}`);
+			activeBuilds -= 1;
+			return fakeFrames(clip.controllerAnnotationId, scale, dpr, clip.frameCount);
+		});
+		const cache = new AnimateFrameCache({ builder });
+		const a = makeClip("anm0R");
+		const b = makeClip("anm1R");
+		const c = makeClip("anm2R");
+
+		await Promise.all([
+			cache.ensure(pdf, page, a, 1, 1),
+			cache.ensure(pdf, page, b, 1, 1),
+			cache.ensure(pdf, page, c, 1, 1),
+		]);
+
+		expect(maxConcurrent).toBe(1);
+		expect(order).toEqual([
+			"start:anm0R",
+			"end:anm0R",
+			"start:anm1R",
+			"end:anm1R",
+			"start:anm2R",
+			"end:anm2R",
+		]);
 	});
 
 	it("releaseClip drops every scale of one clip without touching others", async () => {
