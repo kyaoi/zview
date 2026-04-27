@@ -37,7 +37,16 @@ type RawAnnotation = {
 const FRAME_NAME_RE = /^(\d+)\.(\d+)$/;
 const CONTROLLER_NAME_RE = /^anm(\d+)$/;
 
-const DEFAULT_FPS = 12;
+/**
+ * Fallback FPS when the controller's PageOpen JS literal is missing or
+ * unparseable. Overridden at runtime by the `[animate].default_fps` config
+ * value via `setDefaultAnimateFps`.
+ */
+let defaultFps = 12;
+
+export function setDefaultAnimateFps(value: number): void {
+	if (Number.isFinite(value) && value > 0) defaultFps = value;
+}
 
 function bboxFromRect(rect: number[] | undefined): AnimateClipBbox | null {
 	if (!rect || rect.length !== 4) return null;
@@ -58,9 +67,9 @@ function joinActionScripts(actions: Record<string, string[]> | undefined, name: 
 function extractFps(script: string, idx: number): number {
 	const re = new RegExp(`a${idx}_fps\\s*=\\s*([\\d.]+)`);
 	const match = re.exec(script);
-	if (!match) return DEFAULT_FPS;
+	if (!match) return defaultFps;
 	const value = Number.parseFloat(match[1]);
-	return Number.isFinite(value) && value > 0 ? value : DEFAULT_FPS;
+	return Number.isFinite(value) && value > 0 ? value : defaultFps;
 }
 
 function extractFrameCount(script: string): number | null {

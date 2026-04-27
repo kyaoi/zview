@@ -91,6 +91,7 @@ func Parse(args []string) (Options, error) {
 		fmt.Fprintln(out, "      --watch              enable file watching for MAIN (default: true)")
 		fmt.Fprintln(out, "      --no-watch           disable file watching for MAIN")
 		fmt.Fprintln(out, "      --no-text-select     disable selectable text layer (smaller memory footprint)")
+		fmt.Fprintln(out, "      --no-animate         disable Beamer `animate` playback layer")
 		fmt.Fprintln(out, "      --port <int>         port to bind (0 = auto-select) (default 8571)")
 		fmt.Fprintln(out, "      --no-open            do not auto-open browser tab")
 		fmt.Fprintln(out, "      --version            print version and exit")
@@ -129,6 +130,7 @@ func Parse(args []string) (Options, error) {
 	watchFlag := fs.Bool("watch", cfg.Watch, "enable file watching for MAIN (default)")
 	noWatchFlag := fs.Bool("no-watch", false, "disable file watching for MAIN")
 	noTextSelectFlag := fs.Bool("no-text-select", false, "disable selectable text layer")
+	noAnimateFlag := fs.Bool("no-animate", false, "disable Beamer animate playback layer")
 	fs.IntVar(&opts.Port, "port", opts.Port, "port to bind (0 = auto-select)")
 	noOpenFlag := fs.Bool("no-open", false, "do not auto-open browser tab")
 	versionFlag := fs.Bool("version", false, "print version and exit")
@@ -174,6 +176,9 @@ func Parse(args []string) (Options, error) {
 	opts.Config.Watch = opts.Watch
 	if *noTextSelectFlag {
 		opts.Config.TextSelect = false
+	}
+	if *noAnimateFlag {
+		opts.Config.Animate.Enabled = false
 	}
 	opts.OpenBrowser = !*noOpenFlag
 

@@ -80,7 +80,7 @@ A task is "done" when:
 * [x] **Task B3:** Player driver hook (`IntersectionObserver` + rAF loop)
 * [x] **Task B4:** Zoom / reload / scroll integrity
 * [x] **Task B5:** Performance validation & budget tuning
-* [ ] **Task B6:** Config + CLI (`--no-animate`, `[animate]` TOML section)
+* [x] **Task B6:** Config + CLI (`--no-animate`, `[animate]` TOML section)
 * [ ] **Task B7:** Docs + E2E (sample animate PDF fixture)
 * [ ] **Task B8 (stretch):** `media9` embedded video overlay
 
@@ -324,7 +324,7 @@ Prove the committed sample workload (41 frames × 2 clips × fit-width, 8 fps) s
 ---
 
 #### `task/animate-config`
-* [ ] **Task B6:** Config + CLI surface
+* [x] **Task B6:** Config + CLI surface
 
 **Goal:**
 Expose the feature as a first-class config + flag.

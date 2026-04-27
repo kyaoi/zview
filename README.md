@@ -113,6 +113,7 @@ zview kill <port>
 | `--focus <main|sub>` | Initial focus pane (default: `main`) |
 | `--watch` / `--no-watch` | Enable/disable MAIN file watching |
 | `--no-text-select` | Disable the selectable text layer (smaller memory footprint) |
+| `--no-animate` | Disable Beamer `animate` playback (frames render statically) |
 | `--port <N>` | Port to bind (`0` = auto-select) |
 | `--no-open` | Do not open browser automatically |
 | `--help` | Show help |
@@ -154,6 +155,11 @@ scroll_step_horizontal = 64.0
 page_scroll_ratio = 0.5
 text_select = true
 
+[animate]
+enabled = true
+default_fps = 12
+max_active_clips = 4
+
 # [keys]
 # scroll_down = ["j", "ArrowDown"]
 # jump_top = ["g g"]
@@ -165,6 +171,7 @@ text_select = true
 ## Troubleshooting
 
 - Text selection: the TextLayer is enabled by default for Chrome-like text selection and copy. Disable it with `--no-text-select` or `text_select = false` if memory pressure matters more than selectability.
+- Beamer animations: PDFs from LaTeX's `animate` package play inline by default. Disable with `--no-animate` or `enabled = false` under `[animate]` to skip the playback layer entirely.
 - Reload behavior: `SUB` is static; re-open via UI to refresh it.
 - Watch behavior: with `--no-watch`, file changes are not detected.
 - Password-protected PDFs: the viewer prompts for a password and keeps the current view on cancel/failure.

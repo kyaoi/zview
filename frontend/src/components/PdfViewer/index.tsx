@@ -28,11 +28,15 @@ import type {
 	ZoomMode,
 } from "../../lib/types";
 import { clampScaleValue, withCacheBust } from "../../lib/utils";
-import { getTextSelect } from "../../lib/config";
+import { getAnimateConfig, getTextSelect } from "../../lib/config";
 import { PageSlot, type PageOverlay } from "./PageSlot";
 import "./textLayer.css";
 import { TextLayerOverlay } from "./TextLayerOverlay";
-import { type AnimateClip, detectAnimateClips } from "../../lib/animate/detect";
+import {
+	type AnimateClip,
+	detectAnimateClips,
+	setDefaultAnimateFps,
+} from "../../lib/animate/detect";
 import { AnimateFrameCache } from "../../lib/animate/frames";
 import { AnimatePlayer } from "./AnimatePlayer";
 
@@ -554,8 +558,16 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 		[fitScale, manualScale, zoomMode],
 	);
 
-	const animateCache = useMemo(() => new AnimateFrameCache(), []);
+	const animateConfig = useMemo(() => getAnimateConfig(), []);
+	const animateCache = useMemo(
+		() => new AnimateFrameCache({ maxActiveClips: animateConfig.max_active_clips }),
+		[animateConfig.max_active_clips],
+	);
 	const [animateClips, setAnimateClips] = useState<readonly AnimateClip[]>([]);
+
+	useEffect(() => {
+		setDefaultAnimateFps(animateConfig.default_fps);
+	}, [animateConfig.default_fps]);
 
 	useEffect(() => {
 		// Always reset upfront so a stale clips list cannot survive a `pdf`
@@ -564,7 +576,7 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 		// oldClipId)` and race against the next detection pass.
 		setAnimateClips([]);
 		animateCache.releaseAll();
-		if (!pdf) return;
+		if (!pdf || !animateConfig.enabled) return;
 
 		let cancelled = false;
 		detectAnimateClips(pdf)
@@ -591,7 +603,7 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 		return () => {
 			cancelled = true;
 		};
-	}, [pdf, animateCache]);
+	}, [pdf, animateCache, animateConfig.enabled]);
 
 	useEffect(() => {
 		return () => {
