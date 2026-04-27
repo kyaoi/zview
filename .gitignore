@@ -39,3 +39,6 @@ tmp/
 
 # zview
 zview
+
+# Local dev fixtures (large PDFs for manual testing / research spikes)
+sample/

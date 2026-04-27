@@ -27,6 +27,18 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg.PageScrollRatio != 0.5 {
 		t.Errorf("Default PageScrollRatio should be 0.5, got %f", cfg.PageScrollRatio)
 	}
+	if !cfg.TextSelect {
+		t.Error("Default TextSelect should be true")
+	}
+	if !cfg.Animate.Enabled {
+		t.Error("Default Animate.Enabled should be true")
+	}
+	if cfg.Animate.DefaultFps != 12 {
+		t.Errorf("Default Animate.DefaultFps should be 12, got %f", cfg.Animate.DefaultFps)
+	}
+	if cfg.Animate.MaxActiveClips != 4 {
+		t.Errorf("Default Animate.MaxActiveClips should be 4, got %d", cfg.Animate.MaxActiveClips)
+	}
 
 	// Test default keys (now stored as arrays in a map)
 	defaults := DefaultKeysMap()

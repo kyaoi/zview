@@ -28,6 +28,17 @@ import type {
 	ZoomMode,
 } from "../../lib/types";
 import { clampScaleValue, withCacheBust } from "../../lib/utils";
+import { getAnimateConfig, getTextSelect } from "../../lib/config";
+import { PageSlot, type PageOverlay } from "./PageSlot";
+import "./textLayer.css";
+import { TextLayerOverlay } from "./TextLayerOverlay";
+import {
+	type AnimateClip,
+	detectAnimateClips,
+	setDefaultAnimateFps,
+} from "../../lib/animate/detect";
+import { AnimateFrameCache } from "../../lib/animate/frames";
+import { AnimatePlayer } from "./AnimatePlayer";
 
 GlobalWorkerOptions.workerSrc = workerSrc;
 
@@ -58,6 +69,7 @@ interface PdfViewerProps {
 	onFocus?: () => void;
 	reloadKey?: number;
 	initialSnapshot?: ScrollSnapshot | null;
+	overlays?: readonly PageOverlay[];
 }
 
 type PasswordPromptState = {
@@ -65,7 +77,7 @@ type PasswordPromptState = {
 };
 
 export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfViewer(
-	{ paneRole, url, onNotify, reloadKey = 0, initialSnapshot },
+	{ paneRole, url, onNotify, reloadKey = 0, initialSnapshot, overlays },
 	ref,
 ) {
 	const role = paneRole;
@@ -108,6 +120,34 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 			releasePageSlot(slot);
 		});
 		pageSlotsRef.current = [];
+	}, []);
+
+	const registerContainer = useCallback((index: number, node: HTMLDivElement | null) => {
+		const existing = pageSlotsRef.current[index];
+		if (existing) {
+			existing.container = node;
+		} else {
+			pageSlotsRef.current[index] = {
+				container: node,
+				canvas: null,
+				renderTask: null,
+				renderedScale: null,
+			};
+		}
+	}, []);
+
+	const registerCanvas = useCallback((index: number, node: HTMLCanvasElement | null) => {
+		const existing = pageSlotsRef.current[index];
+		if (existing) {
+			existing.canvas = node;
+		} else {
+			pageSlotsRef.current[index] = {
+				container: null,
+				canvas: node,
+				renderTask: null,
+				renderedScale: null,
+			};
+		}
 	}, []);
 
 	useEffect(
@@ -159,10 +199,6 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 		}
 
 		setState({ phase: "loading" });
-		// Only notify if this looks like a reload (manual or verify), not initial load
-		if (reloadKey > 0) {
-			onNotify(`${role}: Reloading…`, "info");
-		}
 
 		async function loadAndRender() {
 			try {
@@ -187,9 +223,6 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 					setPasswordPrompt({ reason: promptReason });
 					setPasswordInput("");
 					passwordResolverRef.current = (password) => updatePassword(password);
-					if (promptReason === "required") {
-						onNotify(`${role}: password required`, "info");
-					}
 				};
 
 				const loaded = await loadingTask.promise;
@@ -243,7 +276,6 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 				setZoomMode(restoredZoomMode);
 				setRenderNonce((v) => v + 1);
 				manualScaleInitializedRef.current = Boolean(restoreSnapshot);
-				onNotify(restoreSnapshot ? `${role}: restored scroll` : `${role}: loaded`, "success");
 			} catch (err) {
 				if (cancelled) return;
 				if (abortReasonRef.current) {
@@ -526,6 +558,88 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 		[fitScale, manualScale, zoomMode],
 	);
 
+	const animateConfig = useMemo(() => getAnimateConfig(), []);
+	const animateCache = useMemo(
+		() => new AnimateFrameCache({ maxActiveClips: animateConfig.max_active_clips }),
+		[animateConfig.max_active_clips],
+	);
+	const [animateClips, setAnimateClips] = useState<readonly AnimateClip[]>([]);
+
+	useEffect(() => {
+		setDefaultAnimateFps(animateConfig.default_fps);
+	}, [animateConfig.default_fps]);
+
+	useEffect(() => {
+		// Always reset upfront so a stale clips list cannot survive a `pdf`
+		// swap (MAIN reload, SUB-tab switch, --watch trigger). Otherwise the
+		// AnimatePlayer instances would briefly call `cache.ensure(newPdf,
+		// oldClipId)` and race against the next detection pass.
+		setAnimateClips([]);
+		animateCache.releaseAll();
+		if (!pdf || !animateConfig.enabled) return;
+
+		let cancelled = false;
+		detectAnimateClips(pdf)
+			.then((clips) => {
+				if (cancelled) return;
+				setAnimateClips(clips);
+			})
+			.catch((err) => {
+				if (!cancelled) {
+					console.warn("[animate] detect failed:", err);
+				}
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, [pdf, animateCache, animateConfig.enabled]);
+
+	useEffect(() => {
+		return () => {
+			animateCache.releaseAll();
+		};
+	}, [animateCache]);
+
+	const combinedOverlays = useMemo<readonly PageOverlay[]>(() => {
+		const defaults: PageOverlay[] = [];
+		if (getTextSelect()) {
+			defaults.push({
+				key: "textLayer",
+				render: (ctx) => (
+					<TextLayerOverlay
+						pageIndex={ctx.pageIndex}
+						pdf={ctx.pdf}
+						layoutScale={ctx.layoutScale}
+						isVisible={ctx.isVisible}
+					/>
+				),
+			});
+		}
+		if (animateClips.length > 0) {
+			defaults.push({
+				key: "animatePlayers",
+				render: (ctx) => {
+					const clipsForPage = animateClips.filter((c) => c.pageIndex === ctx.pageIndex);
+					if (clipsForPage.length === 0 || !ctx.pdf) return null;
+					return (
+						<>
+							{clipsForPage.map((clip) => (
+								<AnimatePlayer
+									key={clip.controllerAnnotationId}
+									clip={clip}
+									pdf={ctx.pdf}
+									cache={animateCache}
+									scale={ctx.layoutScale}
+								/>
+							))}
+						</>
+					);
+				},
+			});
+		}
+		return overlays ? [...defaults, ...overlays] : defaults;
+	}, [overlays, animateClips, animateCache]);
+
 	const announceZoom = useCallback((_nextScale: number, _mode: ZoomMode) => {
 		// Optional: could toast on zoom, but acts as noise. Keeping silent for now.
 	}, []);
@@ -710,7 +824,6 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 			rerender: () => {
 				resetPageSlots();
 				setRenderNonce((v) => v + 1);
-				onNotify(`${role}: re-rendering`, "info");
 			},
 			getSnapshot: () => {
 				const scrollEl = scrollRef.current;
@@ -744,7 +857,6 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 			jumpByPages,
 			jumpToBottom,
 			jumpToTop,
-			onNotify,
 			resetPageSlots,
 			scrollHalfPage,
 			scrollHorizontal,
@@ -753,7 +865,6 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 			scrollLine,
 			zoomIn,
 			zoomOut,
-			role,
 			zoomMode,
 			fitScale,
 			manualScale,
@@ -851,56 +962,19 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 							}
 							const isVisible = index >= visibleRange[0] && index <= visibleRange[1];
 							return (
-								<div key={`page-${index + 1}`} className="flex flex-col items-center gap-2">
-									<div
-										ref={(node) => {
-											const existing = pageSlotsRef.current[index];
-											if (existing) {
-												existing.container = node;
-											} else {
-												pageSlotsRef.current[index] = {
-													container: node,
-													canvas: null,
-													renderTask: null,
-													renderedScale: null,
-												};
-											}
-										}}
-										className="relative overflow-visible bg-slate-950/60 shadow-lg"
-										style={{
-											margin: "0 auto",
-											height: placeholderHeight
-												? `${placeholderHeight}px`
-												: `${Math.round(pageSize.height * layoutScale)}px`,
-											width: displayWidth ? `${displayWidth}px` : "auto",
-											minWidth: displayWidth ? `${displayWidth}px` : "auto",
-										}}
-									>
-										<canvas
-											ref={(node) => {
-												const existing = pageSlotsRef.current[index];
-												if (existing) {
-													existing.canvas = node;
-												} else {
-													pageSlotsRef.current[index] = {
-														container: null,
-														canvas: node,
-														renderTask: null,
-														renderedScale: null,
-													};
-												}
-											}}
-											className="block h-full w-full bg-slate-900"
-											aria-label={`${role} PDF page ${index + 1}`}
-											style={{
-												opacity: isVisible ? 1 : 0.4,
-											}}
-										/>
-										{!isVisible ? (
-											<div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-slate-900/70 via-slate-900/30 to-slate-900/70" />
-										) : null}
-									</div>
-								</div>
+								<PageSlot
+									key={`page-${index + 1}`}
+									pageIndex={index}
+									role={role}
+									isVisible={isVisible}
+									displayWidth={displayWidth ?? Math.round(pageSize.width * layoutScale)}
+									displayHeight={placeholderHeight ?? Math.round(pageSize.height * layoutScale)}
+									layoutScale={layoutScale}
+									pdf={pdf}
+									registerContainer={registerContainer}
+									registerCanvas={registerCanvas}
+									overlays={combinedOverlays}
+								/>
 							);
 						})
 					)}

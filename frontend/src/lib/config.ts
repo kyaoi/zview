@@ -41,6 +41,34 @@ export const getDisableBrowserShortcuts = (): boolean => {
 	return window.ZVIEW_CONFIG?.disable_browser_shortcuts ?? false;
 };
 
+export const getTextSelect = (): boolean => {
+	if (typeof window === "undefined") return true;
+	return window.ZVIEW_CONFIG?.text_select ?? true;
+};
+
+const ANIMATE_DEFAULTS = {
+	enabled: true,
+	default_fps: 12,
+	max_active_clips: 4,
+} as const;
+
+export const getAnimateConfig = (): ZviewAnimateConfig => {
+	if (typeof window === "undefined") return { ...ANIMATE_DEFAULTS };
+	const cfg = window.ZVIEW_CONFIG?.animate;
+	if (!cfg) return { ...ANIMATE_DEFAULTS };
+	return {
+		enabled: cfg.enabled ?? ANIMATE_DEFAULTS.enabled,
+		default_fps:
+			Number.isFinite(cfg.default_fps) && cfg.default_fps > 0
+				? cfg.default_fps
+				: ANIMATE_DEFAULTS.default_fps,
+		max_active_clips:
+			Number.isFinite(cfg.max_active_clips) && cfg.max_active_clips > 0
+				? Math.floor(cfg.max_active_clips)
+				: ANIMATE_DEFAULTS.max_active_clips,
+	};
+};
+
 // Format keys for display (e.g., ["j", "ArrowDown"] -> "`j` / `ArrowDown`")
 export const formatKeysForDisplay = (keys: string[]): string => {
 	return keys.map((k) => `\`${k}\``).join(" / ");
@@ -54,6 +82,7 @@ export const getConfig = () => {
 		scroll_step_vertical: 64.0,
 		scroll_step_horizontal: 64.0,
 		page_scroll_ratio: 0.5,
+		text_select: true,
 	};
 	if (typeof window !== "undefined" && window.ZVIEW_CONFIG) {
 		return { ...defaults, ...window.ZVIEW_CONFIG };

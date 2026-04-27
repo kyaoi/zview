@@ -9,6 +9,13 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
+// AnimateConfig holds settings for the Beamer `animate` playback layer.
+type AnimateConfig struct {
+	Enabled        bool    `toml:"enabled" json:"enabled"`
+	DefaultFps     float64 `toml:"default_fps" json:"default_fps"`
+	MaxActiveClips int     `toml:"max_active_clips" json:"max_active_clips"`
+}
+
 // Config holds the application configuration.
 type Config struct {
 	Watch                   bool           `toml:"watch" json:"watch"`
@@ -17,6 +24,8 @@ type Config struct {
 	ScrollStepVertical      float64        `toml:"scroll_step_vertical" json:"scroll_step_vertical"`
 	ScrollStepHorizontal    float64        `toml:"scroll_step_horizontal" json:"scroll_step_horizontal"`
 	PageScrollRatio         float64        `toml:"page_scroll_ratio" json:"page_scroll_ratio"`
+	TextSelect              bool           `toml:"text_select" json:"text_select"`
+	Animate                 AnimateConfig  `toml:"animate" json:"animate"`
 	Keys                    map[string]any `toml:"keys" json:"keys"`
 	BlockedKeys             []string       `toml:"blocked_keys" json:"blocked_keys"`
 	DisableBrowserShortcuts bool           `toml:"disable_browser_shortcuts" json:"disable_browser_shortcuts"`
@@ -57,7 +66,13 @@ func Default() Config {
 		ScrollStepVertical:   64.0,
 		ScrollStepHorizontal: 64.0,
 		PageScrollRatio:      0.5,
-		Keys:                 DefaultKeysMap(),
+		TextSelect:           true,
+		Animate: AnimateConfig{
+			Enabled:        true,
+			DefaultFps:     12,
+			MaxActiveClips: 4,
+		},
+		Keys: DefaultKeysMap(),
 	}
 }
 

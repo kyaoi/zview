@@ -30,7 +30,7 @@ export function Pane({ children, focused, paneRole, status, onFocus }: PaneProps
 			{/* Pane Header Overlay */}
 			<div
 				className={classNames(
-					"absolute top-4 left-6 z-20 flex items-center gap-2 pointer-events-none transition-all duration-300 origin-left",
+					"absolute top-4 left-6 z-20 flex items-center gap-2 pointer-events-none select-none transition-all duration-300 origin-left",
 					focused ? "opacity-100 scale-100 translate-x-0" : "opacity-80 scale-90 -translate-x-2",
 				)}
 			>

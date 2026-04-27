@@ -193,7 +193,6 @@ export default function App() {
 		const formData = new FormData();
 		formData.append("file", file);
 
-		addToast("SUB: Uploading…", "info");
 		try {
 			const res = await fetch("/api/sub/upload", {
 				method: "POST",
@@ -234,7 +233,6 @@ export default function App() {
 		const formData = new FormData();
 		formData.append("file", file);
 
-		addToast("MAIN: Uploading…", "info");
 		try {
 			const res = await fetch("/api/main/upload", {
 				method: "POST",

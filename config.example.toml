@@ -26,6 +26,22 @@ scroll_step_horizontal = 64.0
 # Controls how much to scroll relative to the view height when using d/u keys.
 page_scroll_ratio = 0.5
 
+# Selectable text layer (default: true)
+# When true, text on each page is selectable and copyable (Chrome-like).
+# Set to false to skip the text layer entirely for smaller memory use.
+text_select = true
+
+# Beamer `animate` playback layer.
+# When enabled, PDFs produced by the LaTeX `animate` package
+# (`\animategraphics{...}`) play their animations inline.
+# - default_fps: fallback FPS when the controller's metadata is unparseable.
+# - max_active_clips: how many (clip, scale) entries the frame cache holds.
+#   Larger = more memory but smoother zoom-back.
+[animate]
+enabled = true
+default_fps = 12
+max_active_clips = 4
+
 # Blocked keys
 # Keys defined here will be blocked from reaching the browser/extensions.
 # Useful for preventing conflicts with browser shortcuts or global hotkeys.
