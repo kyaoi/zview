@@ -81,7 +81,7 @@ A task is "done" when:
 * [x] **Task B4:** Zoom / reload / scroll integrity
 * [x] **Task B5:** Performance validation & budget tuning
 * [x] **Task B6:** Config + CLI (`--no-animate`, `[animate]` TOML section)
-* [ ] **Task B7:** Docs + E2E (sample animate PDF fixture)
+* [x] **Task B7:** Docs + E2E (sample animate PDF fixture)
 * [ ] **Task B8 (stretch):** `media9` embedded video overlay
 
 ---
@@ -341,7 +341,7 @@ Expose the feature as a first-class config + flag.
 ---
 
 #### `task/animate-docs-e2e`
-* [ ] **Task B7:** Docs + E2E
+* [x] **Task B7:** Docs + E2E
 
 **Goal:**
 Lock in the feature and give users guidance.

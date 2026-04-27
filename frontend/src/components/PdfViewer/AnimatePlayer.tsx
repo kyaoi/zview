@@ -67,41 +67,18 @@ export function AnimatePlayer({ clip, pdf, cache, scale }: AnimatePlayerProps) {
 		setHasFrames(false);
 
 		let cancelled = false;
-		const t0 = performance.now();
-		let firstSeenAt: number | null = null;
-		console.info(
-			`[animate] building cache: clip=${clip.controllerAnnotationId} ` +
-				`page=${clip.pageIndex + 1} frames=${clip.frameCount} ` +
-				`scale=${scale.toFixed(3)} dpr=${dpr}`,
-		);
 		cache
 			.ensure(pdf, page, clip, scale, dpr, {
 				onFrame: (idx, canvas) => {
 					if (cancelled) return;
 					liveFramesRef.current[idx] = canvas;
 					if (idx > tipMaxRef.current) tipMaxRef.current = idx;
-					if (firstSeenAt === null) {
-						firstSeenAt = performance.now();
-						console.info(
-							`[animate] first frame: clip=${clip.controllerAnnotationId} ` +
-								`in ${(firstSeenAt - t0).toFixed(0)}ms`,
-						);
-						// Trigger one re-render so the RAF loop and the static-paint
-						// effect see the first cached frame.
-						setHasFrames(true);
-					}
+					setHasFrames(true);
 				},
 			})
 			.then((cached) => {
 				if (cancelled) return;
-				const ms = performance.now() - t0;
-				console.info(
-					`[animate] cache ready: clip=${clip.controllerAnnotationId} ` +
-						`frames=${cached.frames.length} in ${ms.toFixed(0)}ms ` +
-						`bbox=${JSON.stringify(cached.pixelBox)}`,
-				);
 				setBox(cached.pixelBox);
-				// Flag triggers React effects regardless of cache-hit vs build path.
 				setHasFrames(true);
 			})
 			.catch((err) => {
@@ -206,9 +183,6 @@ export function AnimatePlayer({ clip, pdf, cache, scale }: AnimatePlayerProps) {
 		pointerEvents: "auto",
 		zIndex: 2,
 		cursor: hasFrames ? "pointer" : "wait",
-		// Debug aid (Task B3 verification): visible outline + label until cache lands.
-		outline: hasFrames ? "none" : "2px dashed rgb(28 202 216 / 0.85)",
-		outlineOffset: "-2px",
 	};
 
 	const canvasWidth = Math.max(1, Math.floor(box.width * dpr));

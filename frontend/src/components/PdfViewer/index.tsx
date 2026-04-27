@@ -582,17 +582,6 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 		detectAnimateClips(pdf)
 			.then((clips) => {
 				if (cancelled) return;
-				console.info(
-					`[animate] detected ${clips.length} clip(s)`,
-					clips.map((c) => ({
-						page: c.pageIndex + 1,
-						idx: c.animationIndex,
-						frames: c.frameCount,
-						fps: c.fps,
-						bbox: c.bbox,
-						controller: c.controllerAnnotationId,
-					})),
-				);
 				setAnimateClips(clips);
 			})
 			.catch((err) => {
