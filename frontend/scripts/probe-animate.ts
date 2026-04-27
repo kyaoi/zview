@@ -37,9 +37,7 @@ async function main() {
 	const t0 = performance.now();
 	const clips = await detectAnimateClips(pdf);
 	const detectMs = performance.now() - t0;
-	console.log(
-		`detectAnimateClips: ${clips.length} clips in ${detectMs.toFixed(1)}ms`,
-	);
+	console.log(`detectAnimateClips: ${clips.length} clips in ${detectMs.toFixed(1)}ms`);
 	for (const clip of clips) {
 		console.log(
 			`  page=${clip.pageIndex + 1} anim=${clip.animationIndex} ` +
@@ -63,32 +61,24 @@ async function main() {
 	const page = await pdf.getPage(clip.pageIndex + 1);
 
 	const baseline = await page.getOperatorList({ annotationMode: 1 }); // ENABLE
-	console.log(
-		`baseline operator list: fnArray=${baseline.fnArray.length} (with all annotations)`,
-	);
+	console.log(`baseline operator list: fnArray=${baseline.fnArray.length} (with all annotations)`);
 
 	pdf.annotationStorage.setValue(clip.frameAnnotationIds[0], { noView: true });
 	const oneHidden = await page.getOperatorList({ annotationMode: 3 }); // ENABLE_STORAGE
-	console.log(
-		`with frame[0].noView=true (storage): fnArray=${oneHidden.fnArray.length}`,
-	);
+	console.log(`with frame[0].noView=true (storage): fnArray=${oneHidden.fnArray.length}`);
 
 	for (const id of clip.frameAnnotationIds) {
 		pdf.annotationStorage.setValue(id, { noView: true });
 	}
 	const allHidden = await page.getOperatorList({ annotationMode: 3 });
-	console.log(
-		`with all frames[].noView=true: fnArray=${allHidden.fnArray.length}`,
-	);
+	console.log(`with all frames[].noView=true: fnArray=${allHidden.fnArray.length}`);
 
 	for (const id of clip.frameAnnotationIds) {
 		pdf.annotationStorage.setValue(id, { noView: true });
 	}
 	pdf.annotationStorage.setValue(clip.frameAnnotationIds[5], { noView: false });
 	const onlyOne = await page.getOperatorList({ annotationMode: 3 });
-	console.log(
-		`with only frame[5] visible: fnArray=${onlyOne.fnArray.length}`,
-	);
+	console.log(`with only frame[5] visible: fnArray=${onlyOne.fnArray.length}`);
 
 	console.log(
 		"\nDelta interpretation: smaller fnArray when more frames are hidden ⇒ Strategy 1 viable.",

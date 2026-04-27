@@ -21,9 +21,7 @@ test.describe("Text selection (TextLayer)", () => {
 
 	test("renders TextLayer spans for the visible page", async ({ page }) => {
 		const firstPageText = await page.evaluate(() => {
-			const spans = document.querySelectorAll(
-				'[data-testid="pane-main"] .textLayer span',
-			);
+			const spans = document.querySelectorAll('[data-testid="pane-main"] .textLayer span');
 			return Array.from(spans)
 				.map((s) => s.textContent ?? "")
 				.join("");
@@ -31,9 +29,7 @@ test.describe("Text selection (TextLayer)", () => {
 		expect(firstPageText).toContain("Line 1 on page 1");
 	});
 
-	test("selecting TextLayer content yields readable text via Selection API", async ({
-		page,
-	}) => {
+	test("selecting TextLayer content yields readable text via Selection API", async ({ page }) => {
 		const selected = await page.evaluate(() => {
 			const textLayer = document.querySelector(
 				'[data-testid="pane-main"] .textLayer',
