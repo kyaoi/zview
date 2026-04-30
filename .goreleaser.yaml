@@ -19,9 +19,9 @@ builds:
         goarch: arm64
     ldflags:
       - -s -w
-      - -X main.version={{.Version}}
-      - -X main.commit={{.Commit}}
-      - -X main.date={{.Date}}
+      - -X github.com/kyaoi/zview/backend/internal/cli.Version=v{{.Version}}
+      - -X github.com/kyaoi/zview/backend/internal/cli.Commit={{.Commit}}
+      - -X github.com/kyaoi/zview/backend/internal/cli.Date={{.Date}}
 
 archives:
   - format: tar.gz

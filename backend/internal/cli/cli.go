@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"runtime/debug"
 	"strings"
 
 	"github.com/kyaoi/zview/backend/internal/config"
@@ -60,6 +61,37 @@ var (
 	Commit  = "none"
 	Date    = "unknown"
 )
+
+// versionInfo returns version, commit, and date strings, preferring values
+// injected via -ldflags (used by GoReleaser) and falling back to
+// runtime/debug.ReadBuildInfo so `go install module@vX` and `go build` in a
+// VCS checkout still produce meaningful output instead of "dev (none) ...".
+func versionInfo() (version, commit, date string) {
+	version, commit, date = Version, Commit, Date
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return
+	}
+	if version == "dev" && info.Main.Version != "" && info.Main.Version != "(devel)" {
+		version = info.Main.Version
+	}
+	for _, s := range info.Settings {
+		switch s.Key {
+		case "vcs.revision":
+			if commit == "none" && s.Value != "" {
+				commit = s.Value
+				if len(commit) > 7 {
+					commit = commit[:7]
+				}
+			}
+		case "vcs.time":
+			if date == "unknown" && s.Value != "" {
+				date = s.Value
+			}
+		}
+	}
+	return
+}
 
 // Parse parses command-line arguments and returns Options.
 func Parse(args []string) (Options, error) {
@@ -147,7 +179,8 @@ func Parse(args []string) (Options, error) {
 		return Options{}, ErrShowHelp
 	}
 	if *versionFlag {
-		fmt.Printf("zview %s (%s) built at %s\n", Version, Commit, Date)
+		v, c, d := versionInfo()
+		fmt.Printf("zview %s (%s) built at %s\n", v, c, d)
 		os.Exit(0)
 	}
 
