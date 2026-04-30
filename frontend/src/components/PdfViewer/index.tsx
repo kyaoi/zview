@@ -116,10 +116,14 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 	const passwordInputRef = useRef<HTMLInputElement | null>(null);
 
 	const resetPageSlots = useCallback(() => {
+		// Cancel render tasks and zero canvas dimensions, but keep slot entries
+		// (and their canvas/container refs) in place. PageSlot ref callbacks are
+		// stable across reloads, so React won't re-register them — wiping the
+		// array would orphan the live canvas DOM nodes and the next render pass
+		// would skip them, leaving a blank viewer.
 		pageSlotsRef.current.forEach((slot) => {
 			releasePageSlot(slot);
 		});
-		pageSlotsRef.current = [];
 	}, []);
 
 	const registerContainer = useCallback((index: number, node: HTMLDivElement | null) => {
