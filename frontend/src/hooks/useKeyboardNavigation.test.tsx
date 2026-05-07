@@ -63,6 +63,7 @@ describe("useKeyboardNavigation", () => {
 		jumpToTop: vi.fn(),
 		jumpToBottom: vi.fn(),
 		jumpByPages: vi.fn(),
+		jumpToPage: vi.fn(),
 		zoomIn: vi.fn(),
 		zoomOut: vi.fn(),
 		fitToWidth: vi.fn(),
@@ -106,6 +107,8 @@ describe("useKeyboardNavigation", () => {
 		});
 		vi.mocked(config.validateKeyConflicts).mockReturnValue([]);
 		vi.mocked(config.isKeySequence).mockReturnValue(false);
+		vi.mocked(config.getBlockedKeys).mockReturnValue([]);
+		vi.mocked(config.getDisableBrowserShortcuts).mockReturnValue(false);
 	});
 	afterEach(() => {
 		vi.useRealTimers();
@@ -136,7 +139,9 @@ describe("useKeyboardNavigation", () => {
 
 		unmount();
 
-		expect(removeSpy).toHaveBeenCalledWith("keydown", expect.any(Function));
+		expect(removeSpy).toHaveBeenCalledWith("keydown", expect.any(Function), {
+			capture: true,
+		});
 		expect(removeSpy).toHaveBeenCalledWith("keyup", expect.any(Function));
 	});
 
@@ -375,5 +380,169 @@ describe("useKeyboardNavigation", () => {
 		const event = new KeyboardEvent("keydown", { key: "k", ctrlKey: true, cancelable: true });
 		window.dispatchEvent(event);
 		expect(event.defaultPrevented).toBe(true);
+	});
+
+	describe("vim-style count prefix", () => {
+		it("passes accumulated count to single-key actions (5j)", () => {
+			vi.mocked(config.getKeyBinding).mockImplementation((id: string) => {
+				if (id === "scroll_down") return ["j"];
+				return [];
+			});
+			vi.mocked(matchesAnyKey).mockImplementation((event, keys) => keys.includes(event.key));
+
+			const setCountBuffer = vi.fn();
+			renderHook(() => useKeyboardNavigation({ ...defaultProps, setCountBuffer }));
+
+			window.dispatchEvent(new KeyboardEvent("keydown", { key: "5", cancelable: true }));
+			expect(setCountBuffer).toHaveBeenLastCalledWith("5");
+			expect(mockActionHandlers.scroll_down).not.toHaveBeenCalled();
+
+			window.dispatchEvent(new KeyboardEvent("keydown", { key: "j", cancelable: true }));
+			expect(mockActionHandlers.scroll_down).toHaveBeenCalledWith(
+				expect.anything(),
+				expect.anything(),
+				expect.anything(),
+				5,
+			);
+			expect(setCountBuffer).toHaveBeenLastCalledWith("");
+		});
+
+		it("accumulates multi-digit counts (12j)", () => {
+			vi.mocked(config.getKeyBinding).mockImplementation((id: string) => {
+				if (id === "scroll_down") return ["j"];
+				return [];
+			});
+			vi.mocked(matchesAnyKey).mockImplementation((event, keys) => keys.includes(event.key));
+
+			renderHook(() => useKeyboardNavigation(defaultProps));
+
+			window.dispatchEvent(new KeyboardEvent("keydown", { key: "1", cancelable: true }));
+			window.dispatchEvent(new KeyboardEvent("keydown", { key: "2", cancelable: true }));
+			window.dispatchEvent(new KeyboardEvent("keydown", { key: "j", cancelable: true }));
+
+			expect(mockActionHandlers.scroll_down).toHaveBeenCalledWith(
+				expect.anything(),
+				expect.anything(),
+				expect.anything(),
+				12,
+			);
+		});
+
+		it("appends 0 inside an existing count (10j) but not as a leading digit", () => {
+			vi.mocked(config.getKeyBinding).mockImplementation((id: string) => {
+				if (id === "scroll_down") return ["j"];
+				return [];
+			});
+			vi.mocked(matchesAnyKey).mockImplementation((event, keys) => keys.includes(event.key));
+
+			renderHook(() => useKeyboardNavigation(defaultProps));
+
+			// Leading 0 should not start a count → consumed as a no-op (no action bound)
+			const lead = new KeyboardEvent("keydown", { key: "0", cancelable: true });
+			window.dispatchEvent(lead);
+			// Then 1 starts the count, 0 appends.
+			window.dispatchEvent(new KeyboardEvent("keydown", { key: "1", cancelable: true }));
+			window.dispatchEvent(new KeyboardEvent("keydown", { key: "0", cancelable: true }));
+			window.dispatchEvent(new KeyboardEvent("keydown", { key: "j", cancelable: true }));
+
+			expect(mockActionHandlers.scroll_down).toHaveBeenCalledWith(
+				expect.anything(),
+				expect.anything(),
+				expect.anything(),
+				10,
+			);
+		});
+
+		it("passes count to sequence completions (5gg)", () => {
+			vi.mocked(config.getKeyBinding).mockImplementation((id: string) => {
+				if (id === "jump_top") return ["g g"];
+				return [];
+			});
+			vi.mocked(config.isKeySequence).mockImplementation((b: string) => b.includes(" "));
+			vi.mocked(config.parseKeySequence).mockImplementation((b: string) => b.split(" "));
+			vi.mocked(matchesAnyKey).mockImplementation((event, keys) => keys.includes(event.key));
+
+			renderHook(() => useKeyboardNavigation(defaultProps));
+
+			window.dispatchEvent(new KeyboardEvent("keydown", { key: "5", cancelable: true }));
+			window.dispatchEvent(new KeyboardEvent("keydown", { key: "g", cancelable: true }));
+			window.dispatchEvent(new KeyboardEvent("keydown", { key: "g", cancelable: true }));
+
+			expect(mockActionHandlers.jump_top).toHaveBeenCalledWith(
+				expect.anything(),
+				expect.anything(),
+				expect.anything(),
+				5,
+			);
+		});
+
+		it("clears count buffer when an unbound non-digit key is pressed", () => {
+			vi.mocked(config.getKeyBinding).mockImplementation((id: string) => {
+				if (id === "scroll_down") return ["j"];
+				return [];
+			});
+			vi.mocked(matchesAnyKey).mockImplementation((event, keys) => keys.includes(event.key));
+
+			const setCountBuffer = vi.fn();
+			renderHook(() => useKeyboardNavigation({ ...defaultProps, setCountBuffer }));
+
+			window.dispatchEvent(new KeyboardEvent("keydown", { key: "5", cancelable: true }));
+			// 'x' is not bound to any action → cancels count
+			window.dispatchEvent(new KeyboardEvent("keydown", { key: "x", cancelable: true }));
+			window.dispatchEvent(new KeyboardEvent("keydown", { key: "j", cancelable: true }));
+
+			expect(mockActionHandlers.scroll_down).toHaveBeenCalledWith(
+				expect.anything(),
+				expect.anything(),
+				expect.anything(),
+				undefined,
+			);
+		});
+
+		it("does not start a count when modifier is held (Ctrl+5)", () => {
+			vi.mocked(config.getKeyBinding).mockImplementation((id: string) => {
+				if (id === "scroll_down") return ["j"];
+				return [];
+			});
+			vi.mocked(matchesAnyKey).mockImplementation((event, keys) => keys.includes(event.key));
+
+			const setCountBuffer = vi.fn();
+			renderHook(() => useKeyboardNavigation({ ...defaultProps, setCountBuffer }));
+
+			window.dispatchEvent(
+				new KeyboardEvent("keydown", { key: "5", ctrlKey: true, cancelable: true }),
+			);
+			window.dispatchEvent(new KeyboardEvent("keydown", { key: "j", cancelable: true }));
+
+			expect(mockActionHandlers.scroll_down).toHaveBeenCalledWith(
+				expect.anything(),
+				expect.anything(),
+				expect.anything(),
+				undefined,
+			);
+			expect(setCountBuffer).not.toHaveBeenCalled();
+		});
+
+		it("expires the count after timeout", () => {
+			vi.useFakeTimers();
+			vi.mocked(config.getKeyBinding).mockImplementation((id: string) => {
+				if (id === "scroll_down") return ["j"];
+				return [];
+			});
+			vi.mocked(matchesAnyKey).mockImplementation((event, keys) => keys.includes(event.key));
+
+			renderHook(() => useKeyboardNavigation(defaultProps));
+
+			window.dispatchEvent(new KeyboardEvent("keydown", { key: "5", cancelable: true }));
+			vi.advanceTimersByTime(2000);
+			window.dispatchEvent(new KeyboardEvent("keydown", { key: "j", cancelable: true }));
+
+			expect(mockActionHandlers.scroll_down).toHaveBeenCalledWith(
+				expect.anything(),
+				expect.anything(),
+				expect.anything(),
+				undefined,
+			);
+		});
 	});
 });

@@ -26,6 +26,7 @@ export type ActionHandler = (
 	viewer: ViewerHandle | null,
 	event: KeyboardEvent,
 	context: ActionContext,
+	count?: number,
 ) => void;
 
 /**
@@ -49,52 +50,66 @@ export function createActionHandlers(callbacks: ActionCallbacks): Record<string,
 		callbacks;
 
 	return {
-		scroll_down: (v, e) => {
+		scroll_down: (v, e, _ctx, count) => {
 			if (e.repeat) {
 				v?.startContinuousScroll(0, CONT_SCROLL_PER_FRAME);
 			} else {
-				v?.scrollLine(SCROLL_STEP_VERTICAL);
+				v?.scrollLine(SCROLL_STEP_VERTICAL * (count ?? 1));
 			}
 		},
-		scroll_up: (v, e) => {
+		scroll_up: (v, e, _ctx, count) => {
 			if (e.repeat) {
 				v?.startContinuousScroll(0, -CONT_SCROLL_PER_FRAME);
 			} else {
-				v?.scrollLine(-SCROLL_STEP_VERTICAL);
+				v?.scrollLine(-SCROLL_STEP_VERTICAL * (count ?? 1));
 			}
 		},
-		scroll_left: (v, e) => {
+		scroll_left: (v, e, _ctx, count) => {
 			if (e.repeat) {
 				v?.startContinuousScroll(-CONT_SCROLL_PER_FRAME, 0);
 			} else {
-				v?.scrollHorizontal(-SCROLL_STEP_HORIZONTAL);
+				v?.scrollHorizontal(-SCROLL_STEP_HORIZONTAL * (count ?? 1));
 			}
 		},
-		scroll_right: (v, e) => {
+		scroll_right: (v, e, _ctx, count) => {
 			if (e.repeat) {
 				v?.startContinuousScroll(CONT_SCROLL_PER_FRAME, 0);
 			} else {
-				v?.scrollHorizontal(SCROLL_STEP_HORIZONTAL);
+				v?.scrollHorizontal(SCROLL_STEP_HORIZONTAL * (count ?? 1));
 			}
 		},
-		half_page_down: (v, e) => {
+		half_page_down: (v, e, _ctx, count) => {
 			if (e.repeat) {
 				v?.startContinuousScroll(0, CONT_SCROLL_FAST);
 			} else {
-				v?.scrollHalfPage(1);
+				const n = count ?? 1;
+				for (let i = 0; i < n; i++) v?.scrollHalfPage(1);
 			}
 		},
-		half_page_up: (v, e) => {
+		half_page_up: (v, e, _ctx, count) => {
 			if (e.repeat) {
 				v?.startContinuousScroll(0, -CONT_SCROLL_FAST);
 			} else {
-				v?.scrollHalfPage(-1);
+				const n = count ?? 1;
+				for (let i = 0; i < n; i++) v?.scrollHalfPage(-1);
 			}
 		},
-		jump_top: (v) => v?.jumpToTop(),
-		jump_bottom: (v) => v?.jumpToBottom(),
-		next_page: (v) => v?.jumpByPages(1),
-		prev_page: (v) => v?.jumpByPages(-1),
+		jump_top: (v, _e, _ctx, count) => {
+			if (count !== undefined) {
+				v?.jumpToPage(count);
+			} else {
+				v?.jumpToTop();
+			}
+		},
+		jump_bottom: (v, _e, _ctx, count) => {
+			if (count !== undefined) {
+				v?.jumpToPage(count);
+			} else {
+				v?.jumpToBottom();
+			}
+		},
+		next_page: (v, _e, _ctx, count) => v?.jumpByPages(count ?? 1),
+		prev_page: (v, _e, _ctx, count) => v?.jumpByPages(-(count ?? 1)),
 		zoom_in: (v) => v?.zoomIn(),
 		zoom_out: (v) => v?.zoomOut(),
 		fit_width: (v) => v?.fitToWidth(),

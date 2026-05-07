@@ -22,6 +22,7 @@ export default function App() {
 	const [showHelp, setShowHelp] = useState(false);
 	const [menuOpen, setMenuOpen] = useState(false);
 	const [keysEnabled, setKeysEnabled] = useState(true);
+	const [countBuffer, setCountBuffer] = useState("");
 
 	const mainViewerRef = useRef<ViewerHandle | null>(null);
 	const subViewerRef = useRef<ViewerHandle | null>(null);
@@ -138,6 +139,7 @@ export default function App() {
 		swapPanes,
 		addToast,
 		onTabSwitch: handleTabSwitch,
+		setCountBuffer,
 	});
 
 	const handleAction = (key: ActionKey) => {
@@ -425,6 +427,15 @@ export default function App() {
 			/>
 
 			<ToastContainer toasts={toasts} removeToast={removeToast} />
+
+			{countBuffer ? (
+				<div
+					className="pointer-events-none fixed bottom-4 right-4 z-40 rounded-md border border-slate-700/80 bg-slate-900/85 px-3 py-1.5 font-mono text-sm text-slate-100 shadow-lg backdrop-blur-sm"
+					aria-hidden="true"
+				>
+					{countBuffer}
+				</div>
+			) : null}
 		</div>
 	);
 }

@@ -21,6 +21,7 @@ const createViewer = (): ViewerHandle => ({
 	jumpToTop: vi.fn(),
 	jumpToBottom: vi.fn(),
 	jumpByPages: vi.fn(),
+	jumpToPage: vi.fn(),
 	zoomIn: vi.fn(),
 	zoomOut: vi.fn(),
 	fitToWidth: vi.fn(),
@@ -126,6 +127,88 @@ describe("createActionHandlers", () => {
 
 		handlers.fit_width(viewer, new KeyboardEvent("keydown"), {} as never);
 		expect(viewer.fitToWidth).toHaveBeenCalled();
+	});
+
+	it("multiplies scroll step by count when provided", () => {
+		const viewer = createViewer();
+		const handlers = createActionHandlers({
+			setFocusedPane: vi.fn(),
+			setMainReloadKey: vi.fn(),
+			setShowHelp: vi.fn(),
+			swapPanes: vi.fn(),
+			addToast: vi.fn(),
+		});
+		const e = new KeyboardEvent("keydown", { repeat: false });
+
+		handlers.scroll_down(viewer, e, {} as never, 5);
+		expect(viewer.scrollLine).toHaveBeenCalledWith(SCROLL_STEP_VERTICAL * 5);
+
+		handlers.scroll_up(viewer, e, {} as never, 3);
+		expect(viewer.scrollLine).toHaveBeenCalledWith(-SCROLL_STEP_VERTICAL * 3);
+
+		handlers.scroll_left(viewer, e, {} as never, 2);
+		expect(viewer.scrollHorizontal).toHaveBeenCalledWith(-SCROLL_STEP_HORIZONTAL * 2);
+
+		handlers.scroll_right(viewer, e, {} as never, 4);
+		expect(viewer.scrollHorizontal).toHaveBeenCalledWith(SCROLL_STEP_HORIZONTAL * 4);
+	});
+
+	it("repeats half-page scroll by count", () => {
+		const viewer = createViewer();
+		const handlers = createActionHandlers({
+			setFocusedPane: vi.fn(),
+			setMainReloadKey: vi.fn(),
+			setShowHelp: vi.fn(),
+			swapPanes: vi.fn(),
+			addToast: vi.fn(),
+		});
+		const e = new KeyboardEvent("keydown", { repeat: false });
+
+		handlers.half_page_down(viewer, e, {} as never, 3);
+		expect(viewer.scrollHalfPage).toHaveBeenCalledTimes(3);
+		expect(viewer.scrollHalfPage).toHaveBeenNthCalledWith(1, 1);
+	});
+
+	it("uses count as page jump for jump_top / jump_bottom", () => {
+		const viewer = createViewer();
+		const handlers = createActionHandlers({
+			setFocusedPane: vi.fn(),
+			setMainReloadKey: vi.fn(),
+			setShowHelp: vi.fn(),
+			swapPanes: vi.fn(),
+			addToast: vi.fn(),
+		});
+
+		handlers.jump_top(viewer, new KeyboardEvent("keydown"), {} as never, 7);
+		expect(viewer.jumpToPage).toHaveBeenCalledWith(7);
+		expect(viewer.jumpToTop).not.toHaveBeenCalled();
+
+		handlers.jump_bottom(viewer, new KeyboardEvent("keydown"), {} as never, 12);
+		expect(viewer.jumpToPage).toHaveBeenCalledWith(12);
+		expect(viewer.jumpToBottom).not.toHaveBeenCalled();
+
+		// No count → default behavior preserved
+		handlers.jump_top(viewer, new KeyboardEvent("keydown"), {} as never);
+		expect(viewer.jumpToTop).toHaveBeenCalled();
+		handlers.jump_bottom(viewer, new KeyboardEvent("keydown"), {} as never);
+		expect(viewer.jumpToBottom).toHaveBeenCalled();
+	});
+
+	it("multiplies next_page / prev_page by count", () => {
+		const viewer = createViewer();
+		const handlers = createActionHandlers({
+			setFocusedPane: vi.fn(),
+			setMainReloadKey: vi.fn(),
+			setShowHelp: vi.fn(),
+			swapPanes: vi.fn(),
+			addToast: vi.fn(),
+		});
+
+		handlers.next_page(viewer, new KeyboardEvent("keydown"), {} as never, 5);
+		expect(viewer.jumpByPages).toHaveBeenCalledWith(5);
+
+		handlers.prev_page(viewer, new KeyboardEvent("keydown"), {} as never, 3);
+		expect(viewer.jumpByPages).toHaveBeenCalledWith(-3);
 	});
 
 	it("handles focus and pane swapping", () => {

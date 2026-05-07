@@ -30,7 +30,13 @@ interface UseKeyboardNavigationOptions {
 	swapPanes: () => boolean;
 	addToast: (message: string, type: ToastType) => void;
 	onTabSwitch?: (direction: "prev" | "next") => void;
+	setCountBuffer?: React.Dispatch<React.SetStateAction<string>>;
 }
+
+// Cap to avoid pathological inputs (e.g., 9999999G) and align with reasonable
+// PDF sizes. The clamp also runs in jumpToPage, but truncating early keeps the
+// indicator readable.
+const COUNT_MAX = 99999;
 
 export function useKeyboardNavigation({
 	keysEnabled,
@@ -45,18 +51,25 @@ export function useKeyboardNavigation({
 	swapPanes,
 	addToast,
 	onTabSwitch,
+	setCountBuffer,
 }: UseKeyboardNavigationOptions) {
 	const keySeqTimeoutRef = useRef<number | null>(null);
 	const lastKeyRef = useRef<string | null>(null);
+	const countBufferRef = useRef<string>("");
+	const countTimeoutRef = useRef<number | null>(null);
 	const hasSubRef = useRef(hasSub);
 	const focusedPaneRef = useRef<"main" | "sub">(focusedPane);
 	const showHelpRef = useRef(showHelp);
 	const keysEnabledRef = useRef(keysEnabled);
 	const onTabSwitchRef = useRef(onTabSwitch);
+	const setCountBufferRef = useRef(setCountBuffer);
 
 	useEffect(() => {
 		onTabSwitchRef.current = onTabSwitch;
 	}, [onTabSwitch]);
+	useEffect(() => {
+		setCountBufferRef.current = setCountBuffer;
+	}, [setCountBuffer]);
 	useEffect(() => {
 		hasSubRef.current = hasSub;
 	}, [hasSub]);
@@ -102,6 +115,35 @@ export function useKeyboardNavigation({
 				lastKeyRef.current = null;
 				keySeqTimeoutRef.current = null;
 			}, 600);
+		};
+
+		const clearCount = () => {
+			if (countTimeoutRef.current) {
+				window.clearTimeout(countTimeoutRef.current);
+				countTimeoutRef.current = null;
+			}
+			if (countBufferRef.current !== "") {
+				countBufferRef.current = "";
+				setCountBufferRef.current?.("");
+			}
+		};
+
+		const scheduleCountClear = () => {
+			if (countTimeoutRef.current) window.clearTimeout(countTimeoutRef.current);
+			countTimeoutRef.current = window.setTimeout(() => {
+				countBufferRef.current = "";
+				countTimeoutRef.current = null;
+				setCountBufferRef.current?.("");
+			}, 1500);
+		};
+
+		const consumeCount = (): number | undefined => {
+			const buf = countBufferRef.current;
+			if (!buf) return undefined;
+			const n = parseInt(buf, 10);
+			clearCount();
+			if (!Number.isFinite(n) || n <= 0) return undefined;
+			return Math.min(n, COUNT_MAX);
 		};
 
 		const consume = (event: KeyboardEvent) => {
@@ -188,6 +230,11 @@ export function useKeyboardNavigation({
 			return true;
 		};
 
+		const isDigitEvent = (event: KeyboardEvent): boolean => {
+			if (event.ctrlKey || event.altKey || event.metaKey) return false;
+			return event.key.length === 1 && event.key >= "0" && event.key <= "9";
+		};
+
 		const handleKey = (event: KeyboardEvent) => {
 			if (!keysEnabledRef.current) return;
 			const target = event.target as HTMLElement | null;
@@ -205,17 +252,34 @@ export function useKeyboardNavigation({
 			const targetViewer = getTargetViewer();
 			const context = getContext();
 
+			// Vim-style count prefix: accumulate digits while not in a key sequence.
+			// A leading '0' is *not* a count start (so '0' can still be bound as an
+			// action in the future), but '0' inside an existing buffer is appended.
+			if (!lastKeyRef.current && !context.showHelp && isDigitEvent(event)) {
+				const isLeadingZero = event.key === "0" && countBufferRef.current === "";
+				if (!isLeadingZero) {
+					consume(event);
+					if (countBufferRef.current.length < 6) {
+						countBufferRef.current += event.key;
+						setCountBufferRef.current?.(countBufferRef.current);
+					}
+					scheduleCountClear();
+					return;
+				}
+			}
+
 			// 1. Check if we are completing a sequence
 			const sequenceMatchId = findSequenceCompletion(event);
 			if (sequenceMatchId) {
 				consume(event);
 				clearSequence();
+				const count = consumeCount();
 
 				if (context.showHelp && handleHelpModeAction(sequenceMatchId, event)) {
 					return;
 				}
 
-				actionHandlers[sequenceMatchId]?.(targetViewer, event, context);
+				actionHandlers[sequenceMatchId]?.(targetViewer, event, context, count);
 				return;
 			}
 			if (lastKeyRef.current) {
@@ -226,12 +290,13 @@ export function useKeyboardNavigation({
 			const singleMatchId = findSingleMatchId(event);
 			if (singleMatchId) {
 				consume(event);
+				const count = consumeCount();
 
 				if (context.showHelp && handleHelpModeAction(singleMatchId, event)) {
 					return;
 				}
 
-				actionHandlers[singleMatchId]?.(targetViewer, event, context);
+				actionHandlers[singleMatchId]?.(targetViewer, event, context, count);
 				return;
 			}
 
@@ -241,8 +306,13 @@ export function useKeyboardNavigation({
 				consume(event);
 				lastKeyRef.current = sequenceStartKey;
 				scheduleSequenceClear();
+				// Note: count buffer is preserved — sequence completion will consume it.
 				return;
 			}
+
+			// No action matched: drop any accumulated count to avoid leaking it
+			// into a later action the user didn't mean to chain.
+			clearCount();
 
 			// If no action matched, check if we should block browser shortcuts
 			if (getDisableBrowserShortcuts()) {
@@ -271,9 +341,10 @@ export function useKeyboardNavigation({
 
 		window.addEventListener("keyup", handleKeyUp);
 		return () => {
-			window.removeEventListener("keydown", handleKey);
+			window.removeEventListener("keydown", handleKey, { capture: true });
 			window.removeEventListener("keyup", handleKeyUp);
 			if (keySeqTimeoutRef.current) window.clearTimeout(keySeqTimeoutRef.current);
+			if (countTimeoutRef.current) window.clearTimeout(countTimeoutRef.current);
 		};
 	}, [
 		addToast,

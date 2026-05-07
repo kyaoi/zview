@@ -89,6 +89,27 @@ export const HelpOverlay: React.FC<HelpOverlayProps> = ({ onClose, visible }) =>
 							</section>
 						);
 					})}
+					<section className="help-section">
+						<h3>Count prefix</h3>
+						<ul>
+							<li>
+								<KeyDisplay keys={["{count}j/k/h/l"]} />
+								<span className="description">— scroll N steps (e.g. 5j)</span>
+							</li>
+							<li>
+								<KeyDisplay keys={["{count}d/u"]} />
+								<span className="description">— half-page scroll N times</span>
+							</li>
+							<li>
+								<KeyDisplay keys={["{count}n/p"]} />
+								<span className="description">— jump N pages</span>
+							</li>
+							<li>
+								<KeyDisplay keys={["{count}G", "{count}gg"]} />
+								<span className="description">— jump to page N</span>
+							</li>
+						</ul>
+					</section>
 					<section className="help-section help-footer">
 						<p>
 							Keybindings can be customized in <code>~/.config/zview/config.toml</code>

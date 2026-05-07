@@ -6,7 +6,7 @@
 #
 # Environment variables:
 #   INSTALL_DIR  — directory to install the binary into (default: $HOME/.local/bin)
-#   VERSION      — install a specific version (e.g., v1.2.1) instead of the latest
+#   VERSION      — install a specific version (e.g., v1.2.3) instead of the latest
 
 set -eu
 

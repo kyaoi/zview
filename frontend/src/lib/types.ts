@@ -48,6 +48,7 @@ export type ViewerHandle = {
 	jumpToTop: () => void;
 	jumpToBottom: () => void;
 	jumpByPages: (delta: number) => void;
+	jumpToPage: (pageNumber: number) => void;
 	zoomIn: () => void;
 	zoomOut: () => void;
 	fitToWidth: () => void;

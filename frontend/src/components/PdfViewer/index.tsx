@@ -828,6 +828,18 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 		[layoutScale, pageCount, pageSize],
 	);
 
+	const jumpToPage = useCallback(
+		(pageNumber: number) => {
+			const el = scrollRef.current;
+			if (!pageSize || pageCount === 0 || !el) return;
+			const targetIndex = Math.min(pageCount - 1, Math.max(0, pageNumber - 1));
+			const pageBlock = Math.round(pageSize.height * layoutScale) + PAGE_GAP_PX;
+			const offset = targetIndex * pageBlock;
+			el.scrollTo({ top: offset, behavior: "auto" });
+		},
+		[layoutScale, pageCount, pageSize],
+	);
+
 	useEffect(() => {
 		const anchor = anchorRef.current;
 		const el = scrollRef.current;
@@ -854,6 +866,7 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 			jumpToTop,
 			jumpToBottom,
 			jumpByPages,
+			jumpToPage,
 			zoomIn,
 			zoomOut,
 			fitToWidth,
@@ -891,6 +904,7 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 		[
 			fitToWidth,
 			jumpByPages,
+			jumpToPage,
 			jumpToBottom,
 			jumpToTop,
 			resetPageSlots,

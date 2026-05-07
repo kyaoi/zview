@@ -13,6 +13,7 @@ const createViewerHandle = (): ViewerHandle => ({
 	jumpToTop: vi.fn(),
 	jumpToBottom: vi.fn(),
 	jumpByPages: vi.fn(),
+	jumpToPage: vi.fn(),
 	zoomIn: vi.fn(),
 	zoomOut: vi.fn(),
 	fitToWidth: vi.fn(),
