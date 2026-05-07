@@ -48,17 +48,29 @@ describe("useFileWatcher", () => {
 		globalThis.EventSource = originalEventSource;
 	});
 
-	it("does not start EventSource when disabled", () => {
-		renderHook(() => useFileWatcher(false, true, vi.fn(), vi.fn()));
-		expect(MockEventSource.instances).toHaveLength(0);
+	it("opens EventSource as a lifeline even when watching is disabled", () => {
+		const onMainChange = vi.fn();
+		const { unmount } = renderHook(() => useFileWatcher(false, true, onMainChange, vi.fn()));
+		expect(MockEventSource.instances).toHaveLength(1);
+		const instance = MockEventSource.instances[0];
+		expect(instance.url).toBe("/events");
+		// main-change events should be ignored while watching is off.
+		instance.emit("main-change", new Event("main-change"));
+		expect(onMainChange).not.toHaveBeenCalled();
+		unmount();
+		expect(instance.close).toHaveBeenCalled();
 	});
 
-	it("does not start EventSource when MAIN is missing", () => {
-		renderHook(() => useFileWatcher(true, false, vi.fn(), vi.fn()));
-		expect(MockEventSource.instances).toHaveLength(0);
+	it("opens EventSource even when MAIN is missing", () => {
+		const onMainChange = vi.fn();
+		renderHook(() => useFileWatcher(true, false, onMainChange, vi.fn()));
+		expect(MockEventSource.instances).toHaveLength(1);
+		const instance = MockEventSource.instances[0];
+		instance.emit("main-change", new Event("main-change"));
+		expect(onMainChange).not.toHaveBeenCalled();
 	});
 
-	it("subscribes to events and cleans up", () => {
+	it("subscribes to events and cleans up when watching is enabled", () => {
 		const onMainChange = vi.fn();
 		const addToast = vi.fn();
 		const { unmount } = renderHook(() => useFileWatcher(true, true, onMainChange, addToast));

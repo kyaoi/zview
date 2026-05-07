@@ -116,6 +116,7 @@ zview kill <port>
 | `--no-animate` | Disable Beamer `animate` playback (frames render statically) |
 | `--port <N>` | Port to bind (`0` = auto-select) |
 | `--no-open` | Do not open browser automatically |
+| `--no-auto-shutdown` | Keep running after the last browser tab closes (default: shut down 8 s after the last tab) |
 | `--help` | Show help |
 | `--version` | Print version |
 
@@ -174,6 +175,7 @@ max_active_clips = 4
 - Beamer animations: PDFs from LaTeX's `animate` package play inline by default. Disable with `--no-animate` or `enabled = false` under `[animate]` to skip the playback layer entirely.
 - Reload behavior: `SUB` is static; re-open via UI to refresh it.
 - Watch behavior: with `--no-watch`, file changes are not detected.
+- Auto-shutdown: by default zview exits ~8 s after the last browser tab pointing at its port closes (closing the tab replaces `zview kill`). Pass `--no-auto-shutdown` if you want the server to stay alive after every tab is gone.
 - Password-protected PDFs: the viewer prompts for a password and keeps the current view on cancel/failure.
 
 ## Development

@@ -165,16 +165,31 @@ function finalizeClip(pageIndex: number, working: WorkingClip): AnimateClip | nu
 	};
 }
 
+export type DetectAnimateClipsOptions = {
+	/** Aborts the walk between pages. Already-collected clips are returned. */
+	signal?: AbortSignal;
+};
+
 /**
  * Walk every page's annotations, group `animate` widget triplets, and return
  * one descriptor per detected clip. Returns `[]` for PDFs that don't use the
  * `animate` package — never throws.
+ *
+ * Yields to the event loop between pages so other PDF.js worker requests
+ * (canvas rendering, text-content extraction for the visible page) can
+ * interleave instead of being serialized behind a full-document scan.
  */
-export async function detectAnimateClips(pdf: PDFDocumentProxy): Promise<AnimateClip[]> {
+export async function detectAnimateClips(
+	pdf: PDFDocumentProxy,
+	options?: DetectAnimateClipsOptions,
+): Promise<AnimateClip[]> {
+	const signal = options?.signal;
 	const result: AnimateClip[] = [];
 	for (let pageIndex = 0; pageIndex < pdf.numPages; pageIndex += 1) {
+		if (signal?.aborted) return result;
 		try {
 			const page = await pdf.getPage(pageIndex + 1);
+			if (signal?.aborted) return result;
 			const annotations = (await page.getAnnotations({
 				intent: "display",
 			})) as RawAnnotation[];
@@ -188,6 +203,9 @@ export async function detectAnimateClips(pdf: PDFDocumentProxy): Promise<Animate
 			}
 		} catch (err) {
 			console.warn(`animate detect: page ${pageIndex + 1} failed`, err);
+		}
+		if (pageIndex + 1 < pdf.numPages) {
+			await new Promise<void>((resolve) => setTimeout(resolve, 0));
 		}
 	}
 	return result;

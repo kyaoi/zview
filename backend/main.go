@@ -13,7 +13,9 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"sync"
 	"syscall"
+	"time"
 
 	"github.com/kyaoi/zview/backend/internal/cli"
 	"github.com/kyaoi/zview/backend/internal/server"
@@ -21,6 +23,8 @@ import (
 	"github.com/kyaoi/zview/backend/internal/state"
 	"github.com/kyaoi/zview/backend/internal/watcher"
 )
+
+const autoShutdownGracePeriod = 8 * time.Second
 
 // Embedded frontend (built via `pnpm build` → backend/dist).
 //
@@ -122,6 +126,33 @@ func main() {
 	// Set up broadcaster for SSE
 	broadcaster := server.New()
 
+	// shutdown is wired up below; declared here so the lifeline callback can
+	// close over it before the HTTP server starts accepting traffic.
+	var (
+		srv          *http.Server
+		shutdownOnce sync.Once
+		shutdownFn   func(reason string)
+	)
+	shutdownFn = func(reason string) {
+		shutdownOnce.Do(func() {
+			log.Printf("Shutting down (%s)...", reason)
+			if err := session.Unregister(); err != nil {
+				log.Printf("Warning: failed to unregister session: %v", err)
+			}
+			if srv != nil {
+				if err := srv.Shutdown(context.Background()); err != nil {
+					log.Printf("Error during shutdown: %v", err)
+				}
+			}
+		})
+	}
+
+	if opts.AutoShutdown {
+		broadcaster.SetLifeline(server.NewLifeline(autoShutdownGracePeriod, func() {
+			shutdownFn(fmt.Sprintf("no active browser tabs for %s", autoShutdownGracePeriod))
+		}))
+	}
+
 	// Start file watcher if enabled
 	if opts.Watch && opts.MainPath != "" {
 		stopWatcher := watcher.Start(opts.MainPath, func() {
@@ -188,21 +219,11 @@ func main() {
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
-	srv := &http.Server{Handler: mux}
+	srv = &http.Server{Handler: mux}
 
 	go func() {
 		<-sigChan
-		log.Println("Shutting down...")
-
-		// Unregister session
-		if err := session.Unregister(); err != nil {
-			log.Printf("Warning: failed to unregister session: %v", err)
-		}
-
-		// Gracefully shutdown the server
-		if err := srv.Shutdown(context.Background()); err != nil {
-			log.Printf("Error during shutdown: %v", err)
-		}
+		shutdownFn("signal received")
 	}()
 
 	// Open browser if requested

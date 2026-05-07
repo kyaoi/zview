@@ -213,6 +213,12 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 					standardFontDataUrl: `${PDFJS_ASSET_BASE}standard_fonts/`,
 					useSystemFonts: true,
 					password: passwordCacheRef.current ?? undefined,
+					// Backend uses http.ServeContent which advertises
+					// Accept-Ranges: bytes, so PDF.js can fetch only the bytes
+					// needed for visible pages instead of pulling the whole
+					// file upfront.
+					disableAutoFetch: true,
+					disableStream: false,
 				});
 				activeLoadingTask = loadingTask;
 				loadingTaskRef.current = loadingTask;
@@ -582,19 +588,41 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 		animateCache.releaseAll();
 		if (!pdf || !animateConfig.enabled) return;
 
-		let cancelled = false;
-		detectAnimateClips(pdf)
-			.then((clips) => {
-				if (cancelled) return;
-				setAnimateClips(clips);
-			})
-			.catch((err) => {
-				if (!cancelled) {
-					console.warn("[animate] detect failed:", err);
-				}
-			});
+		// Defer detection until the browser is idle so the visible page can
+		// claim the PDF.js worker first — otherwise a long document forces a
+		// full-document scan ahead of the first render request.
+		const controller = new AbortController();
+		let idleHandle: number | null = null;
+		let timeoutHandle: number | null = null;
+
+		const start = () => {
+			if (controller.signal.aborted) return;
+			detectAnimateClips(pdf, { signal: controller.signal })
+				.then((clips) => {
+					if (controller.signal.aborted) return;
+					setAnimateClips(clips);
+				})
+				.catch((err) => {
+					if (!controller.signal.aborted) {
+						console.warn("[animate] detect failed:", err);
+					}
+				});
+		};
+
+		if (typeof window.requestIdleCallback === "function") {
+			idleHandle = window.requestIdleCallback(start, { timeout: 1500 });
+		} else {
+			timeoutHandle = window.setTimeout(start, 200);
+		}
+
 		return () => {
-			cancelled = true;
+			controller.abort();
+			if (idleHandle !== null && typeof window.cancelIdleCallback === "function") {
+				window.cancelIdleCallback(idleHandle);
+			}
+			if (timeoutHandle !== null) {
+				window.clearTimeout(timeoutHandle);
+			}
 		};
 	}, [pdf, animateCache, animateConfig.enabled]);
 
@@ -770,7 +798,11 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 	const jumpToTop = useCallback(() => {
 		const el = scrollRef.current;
 		if (!el) return;
-		el.scrollTo({ top: 0, behavior: "smooth" });
+		// Skip the smooth animation: long documents would otherwise stream
+		// scroll events through every intermediate position, briefly marking
+		// dozens of pages "visible" and queuing render tasks that get
+		// cancelled milliseconds later.
+		el.scrollTo({ top: 0, behavior: "auto" });
 	}, []);
 
 	const jumpToBottom = useCallback(() => {
@@ -780,7 +812,7 @@ export const PdfViewer = forwardRef<ViewerHandle, PdfViewerProps>(function PdfVi
 		const totalHeight = pageCount * pageBlock - PAGE_GAP_PX;
 		el.scrollTo({
 			top: Math.max(0, totalHeight - el.clientHeight + PAGE_GAP_PX),
-			behavior: "smooth",
+			behavior: "auto",
 		});
 	}, [layoutScale, pageCount, pageSize]);
 

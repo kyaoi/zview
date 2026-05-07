@@ -9,8 +9,9 @@ import (
 
 // Broadcaster handles SSE broadcasting to multiple clients.
 type Broadcaster struct {
-	mu      sync.RWMutex
-	clients map[chan string]struct{}
+	mu       sync.RWMutex
+	clients  map[chan string]struct{}
+	lifeline *Lifeline
 }
 
 // New creates a new Broadcaster.
@@ -18,6 +19,13 @@ func New() *Broadcaster {
 	return &Broadcaster{
 		clients: make(map[chan string]struct{}),
 	}
+}
+
+// SetLifeline installs a Lifeline that will be notified about SSE
+// connect/disconnect transitions. Must be called before HandleSSE accepts
+// traffic; reading the field without a lock is safe under that constraint.
+func (b *Broadcaster) SetLifeline(l *Lifeline) {
+	b.lifeline = l
 }
 
 // AddClient registers a new client channel.
@@ -65,7 +73,15 @@ func (b *Broadcaster) HandleSSE(w http.ResponseWriter, r *http.Request) {
 
 	ch := make(chan string, 10)
 	b.AddClient(ch)
-	defer b.RemoveClient(ch)
+	if b.lifeline != nil {
+		b.lifeline.Connect()
+	}
+	defer func() {
+		b.RemoveClient(ch)
+		if b.lifeline != nil {
+			b.lifeline.Disconnect()
+		}
+	}()
 
 	for {
 		select {

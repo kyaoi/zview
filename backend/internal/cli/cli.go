@@ -53,6 +53,7 @@ type Options struct {
 	Port          int
 	PortSpecified bool
 	OpenBrowser   bool
+	AutoShutdown  bool
 	Config        config.Config
 }
 
@@ -126,6 +127,7 @@ func Parse(args []string) (Options, error) {
 		fmt.Fprintln(out, "      --no-animate         disable Beamer `animate` playback layer")
 		fmt.Fprintln(out, "      --port <int>         port to bind (0 = auto-select) (default 8571)")
 		fmt.Fprintln(out, "      --no-open            do not auto-open browser tab")
+		fmt.Fprintln(out, "      --no-auto-shutdown   keep running after the last browser tab closes")
 		fmt.Fprintln(out, "      --version            print version and exit")
 
 		fmt.Fprintln(out, "\nExamples:")
@@ -139,12 +141,13 @@ func Parse(args []string) (Options, error) {
 	// Load config first
 	cfg, _ := config.Load()
 	opts := Options{
-		Command:     CommandView,
-		Focus:       "main",
-		Watch:       cfg.Watch,
-		Port:        DefaultPort,
-		OpenBrowser: true,
-		Config:      cfg,
+		Command:      CommandView,
+		Focus:        "main",
+		Watch:        cfg.Watch,
+		Port:         DefaultPort,
+		OpenBrowser:  true,
+		AutoShutdown: true,
+		Config:       cfg,
 	}
 
 	var subFlags RepeatedString
@@ -165,6 +168,7 @@ func Parse(args []string) (Options, error) {
 	noAnimateFlag := fs.Bool("no-animate", false, "disable Beamer animate playback layer")
 	fs.IntVar(&opts.Port, "port", opts.Port, "port to bind (0 = auto-select)")
 	noOpenFlag := fs.Bool("no-open", false, "do not auto-open browser tab")
+	noAutoShutdownFlag := fs.Bool("no-auto-shutdown", false, "keep running after the last browser tab closes")
 	versionFlag := fs.Bool("version", false, "print version and exit")
 
 	reordered := reorderArgs(args)
@@ -214,6 +218,7 @@ func Parse(args []string) (Options, error) {
 		opts.Config.Animate.Enabled = false
 	}
 	opts.OpenBrowser = !*noOpenFlag
+	opts.AutoShutdown = !*noAutoShutdownFlag
 
 	// Check port
 	fs.Visit(func(f *flag.Flag) {
